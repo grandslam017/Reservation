@@ -1,0 +1,20 @@
+project_id = "tennis-booking"
+
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "http://localhost:3000"
+
+[edge_runtime]
+enabled = true
+port = 54324

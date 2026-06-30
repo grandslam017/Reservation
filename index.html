@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Grand Slam Tennis Court - Booking & Admin Portal</title>
+  <!-- Google Fonts: Inter and Sarabun -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Main Header -->
+    <header>
+      <a href="#" class="logo">
+        <i class="fa-solid fa-baseball"></i>
+        <span>The Grand Slam Tennis Court</span>
+      </a>
+      
+      <div class="nav-controls">
+        <nav class="nav-tabs">
+          <button id="navBookingBtn" class="tab-btn active" data-tab="booking">
+            <i class="fa-regular fa-calendar-check"></i>
+            <span data-translate="bookingTab">จองสนาม & โค้ช</span>
+          </button>
+          <button id="navSearchBtn" class="tab-btn" data-tab="search-booking">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span data-translate="searchTab">ตรวจสอบการจอง</span>
+          </button>
+          <button id="navAdminBtn" class="tab-btn" data-tab="admin">
+            <i class="fa-solid fa-user-gear"></i>
+            <span data-translate="adminTab">ผู้ดูแลระบบ (Admin)</span>
+          </button>
+        </nav>
+        
+        <button id="btnLiffLogin" class="btn-primary" style="background-color: #00c300; border: none; font-size: 0.85rem; display: none;">
+          <i class="fa-brands fa-line"></i> เข้าสู่ระบบ
+        </button>
+        <div id="liffProfileBox" style="display: none; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.3rem 0.6rem; border-radius: 20px;">
+          <img id="liffProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%;">
+          <span id="liffProfileName" style="font-size: 0.85rem; font-weight: 500;"></span>
+        </div>
+
+        <select id="langSwitch" class="lang-switch">
+          <option value="th">TH</option>
+          <option value="en">EN</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ========================================== -->
+    <!-- VIEW: Booking (Customer Panel) -->
+    <!-- ========================================== -->
+    <main id="booking" class="view active">
+      <div class="booking-grid">
+        
+        <!-- Left Side: Selection, Coach and Calendar -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- Court and Coach Setup Badge -->
+          <div class="glass-panel">
+            <div class="options-section">
+              <div class="court-badge">
+                <div>
+                  <div class="court-badge-title" data-translate="mainCourtTitle">ค่าบริการ</div>
+                  <div class="court-badge-subtitle" data-translate="courtStatus">08:00-16:00: 250 ฿/ชม. | 16:00-23:00: 350 ฿/ชม.</div>
+                </div>
+                <i class="fa-solid fa-circle-info text-accent" style="font-size: 1.5rem;"></i>
+              </div>
+              
+              <div class="coach-select-container">
+                <div class="coach-label" data-translate="coachSelectLabel">ความต้องการผู้ฝึกสอน (Coach Selection)</div>
+                <div class="coach-options">
+                  <label>
+                    <input type="radio" name="coachSelect" id="coachNoRadio" class="coach-option" checked>
+                    <span class="coach-btn">
+                      <i class="fa-solid fa-user-slash"></i>
+                      <span data-translate="coachNo">ไม่ต้องการโค้ช</span>
+                    </span>
+                  </label>
+                  <label>
+                    <input type="radio" name="coachSelect" id="coachYesRadio" class="coach-option">
+                    <span class="coach-btn">
+                      <i class="fa-solid fa-user-tie"></i>
+                      <span data-translate="coachYes">ต้องการโค้ช</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Calendar Panel -->
+          <div class="glass-panel calendar-container">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-regular fa-calendar-days"></i>
+                <span data-translate="calendarTitle">เลือกวันที่ต้องการเพิ่มความสุข</span>
+              </div>
+            </div>
+            
+            <div class="calendar-header">
+              <button id="prevMonthBtn" class="calendar-nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
+              <div id="currentMonthYear" class="current-month-year">มิถุนายน 2569</div>
+              <button id="nextMonthBtn" class="calendar-nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            
+            <div id="calendarGrid" class="calendar-grid">
+              <!-- Calendar grid content rendered dynamically in app.js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Time Slots & summary -->
+        <div class="glass-panel slots-container">
+          <!-- Time slots normal display -->
+          <div id="activeSlotsPanel" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="slots-header-info">
+              <div id="selectedDateText" class="selected-date-text">ตารางเวลาของวันที่ 29 พ.ค. 2026</div>
+              <div class="legend">
+                <div class="legend-item">
+                  <div class="legend-dot available"></div>
+                  <span data-translate="legendAvailable">ว่าง</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot booked"></div>
+                  <span data-translate="legendBooked">จองแล้ว</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot selected"></div>
+                  <span data-translate="legendSelected">กำลังเลือก</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hourly Slots (08:00 - 23:00) -->
+            <div id="slotsGrid" class="slots-grid">
+              <!-- Rendered in app.js -->
+            </div>
+
+            <!-- Dynamic Booking Checkout widget -->
+            <div id="bookingSummaryPanel" class="booking-summary-panel">
+              <h4 style="margin-bottom: 0.75rem; font-weight: 600;" data-translate="summaryTitle">สรุปรายละเอียดการจอง</h4>
+              
+              <div id="summaryFeeBreakdown">
+                <div class="summary-row">
+                  <span data-translate="summaryCourt">ค่าเช่าสนาม (Court Rental Fee)</span>
+                  <span id="summaryCourtFee" class="summary-value">0 ฿</span>
+                </div>
+              </div>
+              
+              <div class="total-fee-row">
+                <span data-translate="summaryTotal">ยอดรวมทั้งสิ้น</span>
+                <span id="summaryTotalFee" class="total-price">0 ฿</span>
+              </div>
+
+              <button id="btnBookNow" class="btn-primary">
+                <i class="fa-regular fa-circle-check"></i>
+                <span data-translate="btnBookNow">ยืนยันการจองสนาม</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Future month locked message panel (Hidden by default) -->
+          <div id="lockedMonthPanel" class="month-locked-banner" style="display: none;">
+            <i class="fa-solid fa-circle-minus"></i>
+            <h3 data-translate="lockedMonthTitle">การจองสำหรับเดือนนี้ยังไม่เปิดให้บริการ</h3>
+            <p data-translate="lockedMonthDesc">กรุณาติดต่อเจ้าหน้าที่ หรือรอผู้ดูแลระบบอนุมัติเปิดระบบจองสำหรับเดือนนี้</p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- VIEW: Search Booking (Customer Booking Summary) -->
+    <!-- ========================================== -->
+    <main id="search-booking" class="view">
+      <div class="glass-panel" style="max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+          <div class="panel-title">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span data-translate="searchViewTitle">ค้นหาและสรุปรายการจองสนาม</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);" data-translate="searchViewDesc">
+            ใส่ชื่อของคุณที่ใช้จองสนามเพื่อสรุปวันเวลาและรายละเอียดการจองทั้งหมดของคุณ
+          </p>
+        </div>
+        
+        <div style="display: flex; gap: 0.75rem; align-items: center; width: 100%;">
+          <div style="flex-grow: 1; position: relative;">
+            <i class="fa-solid fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 0.95rem;"></i>
+            <input type="text" id="custSearchInput" class="form-control" style="width: 100%; padding-left: 2.5rem; font-family: var(--font-family);" data-translate-placeholder="searchPlaceholderName" placeholder="ระบุชื่อ-นามสกุลลูกค้าที่ใช้จอง (เช่น สมชาย รักเรียน)">
+          </div>
+          <button id="btnSearchBooking" class="btn-primary" style="width: auto; padding: 0.75rem 1.5rem; white-space: nowrap;">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span data-translate="btnSearch">ค้นหา</span>
+          </button>
+        </div>
+
+        <div id="searchResultArea" style="display: none;">
+          <div id="searchSummaryBanner" class="court-badge" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="court-badge-title" id="searchSummaryTitle">-</div>
+              <div class="court-badge-subtitle" id="searchSummarySubtitle">-</div>
+            </div>
+            <i class="fa-solid fa-calendar-check text-accent" style="font-size: 1.5rem;"></i>
+          </div>
+
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th data-translate="thBookDate">วันที่จอง</th>
+                  <th data-translate="thBookTime">เวลา</th>
+                  <th data-translate="thBookCoach">โค้ช</th>
+                  <th data-translate="thBookFee">ค่าบริการ</th>
+                  <th data-translate="thInvoiceNumber">หมายเลขใบแจ้งหนี้</th>
+                  <th data-translate="thReceiptNumber">หมายเลขใบเสร็จ</th>
+                </tr>
+              </thead>
+              <tbody id="searchResultTableBody">
+                <!-- Dynamic Content -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Booking Input Details Modal Overlay -->
+    <div id="bookingModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title" data-translate="modalBookTitle">กรอกข้อมูลรายละเอียดผู้จอง</div>
+          <button id="btnModalClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="color: var(--text-secondary);">วันที่ (Date):</span>
+              <span id="modalSelectedDate" style="font-weight:600; color: var(--text-primary);">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; align-items: flex-start;">
+              <span style="color: var(--text-secondary); white-space: nowrap;">ช่วงเวลา (Time):</span>
+              <span id="modalSelectedSlot" style="font-weight:600; color: var(--accent-color); text-align: right; word-break: break-all; max-width: 70%;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="color: var(--text-secondary);">ผู้ฝึกสอน (Coach):</span>
+              <span id="modalSelectedCoach" style="font-weight:600; color: var(--text-primary);">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">อีเมล (Email):</span>
+              <span id="modalSelectedEmail" style="font-weight:600; color: var(--text-primary);">-</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="custName" class="form-label" data-translate="labelCustName">ชื่อลูกค้า *</label>
+            <input type="text" id="custName" class="form-control" data-translate-placeholder="placeholderName" placeholder="เช่น สมชาย รักเรียน" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="custLineId" class="form-label">LINE ID (ไม่บังคับ)</label>
+            <input type="text" id="custLineId" class="form-control" placeholder="LINE ID ของลูกค้า">
+          </div>
+
+          <div class="form-group">
+            <label for="custPhone" class="form-label" data-translate="labelCustPhone">เบอร์โทรศัพท์ติดต่อ (ไม่บังคับ)</label>
+            <input type="tel" id="custPhone" class="form-control" data-translate-placeholder="placeholderPhone" placeholder="เช่น 081-234-5678">
+          </div>
+
+          <div class="form-group">
+            <label for="custEmail" class="form-label" data-translate="labelCustEmail">อีเมลสำหรับการยืนยันการจอง (ไม่บังคับ)</label>
+            <input type="email" id="custEmail" class="form-control" data-translate-placeholder="placeholderEmail" placeholder="เช่น somchai@gmail.com">
+          </div>
+          
+          <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--panel-border);">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;" data-translate="privacyRemark">ผู้ใช้บริการอนุญาตให้เก็บข้อมูลส่วนบุคคลเพื่อใช้สำหรับสนามเทนนิสเท่านั้น</p>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer;">
+                <input type="radio" name="privacyConsent" value="allow" id="consentAllow" checked> 
+                <span data-translate="consentAllow">อนุญาต</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer;">
+                <input type="radio" name="privacyConsent" value="disallow" id="consentDisallow"> 
+                <span data-translate="consentDisallow">ไม่อนุญาต</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnModalCancel" class="btn-secondary" data-translate="btnCancel">ยกเลิก</button>
+          <button id="btnModalConfirm" class="btn-primary" style="width: auto; padding: 0.65rem 1.5rem;" data-translate="btnConfirm">ยืนยัน</button>
+        </div>
+      </div>
+    </div>
+    <!-- Invoice and Slip Upload Modal -->
+    <div id="invoiceSlipModal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <div class="modal-title" data-translate="modalInvoiceTitle">ใบแจ้งหนี้ & ชำระเงิน</div>
+          <button id="btnInvoiceClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+          <div class="invoice-box" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px; border: 1px dashed var(--accent-color); margin-bottom: 1.5rem;">
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">หมายเลขใบแจ้งหนี้ (Invoice No.)</div>
+            <div id="invoiceNumber" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-color); margin-bottom: 1rem;">-</div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 0.5rem;">
+              <span style="color: var(--text-secondary);">ชื่อลูกค้า:</span>
+              <span id="invoiceCustName" style="font-weight: 500;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 0.5rem;">
+              <span style="color: var(--text-secondary);">วันที่จอง:</span>
+              <span id="invoiceDate" style="font-weight: 500;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 1rem;">
+              <span style="color: var(--text-secondary);">ยอดรวมทั้งสิ้น:</span>
+              <span id="invoiceAmount" style="font-weight: 700; color: var(--text-primary); font-size: 1.1rem;">-</span>
+            </div>
+            
+            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">บัญชีสำหรับโอนเงิน</div>
+              <div style="font-weight: 600; color: #00c300;"><i class="fa-solid fa-qrcode"></i> พร้อมเพย์ (PromptPay)</div>
+              <div style="font-size: 1.2rem; letter-spacing: 1px; color: #00e676; margin: 0.5rem 0;">0894932242</div>
+              <div style="font-size: 0.9rem;">ชื่อบัญชี: ณฐกร เอียสกุล</div>
+            </div>
+          </div>
+
+          <div class="form-group" style="text-align: left;">
+            <label class="form-label">แนบหลักฐานการโอนเงิน (Payment Slip) *</label>
+            <input type="file" id="slipUpload" class="form-control" accept="image/*" style="padding: 0.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
+              * กรุณาแนบสลิปเพื่อยืนยันการทำรายการ
+            </div>
+          </div>
+          
+          <div id="slipValidationLoader" style="display: none; margin: 1.5rem 0;">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent-color); margin-bottom: 0.5rem;"></i>
+            <div style="font-size: 0.9rem; color: var(--text-primary);">กำลังแนบสลิป...</div>
+          </div>
+          
+          <div id="receiptBox" style="display: none; background: rgba(0, 230, 118, 0.1); border: 1px solid #00e676; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <i class="fa-solid fa-circle-check" style="color: #00e676; font-size: 2rem; margin-bottom: 0.5rem;"></i>
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">ชำระเงินสำเร็จ!</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">หมายเลขใบเสร็จรับเงิน (Receipt No.)</div>
+            <div id="receiptNumber" style="font-size: 1.25rem; font-weight: 700; color: #00e676;">-</div>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="justify-content: center;">
+          <button id="btnConfirmPayment" class="btn-primary" style="width: 100%; padding: 0.75rem;">
+            <i class="fa-solid fa-file-invoice-dollar"></i> แจ้งชำระเงิน
+          </button>
+          <button id="btnFinishBooking" class="btn-primary" style="display: none; width: 100%; padding: 0.75rem; background: #00e676; color: #000;">
+            <i class="fa-solid fa-check"></i> เสร็จสิ้นการจอง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW: Admin Access Password Gate -->
+    <!-- ========================================== -->
+    <main id="admin-login-gate" class="view">
+      <div class="glass-panel admin-gate">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <i class="fa-solid fa-lock" style="font-size: 2.5rem; color: var(--accent-color); margin-bottom: 0.5rem;"></i>
+          <h2 data-translate="adminLoginTitle">ผู้ดูแลระบบเข้าสู่ระบบ</h2>
+        </div>
+        
+        <div class="form-group">
+          <label for="adminPassword" class="form-label" data-translate="labelPassword">รหัสผ่านผู้ดูแลระบบ</label>
+          <input type="password" id="adminPassword" class="form-control" data-translate-placeholder="placeholderPassword" placeholder="ป้อนรหัสผ่าน (เริ่มต้น admin123)">
+        </div>
+        
+        <button id="btnLogin" class="btn-primary" style="margin-top: 0.5rem;">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span data-translate="btnLogin">เข้าสู่ระบบ</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- VIEW: Admin Panel Dashboard -->
+    <!-- ========================================== -->
+    <main id="admin" class="view">
+      <div class="admin-dashboard">
+        
+        <!-- Header area inside admin dashboard -->
+        <div class="flex-row-center-between">
+          <h2 data-translate="adminDashboardTitle" style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">แผงควบคุมผู้ดูแลระบบ (Dashboard)</h2>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 0.4rem 0.75rem; border-radius: 10px;">
+              <i class="fa-solid fa-filter" style="color: var(--accent-color); font-size: 0.85rem;"></i>
+              <input type="month" id="adminMonthFilter" class="form-control" style="background: transparent; border: none; padding: 0.25rem; font-size: 0.85rem; color: var(--text-primary); width: 160px;">
+              <button id="btnClearMonthFilter" class="btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 6px; white-space: nowrap;">ทั้งหมด</button>
+            </div>
+            <button id="btnLogout" class="btn-logout">
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span data-translate="btnLogout">ออกจากระบบ</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric Scorecards -->
+        <div class="stat-cards">
+          <!-- Card 1: Revenue -->
+          <div class="stat-card">
+            <div class="stat-icon revenue">
+              <i class="fa-solid fa-sack-dollar"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label" data-translate="statTotalRevenue">รายได้รวมทั้งหมด</span>
+              <span id="statTotalRevenue" class="stat-value">0 ฿</span>
+            </div>
+          </div>
+          <!-- Card 2: Expenses -->
+          <div class="stat-card">
+            <div class="stat-icon expenses">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label" data-translate="statTotalExpense">รายจ่ายรวมทั้งหมด</span>
+              <span id="statTotalExpense" class="stat-value text-red">0 ฿</span>
+            </div>
+          </div>
+          <!-- Card 3: Profit -->
+          <div class="stat-card">
+            <div class="stat-icon profit">
+              <i class="fa-solid fa-coins"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label" data-translate="statNetProfit">กำไรสุทธิ</span>
+              <span id="statNetProfit" class="stat-value text-green">0 ฿</span>
+            </div>
+          </div>
+          <!-- Card 4: Occupancy -->
+          <div class="stat-card">
+            <div class="stat-icon occupancy">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label" data-translate="statOccupancy">อัตราการจองสนาม</span>
+              <span id="statOccupancy" class="stat-value">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic configuration widgets: Month Lock & Google URL -->
+        <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+          
+          <!-- Month Authorization manager card -->
+          <div class="glass-panel monthly-locks-card">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-calendar-check text-accent"></i>
+                <span data-translate="adminMonthlyLocksTitle">จัดการการเปิดจองรายเดือน (Monthly Authorization)</span>
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+              อนุญาตให้ลูกค้าสามารถเข้ามาทำรายการจองล่วงหน้าในแต่ละเดือนได้ (เดือนปัจจุบันจะถูกเปิดสิทธิ์เสมอโดยอัตโนมัติ)
+            </div>
+            <div class="form-group" style="margin-top: 1rem; margin-bottom: 0;">
+              <label for="advanceBookingMonths" class="form-label">อนุญาตให้จองล่วงหน้าได้สูงสุด (เดือน)</label>
+              <select id="advanceBookingMonths" class="form-control">
+                <option value="0">เฉพาะเดือนปัจจุบัน (Current Month Only)</option>
+                <option value="1">1 เดือนล่วงหน้า (1 Month Advance)</option>
+                <option value="2">2 เดือนล่วงหน้า (2 Months Advance)</option>
+                <option value="3">3 เดือนล่วงหน้า (3 Months Advance)</option>
+                <option value="6">6 เดือนล่วงหน้า (6 Months Advance)</option>
+                <option value="12">1 ปีล่วงหน้า (12 Months Advance)</option>
+                <option value="99">เปิดจองตลอดไป (Unlimited)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Supabase connection widget -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-database text-accent"></i>
+                <span data-translate="supabaseConfigTitle">เชื่อมต่อระบบ Supabase Backend</span>
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+              ระบุ URL และ Key เพื่อเชื่อมโยงตารางข้อมูลและการอัปโหลดภาพหลักฐานการชำระเงินกับ Supabase Project ของคุณ
+            </div>
+            <div class="form-group">
+              <label for="supabaseUrlInput" class="form-label">Supabase Project URL</label>
+              <input type="url" id="supabaseUrlInput" class="form-control" placeholder="https://your-project-ref.supabase.co">
+            </div>
+            <div class="form-group">
+              <label for="supabaseKeyInput" class="form-label">Supabase Anon Public Key</label>
+              <input type="text" id="supabaseKeyInput" class="form-control" placeholder="ป้อน Anon Key ของคุณ...">
+            </div>
+            <div class="form-group">
+              <label for="liffIdInput" class="form-label">LINE LIFF ID</label>
+              <input type="text" id="liffIdInput" class="form-control" placeholder="เช่น 1234567890-Abcdefgh">
+            </div>
+            <div class="form-group" style="margin-bottom: 0; display: flex; gap: 0.5rem;">
+              <button id="btnSaveConfig" class="btn-primary" style="width: auto; padding: 0.75rem 1.25rem;" data-translate="btnSaveConfig">บันทึกการตั้งค่า</button>
+              <button id="btnTestConfig" class="btn-secondary" style="width: auto; padding: 0.75rem 1.25rem;" data-translate="btnTestConfig">ทดสอบการเชื่อมต่อ</button>
+            </div>
+          </div>
+
+          <!-- Backup & Sync Widget -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-cloud-arrow-up text-accent"></i>
+                <span data-translate="backupConfigTitle">สำรองข้อมูล & ซิงก์ไปที่ Google Sheet</span>
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+              ส่งออกข้อมูลการจองและธุรกรรมเป็นไฟล์ CSV และบันทึกไปยัง Google Sheet ที่กำหนด
+            </div>
+            <div class="form-group">
+              <label for="gasUrlInput" class="form-label">Google Apps Script Web App URL</label>
+              <input type="url" id="gasUrlInput" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <div class="form-group" style="margin-bottom: 0; display: flex; gap: 0.5rem;">
+              <button id="btnBackupData" class="btn-primary" style="width: auto; padding: 0.75rem 1.25rem;">
+                <i class="fa-solid fa-file-csv"></i> สำรองข้อมูล (Backup)
+              </button>
+              <button id="btnSaveGasConfig" class="btn-secondary" style="width: auto; padding: 0.75rem 1.25rem;" data-translate="btnSaveConfig">บันทึก URL</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Dashboard layout -->
+        <div class="charts-grid">
+          <!-- Main Monthly trend Bar Chart -->
+          <div class="chart-card">
+            <h4 style="margin-bottom: 1rem; font-weight: 600;" data-translate="chartTrendTitle">แนวโน้มรายรับ - รายจ่ายประจำเดือน</h4>
+            <div class="chart-container">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Pie Tints for Category Breakdowns -->
+          <div class="doughnut-charts-subgrid">
+            <div class="doughnut-chart-card">
+              <h4 style="margin-bottom: 1rem; font-weight: 600;" data-translate="chartIncomeTitle">สัดส่วนรายได้แยกตามหมวดหมู่</h4>
+              <div class="chart-container">
+                <canvas id="incomeChart"></canvas>
+              </div>
+            </div>
+            
+            <div class="doughnut-chart-card">
+              <h4 style="margin-bottom: 1rem; font-weight: 600;" data-translate="chartExpenseTitle">สัดส่วนรายจ่ายแยกตามหมวดหมู่</h4>
+              <div class="chart-container">
+                <canvas id="expenseChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings drawer and ledger entry forms -->
+        <div class="admin-settings-grid">
+          
+          <!-- Manual income & expense ledger form -->
+          <div class="glass-panel ledger-form-card">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-file-invoice-dollar"></i>
+                <span data-translate="ledgerTitle">บันทึกรายรับ - รายจ่าย (แอดมิน)</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="txDate" class="form-label" data-translate="labelTxDate">วันที่ทำรายการ</label>
+              <input type="date" id="txDate" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="txType" class="form-label" data-translate="labelTxType">ประเภทรายการ</label>
+              <select id="txType" class="form-control">
+                <option value="income" data-translate="optIncome">รายรับ</option>
+                <option value="expense" data-translate="optExpense">รายจ่าย</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="txCategory" class="form-label" data-translate="labelTxCategory">หมวดหมู่</label>
+              <select id="txCategory" class="form-control">
+                <!-- Loaded dynamically by app.js depending on type -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="txAmount" class="form-label" data-translate="labelTxAmount">จำนวนเงิน (บาท)</label>
+              <input type="number" id="txAmount" class="form-control" placeholder="0" min="1" required>
+            </div>
+
+            <div class="form-group">
+              <label for="txDesc" class="form-label" data-translate="labelTxDesc">คำอธิบายเพิ่มเติม</label>
+              <input type="text" id="txDesc" class="form-control" placeholder="ระบุเพิ่มเติม เช่น ค่าน้ำส้ม 5 ขวด">
+            </div>
+
+            <button id="btnSaveTx" class="btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span data-translate="btnSaveTx">บันทึกธุรกรรม</span>
+            </button>
+          </div>
+
+          <!-- Recent financial ledger transactions table -->
+          <div class="glass-panel" style="display: flex; flex-direction: column;">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-list-check"></i>
+                <span data-translate="recentTxTitle">ประวัติรายรับ-รายจ่ายล่าสุด</span>
+              </div>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 450px;">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th data-translate="thTxDate">วันที่</th>
+                    <th data-translate="thTxType">ประเภท</th>
+                    <th data-translate="thTxCategory">หมวดหมู่</th>
+                    <th data-translate="thTxAmount">จำนวนเงิน</th>
+                    <th data-translate="thTxDesc">รายละเอียด</th>
+                    <th data-translate="thTxAction">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="ledgerTableBody">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bookings table log manager -->
+        <div class="glass-panel">
+          <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+            <div class="panel-title">
+              <i class="fa-solid fa-table-tennis-paddle-ball"></i>
+              <span data-translate="bookingMgrTitle">ตารางสรุปการจองสนามเทนนิสทั้งหมด</span>
+            </div>
+            <!-- Dynamic Search for Admin bookings list -->
+            <div style="width: 100%; display: flex; align-items: center; gap: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 0.4rem 0.8rem; border-radius: 8px; margin-top: 0.25rem;">
+              <i class="fa-solid fa-magnifying-glass" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
+              <input type="text" id="bookingSearchInput" style="background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.9rem; flex-grow: 1; font-family: var(--font-family);" placeholder="ค้นหาด้วยชื่อลูกค้า (Search by customer name)...">
+            </div>
+          </div>
+          
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th data-translate="thBookDate">วันที่จอง</th>
+                  <th data-translate="thBookTime">เวลา</th>
+                  <th data-translate="thBookCust">ชื่อลูกค้า</th>
+                  <th data-translate="thBookPhone">เบอร์โทร</th>
+                  <th data-translate="thBookCoach">โค้ช</th>
+                  <th data-translate="thBookFee">ค่าบริการ</th>
+                  <th data-translate="thBookAction">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="bookingsTableBody">
+                <!-- Loaded dynamically in app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Charts & Core Scripts -->
+  <script src="charts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+
