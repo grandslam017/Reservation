@@ -245,8 +245,8 @@ const state = {
   bookings: [],
   transactions: [],
   config: {
-    supabaseUrl: "https://eqwmodrhorcbwsshbepg.supabase.co",
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
+    supabaseUrl: "",
+    supabaseKey: "",
     liffId: "",
     gasUrl: "",
     rateDay: 250,              // 08:00 - 16:00
