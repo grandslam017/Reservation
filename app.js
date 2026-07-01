@@ -400,11 +400,7 @@ function loadStateFromStorage() {
   if (supabase) {
     // Do NOT fetch transactions on page load for general users (causes RLS error).
     // Transactions will be fetched upon successful Admin authentication.
-    if (localTransactions) {
-      state.transactions = JSON.parse(localTransactions);
-    } else {
-      state.transactions = [];
-    }
+    state.transactions = [];
   } else {
     // No Supabase URL configured yet → use mock data or local storage
     if (localTransactions) {
@@ -422,7 +418,11 @@ function loadStateFromStorage() {
 function saveStateToStorage() {
   try {
     // We no longer save bookings to localStorage to prevent out-of-sync double-booking bugs
-    localStorage.setItem('tennis_transactions', JSON.stringify(state.transactions));
+    if (!supabase) {
+      localStorage.setItem('tennis_transactions', JSON.stringify(state.transactions));
+    } else {
+      localStorage.removeItem('tennis_transactions'); // Clean up transactions cache if Supabase is active
+    }
     localStorage.setItem('tennis_config', JSON.stringify(state.config));
     localStorage.setItem('tennis_lang', state.language);
   } catch (error) {
