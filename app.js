@@ -46,7 +46,7 @@ const translations = {
     chartTrendTitle: "แนวโน้มรายรับ - รายจ่ายประจำเดือน",
     chartIncomeTitle: "สัดส่วนรายได้แยกตามหมวดหมู่",
     chartExpenseTitle: "สัดส่วนรายจ่ายแยกตามหมวดหมู่",
-    supabaseConfigTitle: "เชื่อมต่อระบบ Supabase Backend",
+    supabaseConfigTitle: "เชื่อมต่อระบบ supabaseClient Backend",
     backupConfigTitle: "สำรองข้อมูล & ซิงก์ไปที่ Google Sheet",
     btnSaveConfig: "บันทึกการตั้งค่า",
     btnTestConfig: "ทดสอบการเชื่อมต่อ",
@@ -408,7 +408,7 @@ function loadStateFromStorage() {
   // Initialize Supabase Client
   initSupabaseClient();
 
-  if (supabase) {
+  if (supabaseClient) {
     // Do NOT fetch transactions on page load for general users (causes RLS error).
     // Transactions will be fetched upon successful Admin authentication.
     state.transactions = [];
@@ -434,7 +434,7 @@ function loadStateFromStorage() {
 function saveStateToStorage() {
   try {
     // We no longer save bookings to localStorage to prevent out-of-sync double-booking bugs
-    if (!supabase) {
+    if (!supabaseClient) {
       localStorage.setItem('tennis_transactions', JSON.stringify(state.transactions));
     } else {
       localStorage.removeItem('tennis_transactions'); // Clean up transactions cache if Supabase is active
@@ -555,32 +555,32 @@ function preloadMockData() {
 }
 
 // ----------------------------------------------------
-// Supabase Database & Storage API Integration
+// supabaseClient Database & Storage API Integration
 // ----------------------------------------------------
 // Initialize Supabase Client
-let supabase = null;
+let supabaseClient = null;
 function initSupabaseClient() {
   try {
     if (state.config.supabaseUrl && state.config.supabaseKey) {
       if (window.supabase) {
-        supabase = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
+        supabaseClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
       } else {
         console.error("Supabase SDK is not loaded from CDN.");
       }
     }
   } catch (err) {
     console.error("Failed to initialize Supabase client:", err);
-    supabase = null;
+    supabaseClient = null;
   }
 }
 
 async function syncBookingWithSupabase(booking) {
-  if (!supabase) {
+  if (!supabaseClient) {
     return { status: "local" };
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('bookings')
       .insert([{
         booking_date: booking.date,
@@ -615,12 +615,12 @@ async function syncBookingWithSupabase(booking) {
 }
 
 async function fetchBookingsFromSupabase(silent = false) {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   
   state.isFetchingBookings = true;
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('bookings')
       .select('*')
       .neq('status', 'cancelled');
@@ -659,7 +659,7 @@ async function fetchBookingsFromSupabase(silent = false) {
 }
 
 async function addTransactionToSupabase(tx) {
-  if (!supabase) {
+  if (!supabaseClient) {
     state.transactions.push({
       id: tx.id || Math.random().toString(36).substr(2, 9),
       ...tx
@@ -668,7 +668,7 @@ async function addTransactionToSupabase(tx) {
     return;
   }
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('transactions')
       .insert([{
         transaction_date: tx.date,
@@ -700,9 +700,9 @@ async function addTransactionToSupabase(tx) {
 }
 
 async function fetchTransactionsFromSupabase() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('transactions')
       .select('*')
       .order('transaction_date', { ascending: false });
@@ -902,7 +902,7 @@ function renderTimeSlots() {
   const slotsGrid = document.getElementById('slotsGrid');
   if (!slotsGrid) return;
 
-  // ถ้าเชื่อมต่อ Supabase → fetch ล่าสุดก่อนแสดง
+  // ถ้าเชื่อมต่อ supabaseClient → fetch ล่าสุดก่อนแสดง
   if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
     // แสดง loading indicator
     slotsGrid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-secondary);">
@@ -1335,17 +1335,17 @@ function initBookingWizard() {
 
         // 1. Upload payment slip to Supabase Storage if file exists
         let slipUrl = '';
-        if (state.currentSlipFile && supabase) {
+        if (state.currentSlipFile && supabaseClient) {
           try {
             const fileExt = state.currentSlipFile.name.split('.').pop() || 'jpg';
             const fileName = `${invoiceNumber}_${Date.now()}.${fileExt}`;
-            const { data, error: uploadError } = await supabase.storage
+            const { data, error: uploadError } = await supabaseClient.storage
               .from('slips')
               .upload(fileName, state.currentSlipFile);
 
             if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage
+            const { data: { publicUrl } } = supabaseClient.storage
               .from('slips')
               .getPublicUrl(fileName);
             
@@ -1450,10 +1450,10 @@ function initAdminAuth() {
   if (loginBtn && passwordInput) {
     loginBtn.addEventListener('click', async () => {
       const password = passwordInput.value;
-      if (supabase) {
+      if (supabaseClient) {
         showToast(state.language === 'th' ? "กำลังเข้าสู่ระบบ..." : "Logging in...", 'info');
         try {
-          const { data, error } = await supabase.auth.signInWithPassword({
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: 'admin@grandslam.com',
             password: password
           });
@@ -1470,7 +1470,7 @@ function initAdminAuth() {
           showView('admin');
           renderAdminDashboard();
         } catch (err) {
-          console.error("Supabase login failed:", err);
+          console.error("supabaseClient login failed:", err);
           // Fallback to static check for backward compatibility or local test mode
           if (password === 'Zxcv1234') {
             state.isAdminLoggedIn = true;
@@ -1504,8 +1504,8 @@ function initAdminAuth() {
   const logoutBtn = document.getElementById('btnLogout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      if (supabase) {
-        await supabase.auth.signOut();
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
       }
       state.isAdminLoggedIn = false;
       showToast(state.language === 'th' ? 'ออกจากระบบเรียบร้อย' : 'Logged out', 'info');
@@ -1902,11 +1902,11 @@ function renderLedgerTable() {
 }
 
 async function cancelBooking(bookingId) {
-  if (supabase) {
+  if (supabaseClient) {
     try {
-      // Update status to 'cancelled' in Supabase.
+      // Update status to 'cancelled' in supabaseClient.
       // This will trigger 'trigger_after_booking_update' to delete associated transactions.
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('bookings')
         .update({ status: 'cancelled' })
         .eq('id', bookingId);
@@ -1936,9 +1936,9 @@ async function cancelBooking(bookingId) {
 }
 
 async function deleteTransaction(txId) {
-  if (supabase) {
+  if (supabaseClient) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('transactions')
         .delete()
         .eq('id', txId);
