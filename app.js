@@ -245,8 +245,8 @@ const state = {
   bookings: [],
   transactions: [],
   config: {
-    supabaseUrl: "",
-    supabaseKey: "",
+    supabaseUrl: "https://eqwmodrhorcbwsshbepg.supabase.co",
+    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
     liffId: "",
     gasUrl: "",
     rateDay: 250,              // 08:00 - 16:00
@@ -384,7 +384,18 @@ function loadStateFromStorage() {
   const localConfig = localStorage.getItem('tennis_config');
   const localLang = localStorage.getItem('tennis_lang');
 
-  if (localConfig) state.config = JSON.parse(localConfig);
+  try {
+    if (localConfig) {
+      const parsedConfig = JSON.parse(localConfig);
+      // Merge values but keep hardcoded defaults if local storage values are empty
+      if (!parsedConfig.supabaseUrl) parsedConfig.supabaseUrl = state.config.supabaseUrl;
+      if (!parsedConfig.supabaseKey) parsedConfig.supabaseKey = state.config.supabaseKey;
+      state.config = { ...state.config, ...parsedConfig };
+    }
+  } catch (err) {
+    console.error("Failed to parse localConfig from localStorage:", err);
+  }
+
   if (localLang) state.language = localLang;
 
   // Set Language select
@@ -403,14 +414,19 @@ function loadStateFromStorage() {
     state.transactions = [];
   } else {
     // No Supabase URL configured yet → use mock data or local storage
-    if (localTransactions) {
-      state.transactions = JSON.parse(localTransactions);
-    } else {
-      if (!localConfig) {
-        preloadMockData();
+    try {
+      if (localTransactions) {
+        state.transactions = JSON.parse(localTransactions);
       } else {
-        state.transactions = [];
+        if (!localConfig) {
+          preloadMockData();
+        } else {
+          state.transactions = [];
+        }
       }
+    } catch (err) {
+      console.error("Failed to parse localTransactions from localStorage:", err);
+      state.transactions = [];
     }
   }
 }
@@ -544,12 +560,17 @@ function preloadMockData() {
 // Initialize Supabase Client
 let supabase = null;
 function initSupabaseClient() {
-  if (state.config.supabaseUrl && state.config.supabaseKey) {
-    if (window.supabase) {
-      supabase = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
-    } else {
-      console.error("Supabase SDK is not loaded from CDN.");
+  try {
+    if (state.config.supabaseUrl && state.config.supabaseKey) {
+      if (window.supabase) {
+        supabase = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
+      } else {
+        console.error("Supabase SDK is not loaded from CDN.");
+      }
     }
+  } catch (err) {
+    console.error("Failed to initialize Supabase client:", err);
+    supabase = null;
   }
 }
 
