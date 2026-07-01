@@ -1706,26 +1706,26 @@ function initAdminForms() {
       csvContent += "ID,Date,Time Slot,Customer,Phone,Email,Court,Coach,Fee\n";
       state.bookings.forEach(b => {
         const row = [
-          b.id, b.date, b.slot, \`"\${b.name}"\`, b.phone, b.email || '', b.court, b.requireCoach ? 'Yes' : 'No', b.fee
+          b.id, b.date, b.slot, `"${b.name}"`, b.phone, b.email || '', b.court, b.requireCoach ? 'Yes' : 'No', b.fee
         ];
-        csvContent += row.join(",") + "\\n";
+        csvContent += row.join(",") + "\n";
       });
 
       // Transactions CSV
-      csvContent += "\\n--- Transactions ---\\n";
+      csvContent += "\n--- Transactions ---\n";
       csvContent += "ID,Date,Type,Category,Amount,Description\n";
       state.transactions.forEach(tx => {
         const row = [
-          tx.id, tx.date, tx.type, tx.category, tx.amount, \`"\${tx.description.replace(/"/g, '""')}"\`
+          tx.id, tx.date, tx.type, tx.category, tx.amount, `"${tx.description.replace(/"/g, '""')}"`
         ];
-        csvContent += row.join(",") + "\\n";
+        csvContent += row.join(",") + "\n";
       });
 
       // Download CSV locally
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", \`backup_\${new Date().toISOString().split('T')[0]}.csv\`);
+      link.setAttribute("download", `backup_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
