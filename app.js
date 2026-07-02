@@ -108,6 +108,8 @@ const translations = {
     txtSalariesCat: "เงินเดือนพนักงาน",
     txtCoachPayoutCat: "จ่ายส่วนแบ่งโค้ช",
     txtEquipmentPurchaseCat: "จัดซื้ออุปกรณ์",
+    txtEquipmentShopCat: "ขายอุปกรณ์กีฬา (Shop)",
+    txtCafeCat: "คาเฟ่ / ขนม (Snacks)",
     txtOtherIncomeCat: "รายรับอื่นๆ",
     txtOtherExpenseCat: "รายจ่ายอื่นๆ",
     confirmCancelBookingPrompt: "คุณต้องการยกเลิกการจองนี้ใช่หรือไม่? การจองจะถูกลบและเวลาจะถูกปล่อยให้จองใหม่",
@@ -226,6 +228,8 @@ const translations = {
     txtSalariesCat: "Staff Salaries",
     txtCoachPayoutCat: "Coach Payout",
     txtEquipmentPurchaseCat: "Equipment Purchase",
+    txtEquipmentShopCat: "Equipment Shop",
+    txtCafeCat: "Cafe / Snacks",
     txtOtherIncomeCat: "Other Income",
     txtOtherExpenseCat: "Other Expense",
     confirmCancelBookingPrompt: "Are you sure you want to cancel this booking? This slot will become available again.",
@@ -1424,8 +1428,14 @@ function initBookingWizard() {
         state.currentSlipFile = null;
 
         await fetchBookingsFromSupabase();
+        if (state.isAdminLoggedIn) {
+          await fetchTransactionsFromSupabase();
+        }
         renderCalendar();
         renderTimeSlots();
+        if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+          renderAdminDashboard();
+        }
       };
       
       // Close invoice modal if clicked X
@@ -1520,14 +1530,94 @@ function initAdminAuth() {
 // ----------------------------------------------------
 // Admin Dashboard Analytics & Table Managers
 // ----------------------------------------------------
+// Helper: Populate admin Year Filter options dynamically
+function populateYearFilter() {
+  const yearFilterSelect = document.getElementById('adminYearFilter');
+  if (!yearFilterSelect) return;
+
+  const currentValue = yearFilterSelect.value;
+  const years = new Set();
+  
+  // Extract years from transactions
+  state.transactions.forEach(tx => {
+    if (tx.date) {
+      const y = tx.date.substring(0, 4);
+      if (y && /^\d{4}$/.test(y)) years.add(y);
+    }
+  });
+
+  // Extract years from bookings
+  state.bookings.forEach(b => {
+    if (b.date) {
+      const y = b.date.substring(0, 4);
+      if (y && /^\d{4}$/.test(y)) years.add(y);
+    }
+  });
+
+  // Always include current year
+  years.add(new Date().getFullYear().toString());
+
+  // Sort years descending
+  const sortedYears = Array.from(years).sort((a, b) => b - a);
+
+  // Build options HTML
+  let html = `<option value="" style="background: #1e293b;">${state.language === 'th' ? 'ทุกปี' : 'All Years'}</option>`;
+  sortedYears.forEach(y => {
+    const displayYear = state.language === 'th' ? parseInt(y) + 543 : y;
+    html += `<option value="${y}" style="background: #1e293b;">${displayYear}</option>`;
+  });
+
+  yearFilterSelect.innerHTML = html;
+  
+  // Restore previous selection if it is still valid
+  if (sortedYears.includes(currentValue)) {
+    yearFilterSelect.value = currentValue;
+  } else {
+    yearFilterSelect.value = '';
+  }
+}
+
+// ----------------------------------------------------
+// Admin Dashboard Analytics & Table Managers
+// ----------------------------------------------------
 function renderAdminDashboard() {
   if (!state.isAdminLoggedIn) return;
 
-  // 1. Calculate Metrics Card Values
+  // 0. Populate Year dropdown if not populated
+  populateYearFilter();
+
+  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
+  const yearFilter = document.getElementById('adminYearFilter')?.value || '';
+
+  // 1. Filter Transactions for Stats and Category Doughnuts
+  const filteredTxsForMetrics = state.transactions.filter(tx => {
+    if (monthFilter) {
+      return tx.date.startsWith(monthFilter);
+    }
+    if (yearFilter) {
+      return tx.date.startsWith(yearFilter);
+    }
+    return true;
+  });
+
+  // 2. Filter Transactions for Trend Chart (Income vs Expense Monthly Trend)
+  // Shows all months in the selected year, or selected month's year, or all time
+  const filteredTxsForTrend = state.transactions.filter(tx => {
+    if (yearFilter) {
+      return tx.date.startsWith(yearFilter);
+    }
+    if (monthFilter) {
+      const year = monthFilter.split('-')[0];
+      return tx.date.startsWith(year);
+    }
+    return true;
+  });
+
+  // Calculate Metrics Card Values
   let totalRevenue = 0;
   let totalExpense = 0;
 
-  state.transactions.forEach(tx => {
+  filteredTxsForMetrics.forEach(tx => {
     const amount = parseFloat(tx.amount) || 0;
     if (tx.type === 'income') {
       totalRevenue += amount;
@@ -1538,16 +1628,38 @@ function renderAdminDashboard() {
 
   const netProfit = totalRevenue - totalExpense;
 
-  const today = new Date();
-  const past30Days = new Date();
-  past30Days.setDate(today.getDate() - 30);
+  // Calculate Occupancy Rate
+  let occupancyRate = 0;
+  if (monthFilter) {
+    // Calculate for the specific month
+    const [year, month] = monthFilter.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const totalSlotsInMonth = daysInMonth * 15; // 15 slots/day (08:00 to 23:00)
+    
+    const bookingsInMonth = state.bookings.filter(b => b.date.startsWith(monthFilter));
+    occupancyRate = Math.min(100, Math.round((bookingsInMonth.length / totalSlotsInMonth) * 100));
+  } else if (yearFilter) {
+    // Calculate for the specific year
+    const yr = Number(yearFilter);
+    const isLeap = (yr % 4 === 0 && yr % 100 !== 0) || (yr % 400 === 0);
+    const daysInYear = isLeap ? 366 : 365;
+    const totalSlotsInYear = daysInYear * 15;
+    
+    const bookingsInYear = state.bookings.filter(b => b.date.startsWith(yearFilter));
+    occupancyRate = Math.min(100, Math.round((bookingsInYear.length / totalSlotsInYear) * 100));
+  } else {
+    // Fallback to last 30 days
+    const today = new Date();
+    const past30Days = new Date();
+    past30Days.setDate(today.getDate() - 30);
 
-  const bookingsLast30Days = state.bookings.filter(b => {
-    const bDate = new Date(b.date);
-    return bDate >= past30Days && bDate <= today;
-  });
+    const bookingsLast30Days = state.bookings.filter(b => {
+      const bDate = new Date(b.date);
+      return bDate >= past30Days && bDate <= today;
+    });
 
-  const occupancyRate = Math.min(100, Math.round((bookingsLast30Days.length / 450) * 100));
+    occupancyRate = Math.min(100, Math.round((bookingsLast30Days.length / 450) * 100));
+  }
 
   document.getElementById('statTotalRevenue').textContent = `${totalRevenue.toLocaleString()} ฿`;
   document.getElementById('statTotalExpense').textContent = `${totalExpense.toLocaleString()} ฿`;
@@ -1563,7 +1675,7 @@ function renderAdminDashboard() {
   document.getElementById('statOccupancy').textContent = `${occupancyRate}%`;
 
   if (typeof updateDashboardCharts === 'function') {
-    updateDashboardCharts(state.transactions);
+    updateDashboardCharts(filteredTxsForTrend, filteredTxsForMetrics, state.language);
   }
 
   const supabaseUrlInput = document.getElementById('supabaseUrlInput');
@@ -1603,7 +1715,7 @@ function renderAdminDashboard() {
   }
 
   renderBookingsTable();
-  renderLedgerTable();
+  renderLedgerTable(filteredTxsForMetrics);
 }
 
 // ----------------------------------------------------
@@ -1782,16 +1894,28 @@ function renderBookingsTable() {
 
   tbody.innerHTML = '';
 
+  // Get Admin filters
+  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
+  const yearFilter = document.getElementById('adminYearFilter')?.value || '';
+
+  // Filter bookings first
+  let filteredBookings = [...state.bookings];
+  if (monthFilter) {
+    filteredBookings = filteredBookings.filter(b => b.date.startsWith(monthFilter));
+  } else if (yearFilter) {
+    filteredBookings = filteredBookings.filter(b => b.date.startsWith(yearFilter));
+  }
+
   // Sort bookings: newest bookings first
-  const sortedBookings = [...state.bookings].sort((a, b) => new Date(b.date + 'T' + b.slot.split(' - ')[0]) - new Date(a.date + 'T' + a.slot.split(' - ')[0]));
+  filteredBookings.sort((a, b) => new Date(b.date + 'T' + b.slot.split(' - ')[0]) - new Date(a.date + 'T' + a.slot.split(' - ')[0]));
 
   // Get Admin Search query
   const query = document.getElementById('bookingSearchInput')?.value.toLowerCase().trim() || '';
   
   // Filter bookings by customer name
-  const filteredBookings = query !== '' ? 
-    sortedBookings.filter(b => b.name.toLowerCase().includes(query)) : 
-    sortedBookings;
+  if (query !== '') {
+    filteredBookings = filteredBookings.filter(b => b.name.toLowerCase().includes(query));
+  }
 
   if (filteredBookings.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบรายการจองสนามที่ค้นหา' : 'No matching bookings found'}</td></tr>`;
@@ -1836,20 +1960,21 @@ function renderBookingsTable() {
   });
 }
 
-function renderLedgerTable() {
+function renderLedgerTable(filteredTxs) {
   const tbody = document.getElementById('ledgerTableBody');
   if (!tbody) return;
 
   tbody.innerHTML = '';
 
-  const sortedTxs = [...state.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const txsSource = filteredTxs || state.transactions;
+  const sortedTxs = [...txsSource].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   if (sortedTxs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-receipt"></i>${state.language === 'th' ? 'ไม่มีรายการประวัติการเงิน' : 'No transactions recorded'}</td></tr>`;
     return;
   }
 
-  const limitedTxs = sortedTxs.slice(0, 20);
+  const limitedTxs = sortedTxs.slice(0, 50);
 
   limitedTxs.forEach(tx => {
     const row = document.createElement('tr');
@@ -2144,6 +2269,45 @@ async function init() {
     txDateInput.value = `${y}-${m}-${d}`;
   }
 
+  // Set up Admin Filters
+  const monthFilter = document.getElementById('adminMonthFilter');
+  const yearFilter = document.getElementById('adminYearFilter');
+  const clearMonthFilterBtn = document.getElementById('btnClearMonthFilter');
+
+  if (monthFilter) {
+    monthFilter.addEventListener('change', () => {
+      // Sync year filter if month is selected
+      if (monthFilter.value) {
+        const year = monthFilter.value.split('-')[0];
+        if (yearFilter) {
+          yearFilter.value = year;
+        }
+      }
+      renderAdminDashboard();
+    });
+  }
+
+  if (yearFilter) {
+    yearFilter.addEventListener('change', () => {
+      // Clear month filter if it doesn't match the selected year
+      if (monthFilter && monthFilter.value) {
+        const monthYear = monthFilter.value.split('-')[0];
+        if (monthYear !== yearFilter.value) {
+          monthFilter.value = '';
+        }
+      }
+      renderAdminDashboard();
+    });
+  }
+
+  if (clearMonthFilterBtn) {
+    clearMonthFilterBtn.addEventListener('click', () => {
+      if (monthFilter) monthFilter.value = '';
+      if (yearFilter) yearFilter.value = '';
+      renderAdminDashboard();
+    });
+  }
+
   // === Auto-refresh mechanism ===
   // Fetch latest bookings from Supabase every 10 seconds to keep timeslots updated
   if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
@@ -2151,9 +2315,20 @@ async function init() {
     if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
       // Fetch data silently
       await fetchBookingsFromSupabase(true);
+      
+      // If admin is logged in, fetch transactions too
+      if (state.isAdminLoggedIn) {
+        await fetchTransactionsFromSupabase();
+      }
+      
       // If user is viewing the slots, re-render them smoothly
       if (document.getElementById('booking').classList.contains('active')) {
         renderTimeSlotsUI();
+      }
+      
+      // If admin is viewing the admin dashboard, re-render dashboard
+      if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+        renderAdminDashboard();
       }
     }
   }, 10000);

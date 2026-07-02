@@ -1,9 +1,22 @@
-﻿// charts.js - Handles Chart.js initialization and updates for the Admin Dashboard
+// charts.js - Handles Chart.js initialization and updates for the Admin Dashboard
 
 // Keep chart references to update them dynamically
 let trendChartInstance = null;
 let incomeChartInstance = null;
 let expenseChartInstance = null;
+
+// Helper: Format YYYY-MM string to locale-aware month and year
+function formatYearMonth(ymStr, lang = 'th') {
+  if (!ymStr || ymStr === 'No Data') return ymStr;
+  const parts = ymStr.split('-');
+  if (parts.length !== 2) return ymStr;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const date = new Date(year, month, 1);
+  const monthName = date.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { month: 'short' });
+  const displayYear = lang === 'th' ? year + 543 : year;
+  return `${monthName} ${displayYear}`;
+}
 
 /**
  * Helper to get grouped data for charts
@@ -32,17 +45,17 @@ function processTransactionData(transactions) {
   const monthlySummary = {};
 
   transactions.forEach(tx => {
-    const date = new Date(tx.date);
-    const monthYear = date.toLocaleString('default', { month: 'short', year: 'numeric' }); // e.g. "Jun 2026"
+    if (!tx.date) return;
+    const yyyymm = tx.date.substring(0, 7); // e.g. "2026-05"
     
-    if (!monthlySummary[monthYear]) {
-      monthlySummary[monthYear] = { income: 0, expense: 0 };
+    if (!monthlySummary[yyyymm]) {
+      monthlySummary[yyyymm] = { income: 0, expense: 0 };
     }
 
     const amount = parseFloat(tx.amount) || 0;
     
     if (tx.type === 'income') {
-      monthlySummary[monthYear].income += amount;
+      monthlySummary[yyyymm].income += amount;
       
       // Categorize
       if (categories.income.hasOwnProperty(tx.category)) {
@@ -51,7 +64,7 @@ function processTransactionData(transactions) {
         categories.income['Other Income'] += amount;
       }
     } else if (tx.type === 'expense') {
-      monthlySummary[monthYear].expense += amount;
+      monthlySummary[yyyymm].expense += amount;
       
       // Categorize
       if (categories.expense.hasOwnProperty(tx.category)) {
@@ -70,10 +83,13 @@ function processTransactionData(transactions) {
 
 /**
  * Initialize charts with transactions data
- * @param {Array} transactions 
+ * @param {Array} trendTransactions
+ * @param {Array} categoryTransactions
+ * @param {string} lang
  */
-function initDashboardCharts(transactions) {
-  const data = processTransactionData(transactions);
+function initDashboardCharts(trendTransactions, categoryTransactions, lang = 'th') {
+  const trendData = processTransactionData(trendTransactions);
+  const catData = processTransactionData(categoryTransactions);
   
   // Destructure HTML canvas elements
   const trendCtx = document.getElementById('trendChart');
@@ -87,18 +103,41 @@ function initDashboardCharts(transactions) {
   Chart.defaults.font.family = "'Inter', 'Sarabun', sans-serif";
   Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 
+  const getTranslation = (key, fallback) => {
+    if (typeof translations !== 'undefined' && translations[lang] && translations[lang][key]) {
+      return translations[lang][key];
+    }
+    return fallback;
+  };
+
+  const translateCategory = (cat) => {
+    if (cat === 'Court Rental') return getTranslation('txtCourtRentalCat', 'Court Rental');
+    if (cat === 'Coach Fee') return getTranslation('txtCoachFeeCat', 'Coach Fee');
+    if (cat === 'Equipment Shop') return getTranslation('txtEquipmentShopCat', 'Equipment Shop');
+    if (cat === 'Cafe / Snacks') return getTranslation('txtCafeCat', 'Cafe / Snacks');
+    if (cat === 'Utilities (Electricity/Water)') return getTranslation('txtUtilitiesCat', 'Utilities');
+    if (cat === 'Maintenance') return getTranslation('txtMaintenanceCat', 'Maintenance');
+    if (cat === 'Staff Salaries') return getTranslation('txtSalariesCat', 'Staff Salaries');
+    if (cat === 'Coach Payout') return getTranslation('txtCoachPayoutCat', 'Coach Payout');
+    if (cat === 'Equipment Purchase') return getTranslation('txtEquipmentPurchaseCat', 'Equipment Purchase');
+    if (cat === 'Other Income') return getTranslation('txtOtherIncomeCat', 'Other Income');
+    if (cat === 'Other Expense') return getTranslation('txtOtherExpenseCat', 'Other Expense');
+    return cat;
+  };
+
   // 1. Trend Chart (Bar Chart: Income vs Expense)
-  const months = Object.keys(data.monthlySummary);
-  const incomeValues = months.map(m => data.monthlySummary[m].income);
-  const expenseValues = months.map(m => data.monthlySummary[m].expense);
+  const months = Object.keys(trendData.monthlySummary).sort();
+  const incomeValues = months.map(m => trendData.monthlySummary[m].income);
+  const expenseValues = months.map(m => trendData.monthlySummary[m].expense);
+  const monthLabels = months.map(m => formatYearMonth(m, lang));
 
   trendChartInstance = new Chart(trendCtx, {
     type: 'bar',
     data: {
-      labels: months.length > 0 ? months : ['No Data'],
+      labels: months.length > 0 ? monthLabels : [lang === 'th' ? 'ไม่มีข้อมูล' : 'No Data'],
       datasets: [
         {
-          label: 'รายรับ (Income)',
+          label: lang === 'th' ? 'รายรับ (Income)' : 'Income',
           data: months.length > 0 ? incomeValues : [0],
           backgroundColor: 'rgba(16, 185, 129, 0.75)',
           borderColor: '#10b981',
@@ -106,7 +145,7 @@ function initDashboardCharts(transactions) {
           borderRadius: 6
         },
         {
-          label: 'รายจ่าย (Expense)',
+          label: lang === 'th' ? 'รายจ่าย (Expense)' : 'Expense',
           data: months.length > 0 ? expenseValues : [0],
           backgroundColor: 'rgba(239, 68, 68, 0.75)',
           borderColor: '#ef4444',
@@ -147,8 +186,8 @@ function initDashboardCharts(transactions) {
   });
 
   // 2. Income Category Chart (Doughnut)
-  const incLabels = Object.keys(data.categories.income);
-  const incValues = Object.values(data.categories.income);
+  const incLabels = Object.keys(catData.categories.income).map(translateCategory);
+  const incValues = Object.values(catData.categories.income);
   
   incomeChartInstance = new Chart(incomeCtx, {
     type: 'doughnut',
@@ -191,8 +230,8 @@ function initDashboardCharts(transactions) {
   });
 
   // 3. Expense Category Chart (Doughnut)
-  const expLabels = Object.keys(data.categories.expense);
-  const expValues = Object.values(data.categories.expense);
+  const expLabels = Object.keys(catData.categories.expense).map(translateCategory);
+  const expValues = Object.values(catData.categories.expense);
 
   expenseChartInstance = new Chart(expenseCtx, {
     type: 'doughnut',
@@ -238,33 +277,62 @@ function initDashboardCharts(transactions) {
 
 /**
  * Update existing charts with new transactions data
- * @param {Array} transactions 
+ * @param {Array} trendTransactions
+ * @param {Array} categoryTransactions
+ * @param {string} lang
  */
-function updateDashboardCharts(transactions) {
+function updateDashboardCharts(trendTransactions, categoryTransactions, lang = 'th') {
   if (!trendChartInstance || !incomeChartInstance || !expenseChartInstance) {
-    // If charts are not initialized, do it now
-    initDashboardCharts(transactions);
+    initDashboardCharts(trendTransactions, categoryTransactions, lang);
     return;
   }
 
-  const data = processTransactionData(transactions);
+  const trendData = processTransactionData(trendTransactions);
+  const catData = processTransactionData(categoryTransactions);
+
+  const getTranslation = (key, fallback) => {
+    if (typeof translations !== 'undefined' && translations[lang] && translations[lang][key]) {
+      return translations[lang][key];
+    }
+    return fallback;
+  };
+
+  const translateCategory = (cat) => {
+    if (cat === 'Court Rental') return getTranslation('txtCourtRentalCat', 'Court Rental');
+    if (cat === 'Coach Fee') return getTranslation('txtCoachFeeCat', 'Coach Fee');
+    if (cat === 'Equipment Shop') return getTranslation('txtEquipmentShopCat', 'Equipment Shop');
+    if (cat === 'Cafe / Snacks') return getTranslation('txtCafeCat', 'Cafe / Snacks');
+    if (cat === 'Utilities (Electricity/Water)') return getTranslation('txtUtilitiesCat', 'Utilities');
+    if (cat === 'Maintenance') return getTranslation('txtMaintenanceCat', 'Maintenance');
+    if (cat === 'Staff Salaries') return getTranslation('txtSalariesCat', 'Staff Salaries');
+    if (cat === 'Coach Payout') return getTranslation('txtCoachPayoutCat', 'Coach Payout');
+    if (cat === 'Equipment Purchase') return getTranslation('txtEquipmentPurchaseCat', 'Equipment Purchase');
+    if (cat === 'Other Income') return getTranslation('txtOtherIncomeCat', 'Other Income');
+    if (cat === 'Other Expense') return getTranslation('txtOtherExpenseCat', 'Other Expense');
+    return cat;
+  };
 
   // Update Trend Chart
-  const months = Object.keys(data.monthlySummary);
-  const incomeValues = months.map(m => data.monthlySummary[m].income);
-  const expenseValues = months.map(m => data.monthlySummary[m].expense);
+  const months = Object.keys(trendData.monthlySummary).sort();
+  const incomeValues = months.map(m => trendData.monthlySummary[m].income);
+  const expenseValues = months.map(m => trendData.monthlySummary[m].expense);
+  const monthLabels = months.map(m => formatYearMonth(m, lang));
 
-  trendChartInstance.data.labels = months.length > 0 ? months : ['No Data'];
+  trendChartInstance.data.labels = months.length > 0 ? monthLabels : [lang === 'th' ? 'ไม่มีข้อมูล' : 'No Data'];
+  trendChartInstance.data.datasets[0].label = lang === 'th' ? 'รายรับ (Income)' : 'Income';
   trendChartInstance.data.datasets[0].data = months.length > 0 ? incomeValues : [0];
+  trendChartInstance.data.datasets[1].label = lang === 'th' ? 'รายจ่าย (Expense)' : 'Expense';
   trendChartInstance.data.datasets[1].data = months.length > 0 ? expenseValues : [0];
   trendChartInstance.update();
 
   // Update Income Chart
-  incomeChartInstance.data.datasets[0].data = Object.values(data.categories.income);
+  incomeChartInstance.data.labels = Object.keys(catData.categories.income).map(translateCategory);
+  incomeChartInstance.data.datasets[0].data = Object.values(catData.categories.income);
   incomeChartInstance.update();
 
   // Update Expense Chart
-  expenseChartInstance.data.datasets[0].data = Object.values(data.categories.expense);
+  expenseChartInstance.data.labels = Object.keys(catData.categories.expense).map(translateCategory);
+  expenseChartInstance.data.datasets[0].data = Object.values(catData.categories.expense);
   expenseChartInstance.update();
 }
 
