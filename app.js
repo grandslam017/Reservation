@@ -1328,6 +1328,7 @@ function initBookingWizard() {
       };
       
       btnFinishBooking.onclick = async () => {
+        const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
         document.getElementById('invoiceSlipModal').style.display = 'none';
         showToast(translations[state.language].toastGasSyncing, 'info');
 
@@ -1360,7 +1361,7 @@ function initBookingWizard() {
         }
 
         // 2. Insert bookings
-        for (const slot of state.selectedSlots) {
+        for (const slot of slotsBooked) {
           const bookingId = Math.random().toString(36).substr(2, 9);
           const slotPrice = getSlotPrice(slot);
 
@@ -1422,6 +1423,20 @@ function initBookingWizard() {
            showToast(errorMsg, 'error');
         } else {
            showToast(translations[state.language].toastBookingSuccess, 'success');
+           // Trigger notifications via GAS
+           if (state.config.gasUrl) {
+             sendBookingConfirmationNotifications({
+               name: name,
+               phone: phone,
+               email: email,
+               date: dateStr,
+               slots: slotsBooked,
+               invoiceNo: invoiceNumber,
+               receiptNo: receiptNumber,
+               lineIdInput: lineIdInput,
+               lineUserId: state.liffProfile ? state.liffProfile.userId : ''
+             });
+           }
         }
 
         // Clean up temporary slip file reference
@@ -1437,6 +1452,21 @@ function initBookingWizard() {
           renderAdminDashboard();
         }
       };
+
+      async function sendBookingConfirmationNotifications(info) {
+        try {
+          const payload = {
+            action: "sendConfirmation",
+            ...info
+          };
+          fetch(state.config.gasUrl, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          }).catch(err => console.error("GAS notification trigger failed:", err));
+        } catch (e) {
+          console.error("Error triggering booking notifications:", e);
+        }
+      }
       
       // Close invoice modal if clicked X
       document.getElementById('btnInvoiceClose').onclick = () => {
