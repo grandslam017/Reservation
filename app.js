@@ -2241,6 +2241,22 @@ function performBookingSearch(query, isSilent = false) {
   });
 }
 
+// Check and recover admin session if active
+async function checkAdminSession() {
+  if (supabaseClient) {
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (error) throw error;
+      if (session && session.user && session.user.email === 'admin@grandslam.com') {
+        state.isAdminLoggedIn = true;
+        await fetchTransactionsFromSupabase();
+      }
+    } catch (e) {
+      console.warn("Session check failed:", e);
+    }
+  }
+}
+
 // Start app
 async function init() {
   loadStateFromStorage();
@@ -2248,6 +2264,7 @@ async function init() {
   setupTabNavigation();
 
   await fetchBookingsFromSupabase();
+  await checkAdminSession();
   
   // Re-render calendar after fetching remote data
   renderCalendar();
