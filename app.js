@@ -251,8 +251,8 @@ const state = {
   config: {
     supabaseUrl: "https://eqwmodrhorcbwsshbepg.supabase.co",
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
-    liffId: "",
-    gasUrl: "",
+    liffId: "2010398825-4Z3Ff2Gf",
+    gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 1    // Default 1 month
