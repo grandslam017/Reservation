@@ -2122,6 +2122,13 @@ async function deleteTransaction(txId) {
 // LIFF Initialization
 // ----------------------------------------------------
 async function initLiff() {
+  // Wait up to 2 seconds for LIFF SDK script to load on slower mobile networks
+  let retries = 0;
+  while (typeof liff === 'undefined' && retries < 20) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    retries++;
+  }
+
   if (state.config.liffId && typeof liff !== 'undefined') {
     try {
       await liff.init({ liffId: state.config.liffId });
