@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
 :root {
   --bg-color: #0b0f19;
@@ -1143,5 +1143,79 @@ header {
   font-size: 2rem;
   margin-bottom: 0.75rem;
   display: block;
+}
+
+/* Responsive adjustments for mobile screens */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 0.75rem;
+  }
+  
+  header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .logo {
+    font-size: 1.3rem;
+  }
+
+  .nav-controls {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .nav-tabs {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tab-btn {
+    flex-grow: 1;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  #btnLiffLogin, #liffProfileBox {
+    width: 100%;
+    justify-content: center;
+    padding: 0.6rem;
+  }
+
+  .lang-switch {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .calendar-day-num {
+    font-size: 0.95rem;
+  }
+
+  /* Admin panel header responsive overrides */
+  .admin-dashboard .flex-row-center-between {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .admin-dashboard .flex-row-center-between > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-dashboard .flex-row-center-between > div > div {
+    width: 100%;
+  }
+
+  .admin-dashboard h2 {
+    text-align: center;
+    font-size: 1.25rem !important;
+  }
 }
 
