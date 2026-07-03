@@ -1434,7 +1434,8 @@ function initBookingWizard() {
                invoiceNo: invoiceNumber,
                receiptNo: receiptNumber,
                lineIdInput: lineIdInput,
-               lineUserId: state.liffProfile ? state.liffProfile.userId : ''
+               lineUserId: state.liffProfile ? state.liffProfile.userId : '',
+               requireCoach: state.requireCoach
              });
            }
         }
