@@ -1243,12 +1243,16 @@ header {
   
   /* Modal responsive sizing */
   .modal-overlay {
-    padding: 0.75rem;
+    padding: 0.5rem;
+    align-items: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   .modal-content {
     max-width: 100%;
     border-radius: 14px;
+    margin: 1.5rem auto;
   }
   
   .modal-body {
