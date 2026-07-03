@@ -394,6 +394,8 @@ function loadStateFromStorage() {
       // Merge values but keep hardcoded defaults if local storage values are empty
       if (!parsedConfig.supabaseUrl) parsedConfig.supabaseUrl = state.config.supabaseUrl;
       if (!parsedConfig.supabaseKey) parsedConfig.supabaseKey = state.config.supabaseKey;
+      if (!parsedConfig.liffId) parsedConfig.liffId = state.config.liffId;
+      if (!parsedConfig.gasUrl) parsedConfig.gasUrl = state.config.gasUrl;
       state.config = { ...state.config, ...parsedConfig };
     }
   } catch (err) {
