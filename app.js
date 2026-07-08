@@ -300,21 +300,24 @@ function getRunningNumber(type) {
   const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
   const prefix = `${yyyy}${mm}`;
   
-  const countersObjName = `${type}Counters`;
-  // สร้าง Object เก็บ Counter แยกรุ่นตามเดือน เช่น { "202606": 2, "202607": 1 }
-  if (!state.config[countersObjName]) {
-    state.config[countersObjName] = {};
-  }
+  const monthStr = `${yyyy}-${mm}`;
   
-  // ถ้าย้อนกลับไปจองเดือนอื่น จะได้ไม่ไปรีเซ็ตเดือนเดิม
-  if (!state.config[countersObjName][prefix]) {
-    state.config[countersObjName][prefix] = 1;
-  } else {
-    state.config[countersObjName][prefix]++;
-  }
+  // นับรหัสใบเสร็จ/ใบแจ้งหนี้ที่ไม่ซ้ำกันในระบบจริงสำหรับเดือนนี้
+  const uniqueNumbers = new Set();
+  state.bookings.forEach(b => {
+    if (b.date.startsWith(monthStr)) {
+      const numPart = type === 'receipt' ? b.receiptNo : b.invoiceNo;
+      if (numPart) {
+        const cleanNum = numPart.replace('R.', '').replace('INV.', '');
+        if (cleanNum.startsWith(prefix)) {
+          uniqueNumbers.add(cleanNum);
+        }
+      }
+    }
+  });
   
-  saveStateToStorage();
-  const countStr = String(state.config[countersObjName][prefix]).padStart(3, '0');
+  const nextNumber = uniqueNumbers.size + 1;
+  const countStr = String(nextNumber).padStart(3, '0');
   return `${prefix}${countStr}`;
 }
 
@@ -648,7 +651,8 @@ async function fetchBookingsFromSupabase(silent = false) {
         receiptNo: b.receipt_no,
         court: b.court,
         requireCoach: b.require_coach,
-        fee: parseFloat(b.fee) || 0
+        fee: parseFloat(b.fee) || 0,
+        adminNotes: b.admin_notes || ""
       }));
       
       state.bookings = dbBookings;
@@ -1437,7 +1441,8 @@ function initBookingWizard() {
                receiptNo: receiptNumber,
                lineIdInput: lineIdInput,
                lineUserId: state.liffProfile ? state.liffProfile.userId : '',
-               requireCoach: state.requireCoach
+               requireCoach: state.requireCoach,
+               slipUrl: slipUrl
              });
            }
         }
@@ -1728,6 +1733,11 @@ function renderAdminDashboard() {
     gasUrlInput.value = state.config.gasUrl || '';
   }
 
+  const notepadText = document.getElementById('adminNotepadText');
+  if (notepadText && !notepadText.matches(':focus')) {
+    notepadText.value = state.config.adminNotepad || '';
+  }
+
   // Setup Admin search input handler
   const searchInput = document.getElementById('bookingSearchInput');
   if (searchInput) {
@@ -1861,6 +1871,18 @@ function initAdminForms() {
     });
   }
 
+  const btnSaveAdminNotepad = document.getElementById('btnSaveAdminNotepad');
+  if (btnSaveAdminNotepad) {
+    btnSaveAdminNotepad.addEventListener('click', () => {
+      const notepadText = document.getElementById('adminNotepadText');
+      if (notepadText) {
+        state.config.adminNotepad = notepadText.value;
+        saveStateToStorage();
+        showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
+      }
+    });
+  }
+
   const btnBackupData = document.getElementById('btnBackupData');
   if (btnBackupData) {
     btnBackupData.addEventListener('click', async () => {
@@ -1951,7 +1973,7 @@ function renderBookingsTable() {
   }
 
   if (filteredBookings.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบรายการจองสนามที่ค้นหา' : 'No matching bookings found'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบรายการจองสนามที่ค้นหา' : 'No matching bookings found'}</td></tr>`;
     return;
   }
 
@@ -1976,6 +1998,13 @@ function renderBookingsTable() {
       <td><span class="${coachBadgeClass}">${coachBadgeText}</span></td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td>
+        <input type="text" class="form-control admin-booking-note" 
+               data-booking-id="${booking.id}" 
+               value="${booking.adminNotes || ''}" 
+               style="width: 150px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: var(--text-primary);" 
+               placeholder="จดโน้ต...">
+      </td>
+      <td>
         <button class="btn-danger-sm" data-cancel-id="${booking.id}">
           <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
         </button>
@@ -1988,6 +2017,18 @@ function renderBookingsTable() {
         cancelBooking(booking.id);
       }
     });
+
+    const noteInput = row.querySelector('.admin-booking-note');
+    if (noteInput) {
+      noteInput.addEventListener('change', async (e) => {
+        const newNote = e.target.value.trim();
+        const bId = e.target.getAttribute('data-booking-id');
+        
+        showToast(state.language === 'th' ? "กำลังบันทึกโน้ต..." : "Saving note...", 'info');
+        await updateBookingNoteInSupabase(bId, newNote);
+        showToast(state.language === 'th' ? "บันทึกโน้ตเรียบร้อย" : "Note saved successfully", 'success');
+      });
+    }
 
     tbody.appendChild(row);
   });
@@ -2060,6 +2101,20 @@ function renderLedgerTable(filteredTxs) {
 }
 
 async function cancelBooking(bookingId) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (booking && state.config.gasUrl) {
+    // Notify Apps Script to delete calendar event and sheet row
+    fetch(state.config.gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: "cancelBooking",
+        name: booking.name,
+        date: booking.date,
+        slot: booking.slot
+      })
+    }).catch(err => console.error("GAS booking cancellation trigger failed:", err));
+  }
+
   if (supabaseClient) {
     try {
       // Update status to 'cancelled' in supabaseClient.
@@ -2091,6 +2146,30 @@ async function cancelBooking(bookingId) {
   renderCalendar();
   renderTimeSlots();
   renderAdminDashboard();
+}
+
+async function updateBookingNoteInSupabase(bookingId, noteText) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from('bookings')
+        .update({ admin_notes: noteText })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Failed to update booking note in Supabase:", error);
+      showToast(state.language === 'th' ? "บันทึกโน้ตล้มเหลว" : "Failed to save note on server", 'error');
+      return;
+    }
+  }
+
+  // Update local state
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (booking) {
+    booking.adminNotes = noteText;
+    saveStateToStorage();
+  }
 }
 
 async function deleteTransaction(txId) {

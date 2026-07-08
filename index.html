@@ -552,6 +552,28 @@
               <button id="btnSaveGasConfig" class="btn-secondary" style="width: auto; padding: 0.75rem 1.25rem;" data-translate="btnSaveConfig">บันทึก URL</button>
             </div>
           </div>
+
+          <!-- Admin Notepad Widget -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-regular fa-sticky-note text-accent"></i>
+                <span>สมุดโน้ตข้อความของแอดมิน (Admin Notepad)</span>
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+              จดบันทึกข้อความทั่วไปที่นี่ เช่น แจ้งเตือนการปฏิบัติงาน หรือข้อมูลสำคัญของสนาม
+            </div>
+            <div class="form-group">
+              <textarea id="adminNotepadText" class="form-control" rows="4" style="resize: vertical; font-family: var(--font-family); font-size: 0.9rem;" placeholder="พิมพ์ข้อความที่ต้องการบันทึกไว้ที่นี่..."></textarea>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <button id="btnSaveAdminNotepad" class="btn-primary" style="width: auto; padding: 0.75rem 1.25rem;">
+                <i class="fa-solid fa-floppy-disk"></i> บันทึกโน้ตแอดมิน
+              </button>
+            </div>
+          </div>
+
         </div>
 
         <!-- Charts Dashboard layout -->
@@ -683,6 +705,7 @@
                   <th data-translate="thBookPhone">เบอร์โทร</th>
                   <th data-translate="thBookCoach">โค้ช</th>
                   <th data-translate="thBookFee">ค่าบริการ</th>
+                  <th>โน้ตเพิ่มเติม</th>
                   <th data-translate="thBookAction">จัดการ</th>
                 </tr>
               </thead>
@@ -700,7 +723,7 @@
 
   <!-- Charts & Core Scripts -->
   <script src="charts.js?v=6"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
 
