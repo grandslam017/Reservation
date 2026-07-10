@@ -1318,14 +1318,14 @@ function initBookingWizard() {
             
             document.getElementById('slipValidationLoader').style.display = 'none';
             
-            receiptNumber = 'R.' + getRunningNumber('receipt');
+            receiptNumber = 'R.' + invoiceNumber.replace('INV.', '');
             document.getElementById('receiptNumber').textContent = receiptNumber;
             document.getElementById('receiptBox').style.display = 'block';
             btnFinishBooking.style.display = 'block';
 
             // Convert canvas content to blob and save for Supabase Storage upload
             canvas.toBlob((blob) => {
-              state.currentSlipFile = new File([blob], `${invoiceNumber}.jpg`, { type: 'image/jpeg' });
+              state.currentSlipFile = new File([blob], `${receiptNumber}.jpg`, { type: 'image/jpeg' });
             }, 'image/jpeg', 0.7);
           };
           img.src = reader.result;
@@ -1349,7 +1349,7 @@ function initBookingWizard() {
         if (state.currentSlipFile && supabaseClient) {
           try {
             const fileExt = state.currentSlipFile.name.split('.').pop() || 'jpg';
-            const fileName = `${invoiceNumber}_${Date.now()}.${fileExt}`;
+            const fileName = `${receiptNumber}.${fileExt}`;
             const { data, error: uploadError } = await supabaseClient.storage
               .from('slips')
               .upload(fileName, state.currentSlipFile);
@@ -2169,6 +2169,23 @@ async function updateBookingNoteInSupabase(bookingId, noteText) {
   if (booking) {
     booking.adminNotes = noteText;
     saveStateToStorage();
+    
+    // Notify Apps Script to update note on Google Sheets and Google Calendar
+    if (state.config.gasUrl) {
+      fetch(state.config.gasUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: "updateNotes",
+          name: booking.name,
+          phone: booking.phone,
+          date: booking.date,
+          slot: booking.slot,
+          receiptNo: booking.receiptNo,
+          requireCoach: booking.requireCoach,
+          adminNotes: noteText
+        })
+      }).catch(err => console.error("GAS booking notes update trigger failed:", err));
+    }
   }
 }
 
