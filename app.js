@@ -302,21 +302,25 @@ function getRunningNumber(type) {
   
   const monthStr = `${yyyy}-${mm}`;
   
-  // นับรหัสใบเสร็จ/ใบแจ้งหนี้ที่ไม่ซ้ำกันในระบบจริงสำหรับเดือนนี้
-  const uniqueNumbers = new Set();
+  // ค้นหาค่าหมายเลขรันนิ่งที่สูงที่สุดสำหรับเดือนนี้
+  let maxNumber = 0;
   state.bookings.forEach(b => {
     if (b.date.startsWith(monthStr)) {
       const numPart = type === 'receipt' ? b.receiptNo : b.invoiceNo;
       if (numPart) {
         const cleanNum = numPart.replace('R.', '').replace('INV.', '');
         if (cleanNum.startsWith(prefix)) {
-          uniqueNumbers.add(cleanNum);
+          const numStr = cleanNum.substring(prefix.length);
+          const numVal = parseInt(numStr, 10);
+          if (!isNaN(numVal) && numVal > maxNumber) {
+            maxNumber = numVal;
+          }
         }
       }
     }
   });
   
-  const nextNumber = uniqueNumbers.size + 1;
+  const nextNumber = maxNumber + 1;
   const countStr = String(nextNumber).padStart(3, '0');
   return `${prefix}${countStr}`;
 }
