@@ -1137,7 +1137,7 @@ function initBookingWizard() {
     document.getElementById('custName').value = '';
     document.getElementById('custPhone').value = '';
     document.getElementById('custEmail').value = '';
-    document.getElementById('custLineId').value = '';
+    document.getElementById('custCarPlate').value = '';
     const consentAllowRadio = document.getElementById('consentAllow');
     if (consentAllowRadio) consentAllowRadio.checked = true;
     if (btnModalConfirm) {
@@ -1154,7 +1154,7 @@ function initBookingWizard() {
   const checkAutoFill = () => {
     const custNameInput = document.getElementById('custName');
     const custPhoneInput = document.getElementById('custPhone');
-    const custLineIdInput = document.getElementById('custLineId');
+    const custCarPlateInput = document.getElementById('custCarPlate');
     const custEmailInput = document.getElementById('custEmail');
     
     if (custNameInput && custPhoneInput) {
@@ -1168,8 +1168,8 @@ function initBookingWizard() {
         );
         
         if (match) {
-          if (match.lineIdInput && custLineIdInput && !custLineIdInput.value) {
-            custLineIdInput.value = match.lineIdInput;
+          if (match.lineIdInput && custCarPlateInput && !custCarPlateInput.value) {
+            custCarPlateInput.value = match.lineIdInput;
           }
           if (match.email && custEmailInput && !custEmailInput.value) {
             custEmailInput.value = match.email;
@@ -1341,7 +1341,7 @@ function initBookingWizard() {
         const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
         showToast(translations[state.language].toastGasSyncing, 'info');
 
-        const lineIdInput = document.getElementById('custLineId')?.value.trim() || '';
+        const lineIdInput = document.getElementById('custCarPlate')?.value.trim() || '';
 
         let hasCollision = false;
         let hasError = false;
