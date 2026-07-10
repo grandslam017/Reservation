@@ -980,12 +980,7 @@ function renderTimeSlotsUI() {
     if (isBooked || isPastSlot) {
       slotItem.className = 'slot-item booked';
       if (isBooked) {
-        if (state.isAdminLoggedIn && bookedEntry.name) {
-          const shortName = bookedEntry.name.length > 12 ? bookedEntry.name.substring(0, 12) + '...' : bookedEntry.name;
-          slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.8; display: block; margin-top: 2px;">🔒 ${shortName}</span>`;
-        } else {
-          slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.8; display: block; margin-top: 2px;">🔒 จองแล้ว</span>`;
-        }
+        slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.8; display: block; margin-top: 2px;">🔒 จองแล้ว</span>`;
       } else {
         slotItem.innerHTML = `<span class="slot-time">${slot}</span>`;
       }
