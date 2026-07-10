@@ -1339,7 +1339,6 @@ function initBookingWizard() {
       
       btnFinishBooking.onclick = async () => {
         const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
-        document.getElementById('invoiceSlipModal').style.display = 'none';
         showToast(translations[state.language].toastGasSyncing, 'info');
 
         const lineIdInput = document.getElementById('custLineId')?.value.trim() || '';
@@ -1353,7 +1352,8 @@ function initBookingWizard() {
         if (state.currentSlipFile && supabaseClient) {
           try {
             const fileExt = state.currentSlipFile.name.split('.').pop() || 'jpg';
-            const fileName = `${receiptNumber}.${fileExt}`;
+            const timestamp = Date.now();
+            const fileName = `${receiptNumber}_${timestamp}.${fileExt}`;
             const { data, error: uploadError } = await supabaseClient.storage
               .from('slips')
               .upload(fileName, state.currentSlipFile);
@@ -1366,9 +1366,16 @@ function initBookingWizard() {
             
             slipUrl = publicUrl;
           } catch (err) {
-            console.error("Storage upload failed, trying to save transaction anyways:", err);
+            console.error("Storage upload failed:", err);
+            showToast(state.language === 'th' 
+              ? 'อัปโหลดหลักฐานการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' 
+              : 'Failed to upload payment slip. Please try again.', 'error');
+            return;
           }
         }
+
+        // Close modal after successful upload
+        document.getElementById('invoiceSlipModal').style.display = 'none';
 
         // 2. Insert bookings
         for (const slot of slotsBooked) {
