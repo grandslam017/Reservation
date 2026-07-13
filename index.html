@@ -309,63 +309,63 @@
     </div>
     <!-- Invoice and Slip Upload Modal -->
     <div id="invoiceSlipModal" class="modal-overlay">
-      <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-content" style="max-width: 500px; max-height: 95vh; display: flex; flex-direction: column;">
         <div class="modal-header">
           <div class="modal-title" data-translate="modalInvoiceTitle">ใบแจ้งหนี้ & ชำระเงิน</div>
           <button id="btnInvoiceClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="modal-body" style="text-align: center;">
-          <div class="invoice-box" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px; border: 1px dashed var(--accent-color); margin-bottom: 1.5rem;">
-            <div style="font-size: 0.9rem; color: var(--text-secondary);">หมายเลขใบแจ้งหนี้ (Invoice No.)</div>
-            <div id="invoiceNumber" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-color); margin-bottom: 1rem;">-</div>
+        <div class="modal-body" style="text-align: center; overflow-y: auto; flex: 1; padding: 1.25rem 1.5rem;">
+          <div class="invoice-box" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px dashed var(--accent-color); margin-bottom: 1rem;">
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">หมายเลขใบแจ้งหนี้ (Invoice No.)</div>
+            <div id="invoiceNumber" style="font-size: 1.3rem; font-weight: 700; color: var(--accent-color); margin-bottom: 0.75rem;">-</div>
             
-            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.4rem;">
               <span style="color: var(--text-secondary);">ชื่อลูกค้า:</span>
               <span id="invoiceCustName" style="font-weight: 500;">-</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.4rem;">
               <span style="color: var(--text-secondary);">วันที่จอง:</span>
               <span id="invoiceDate" style="font-weight: 500;">-</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.75rem;">
               <span style="color: var(--text-secondary);">ยอดรวมทั้งสิ้น:</span>
-              <span id="invoiceAmount" style="font-weight: 700; color: var(--text-primary); font-size: 1.1rem;">-</span>
+              <span id="invoiceAmount" style="font-weight: 700; color: var(--text-primary); font-size: 1rem;">-</span>
             </div>
             
-            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
-              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">บัญชีสำหรับโอนเงิน</div>
-              <div style="font-weight: 600; color: #00c300;"><i class="fa-solid fa-qrcode"></i> พร้อมเพย์ (PromptPay)</div>
-              <div style="font-size: 1.2rem; letter-spacing: 1px; color: #00e676; margin: 0.5rem 0;">0894932242</div>
-              <div style="font-size: 0.9rem;">ชื่อบัญชี: ณฐกร เอียสกุล</div>
+            <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 8px;">
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">บัญชีสำหรับโอนเงิน</div>
+              <div style="font-weight: 600; color: #00c300; font-size: 0.9rem;"><i class="fa-solid fa-qrcode"></i> พร้อมเพย์ (PromptPay)</div>
+              <div style="font-size: 1.1rem; letter-spacing: 1px; color: #00e676; margin: 0.25rem 0;">0894932242</div>
+              <div style="font-size: 0.85rem;">ชื่อบัญชี: ณฐกร เอียสกุล</div>
             </div>
           </div>
 
-          <div class="form-group" style="text-align: left;">
-            <label class="form-label">แนบหลักฐานการโอนเงิน (Payment Slip) *</label>
-            <input type="file" id="slipUpload" class="form-control" accept="image/*" style="padding: 0.5rem;">
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
+          <div class="form-group" style="text-align: left; margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.4rem;">แนบหลักฐานการโอนเงิน (Payment Slip) *</label>
+            <input type="file" id="slipUpload" class="form-control" accept="image/*" style="padding: 0.4rem; font-size: 0.9rem;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
               * กรุณาแนบสลิปเพื่อยืนยันการทำรายการ
             </div>
           </div>
           
-          <div id="slipValidationLoader" style="display: none; margin: 1.5rem 0;">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent-color); margin-bottom: 0.5rem;"></i>
-            <div style="font-size: 0.9rem; color: var(--text-primary);">กำลังแนบสลิป...</div>
+          <div id="slipValidationLoader" style="display: none; margin: 1rem 0;">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--accent-color); margin-bottom: 0.25rem;"></i>
+            <div style="font-size: 0.85rem; color: var(--text-primary);">กำลังแนบสลิป...</div>
           </div>
           
-          <div id="receiptBox" style="display: none; background: rgba(0, 230, 118, 0.1); border: 1px solid #00e676; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-            <i class="fa-solid fa-circle-check" style="color: #00e676; font-size: 2rem; margin-bottom: 0.5rem;"></i>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">ชำระเงินสำเร็จ!</div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">หมายเลขใบเสร็จรับเงิน (Receipt No.)</div>
-            <div id="receiptNumber" style="font-size: 1.25rem; font-weight: 700; color: #00e676;">-</div>
+          <div id="receiptBox" style="display: none; background: rgba(0, 230, 118, 0.1); border: 1px solid #00e676; padding: 0.75rem; border-radius: 8px; margin-top: 0.75rem;">
+            <i class="fa-solid fa-circle-check" style="color: #00e676; font-size: 1.5rem; margin-bottom: 0.25rem;"></i>
+            <div style="font-weight: 600; margin-bottom: 0.25rem; font-size: 0.95rem;">ชำระเงินสำเร็จ!</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">หมายเลขใบเสร็จรับเงิน (Receipt No.)</div>
+            <div id="receiptNumber" style="font-size: 1.1rem; font-weight: 700; color: #00e676;">-</div>
           </div>
 
         </div>
-        <div class="modal-footer" style="justify-content: center;">
-          <button id="btnConfirmPayment" class="btn-primary" style="width: 100%; padding: 0.75rem;">
+        <div class="modal-footer" style="justify-content: center; padding: 0.75rem 1.5rem;">
+          <button id="btnConfirmPayment" class="btn-primary" style="width: 100%; padding: 0.65rem;">
             <i class="fa-solid fa-file-invoice-dollar"></i> แจ้งชำระเงิน
           </button>
-          <button id="btnFinishBooking" class="btn-primary" style="display: none; width: 100%; padding: 0.75rem; background: #00e676; color: #000;">
+          <button id="btnFinishBooking" class="btn-primary" style="display: none; width: 100%; padding: 0.65rem; background: #00e676; color: #000;">
             <i class="fa-solid fa-check"></i> กรุณากดยืนยัน
           </button>
         </div>
