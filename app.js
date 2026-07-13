@@ -27,7 +27,7 @@ const translations = {
     labelCustPhone: "เบอร์โทรศัพท์ติดต่อ *",
     labelCustEmail: "อีเมลสำหรับการยืนยันการจอง *",
     placeholderName: "เช่น หนูดี",
-    placeholderPhone: "เช่น 081-234-5678",
+    placeholderPhone: "เช่น 089-4932242 (เบอร์แอดมิน)",
     placeholderEmail: "เช่น grandslamcourt@gmail.com",
     privacyRemark: "ผู้ใช้บริการอนุญาตให้เก็บข้อมูลส่วนบุคคลเพื่อใช้สำหรับสนามเทนนิสเท่านั้น",
     consentAllow: "อนุญาต",
@@ -147,7 +147,7 @@ const translations = {
     labelCustPhone: "Contact Phone Number *",
     labelCustEmail: "Booking Confirmation Email *",
     placeholderName: "e.g. Nudee",
-    placeholderPhone: "e.g. 081-234-5678",
+    placeholderPhone: "e.g. 089-4932242 (Admin's No.)",
     placeholderEmail: "e.g. grandslamcourt@gmail.com",
     privacyRemark: "The user allows personal data to be collected for tennis court usage only.",
     consentAllow: "Allow",
@@ -1126,6 +1126,29 @@ function initBookingWizard() {
       document.getElementById('modalSelectedCoach').textContent = state.requireCoach ? 
         translations[state.language].txtNeedCoach : translations[state.language].txtNoCoach;
       
+      // Pre-fill user profile from localStorage if exists
+      try {
+        const savedProfile = localStorage.getItem('bookingProfile');
+        if (savedProfile) {
+          const profile = JSON.parse(savedProfile);
+          if (profile.name) document.getElementById('custName').value = profile.name;
+          if (profile.phone) document.getElementById('custPhone').value = profile.phone;
+          if (profile.email) document.getElementById('custEmail').value = profile.email;
+          if (profile.carPlate) document.getElementById('custVehicle').value = profile.carPlate;
+        }
+      } catch (e) {
+        console.error("Failed to load booking profile from localStorage:", e);
+      }
+
+      // Reset checkbox state and disable confirm button
+      const checkPrivacy = document.getElementById('consentPrivacyCheck');
+      if (checkPrivacy) checkPrivacy.checked = false;
+      if (btnModalConfirm) {
+        btnModalConfirm.disabled = true;
+        btnModalConfirm.style.opacity = '0.5';
+        btnModalConfirm.style.cursor = 'not-allowed';
+      }
+
       modal.style.display = 'flex';
     });
   }
@@ -1135,13 +1158,13 @@ function initBookingWizard() {
     document.getElementById('custName').value = '';
     document.getElementById('custPhone').value = '';
     document.getElementById('custEmail').value = '';
-    document.getElementById('custCarPlate').value = '';
-    const consentAllowRadio = document.getElementById('consentAllow');
-    if (consentAllowRadio) consentAllowRadio.checked = true;
+    document.getElementById('custVehicle').value = '';
+    const checkPrivacy = document.getElementById('consentPrivacyCheck');
+    if (checkPrivacy) checkPrivacy.checked = false;
     if (btnModalConfirm) {
-      btnModalConfirm.disabled = false;
-      btnModalConfirm.style.opacity = '1';
-      btnModalConfirm.style.cursor = 'pointer';
+      btnModalConfirm.disabled = true;
+      btnModalConfirm.style.opacity = '0.5';
+      btnModalConfirm.style.cursor = 'not-allowed';
     }
   };
 
@@ -1152,7 +1175,7 @@ function initBookingWizard() {
   const checkAutoFill = () => {
     const custNameInput = document.getElementById('custName');
     const custPhoneInput = document.getElementById('custPhone');
-    const custCarPlateInput = document.getElementById('custCarPlate');
+    const custCarPlateInput = document.getElementById('custVehicle');
     const custEmailInput = document.getElementById('custEmail');
     
     if (custNameInput && custPhoneInput) {
@@ -1183,23 +1206,40 @@ function initBookingWizard() {
   if (custPhoneInput) custPhoneInput.addEventListener('blur', checkAutoFill);
 
   // Privacy consent toggle logic
-  const consentAllowRadio = document.getElementById('consentAllow');
-  const consentDisallowRadio = document.getElementById('consentDisallow');
-  
-  if (consentDisallowRadio && btnModalConfirm) {
-    consentDisallowRadio.addEventListener('change', () => {
-      btnModalConfirm.disabled = true;
-      btnModalConfirm.style.opacity = '0.5';
-      btnModalConfirm.style.cursor = 'not-allowed';
+  const checkPrivacy = document.getElementById('consentPrivacyCheck');
+  if (checkPrivacy && btnModalConfirm) {
+    checkPrivacy.addEventListener('change', () => {
+      if (checkPrivacy.checked) {
+        btnModalConfirm.disabled = false;
+        btnModalConfirm.style.opacity = '1';
+        btnModalConfirm.style.cursor = 'pointer';
+      } else {
+        btnModalConfirm.disabled = true;
+        btnModalConfirm.style.opacity = '0.5';
+        btnModalConfirm.style.cursor = 'not-allowed';
+      }
     });
   }
-  if (consentAllowRadio && btnModalConfirm) {
-    consentAllowRadio.addEventListener('change', () => {
-      btnModalConfirm.disabled = false;
-      btnModalConfirm.style.opacity = '1';
-      btnModalConfirm.style.cursor = 'pointer';
+
+  // Privacy Policy modal show/hide handlers
+  const privacyModal = document.getElementById('privacyNoticeModal');
+  const linkPrivacy = document.getElementById('linkPrivacyNotice');
+  const btnPrivacyCloseX = document.getElementById('btnPrivacyCloseX');
+  const btnPrivacyCloseOk = document.getElementById('btnPrivacyCloseOk');
+
+  if (linkPrivacy && privacyModal) {
+    linkPrivacy.addEventListener('click', (e) => {
+      e.preventDefault();
+      privacyModal.style.display = 'flex';
     });
   }
+
+  const closePrivacy = () => {
+    if (privacyModal) privacyModal.style.display = 'none';
+  };
+
+  if (btnPrivacyCloseX) btnPrivacyCloseX.addEventListener('click', closePrivacy);
+  if (btnPrivacyCloseOk) btnPrivacyCloseOk.addEventListener('click', closePrivacy);
 
   if (btnModalConfirm) {
     btnModalConfirm.addEventListener('click', async () => {
@@ -1339,7 +1379,7 @@ function initBookingWizard() {
         const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
         showToast(translations[state.language].toastGasSyncing, 'info');
 
-        const lineIdInput = document.getElementById('custCarPlate')?.value.trim() || '';
+        const lineIdInput = document.getElementById('custVehicle')?.value.trim() || '';
 
         let hasCollision = false;
         let hasError = false;
@@ -1438,6 +1478,19 @@ function initBookingWizard() {
            showToast(errorMsg, 'error');
         } else {
            showToast(translations[state.language].toastBookingSuccess, 'success');
+
+           // Save booking profile to localStorage for auto-filling next time
+           try {
+             localStorage.setItem('bookingProfile', JSON.stringify({
+               name: name,
+               phone: phone,
+               email: email,
+               carPlate: lineIdInput
+             }));
+           } catch (e) {
+             console.error("Failed to save booking profile to localStorage:", e);
+           }
+
            // Trigger notifications via GAS
            if (state.config.gasUrl) {
              sendBookingConfirmationNotifications({
@@ -1622,6 +1675,18 @@ function populateYearFilter() {
   } else {
     yearFilterSelect.value = '';
   }
+
+  // Populate bookingYearFilter
+  const bookingYearSelect = document.getElementById('bookingYearFilter');
+  if (bookingYearSelect) {
+    const prevVal = bookingYearSelect.value;
+    bookingYearSelect.innerHTML = html;
+    if (sortedYears.includes(prevVal)) {
+      bookingYearSelect.value = prevVal;
+    } else {
+      bookingYearSelect.value = '';
+    }
+  }
 }
 
 // ----------------------------------------------------
@@ -1783,12 +1848,13 @@ function initAdminForms() {
 
   const btnSaveTx = document.getElementById('btnSaveTx');
   if (btnSaveTx) {
-    btnSaveTx.addEventListener('click', () => {
+    btnSaveTx.addEventListener('click', async () => {
       const dateEl = document.getElementById('txDate');
       const typeEl = document.getElementById('txType');
       const catEl = document.getElementById('txCategory');
       const amountEl = document.getElementById('txAmount');
       const descEl = document.getElementById('txDesc');
+      const fileInput = document.getElementById('txSlipFile');
 
       if (!dateEl || !typeEl || !catEl || !amountEl || !descEl) return;
 
@@ -1797,29 +1863,102 @@ function initAdminForms() {
       const category = catEl.value;
       const amount = parseFloat(amountEl.value) || 0;
       const desc = descEl.value.trim();
+      const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
       if (!date || amount <= 0) {
         showToast(translations[state.language].toastFillRequired, 'error');
         return;
       }
 
-      const newTx = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: date,
-        type: type,
-        category: category,
-        amount: amount,
-        description: desc || category
-      };
+      // Check if file is selected for upload to Google Drive
+      if (file) {
+        if (!state.config.gasUrl) {
+          showToast(state.language === 'th' ? "กรุณาตั้งค่า Google Apps Script Web App URL ก่อนแนบหลักฐาน" : "Please configure Google Apps Script Web App URL first", 'error');
+          return;
+        }
 
-      state.transactions.push(newTx);
-      saveStateToStorage();
+        showToast(state.language === 'th' ? "กำลังอัปโหลดหลักฐานการจ่ายเงิน..." : "Uploading slip...", 'info');
+        
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Data = reader.result.split(',')[1];
+          try {
+            const res = await fetch(state.config.gasUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: "uploadLedgerSlip",
+                fileData: base64Data,
+                fileName: `ledger_slip_${Date.now()}_${file.name}`,
+                mimeType: file.type,
+                folderName: "Slip บันทึกรายรับ - รายจ่าย"
+              })
+            });
+            const r = await res.json();
+            if (r.status === 'success' && r.fileUrl) {
+              const driveUrl = r.fileUrl;
+              const finalDesc = desc ? `${desc} (หลักฐาน: ${driveUrl})` : `${category} (หลักฐาน: ${driveUrl})`;
+              
+              const newTx = {
+                id: Math.random().toString(36).substr(2, 9),
+                date: date,
+                type: type,
+                category: category,
+                amount: amount,
+                description: finalDesc
+              };
 
-      amountEl.value = '';
-      descEl.value = '';
+              await addTransactionToSupabase(newTx);
+              
+              amountEl.value = '';
+              descEl.value = '';
+              if (fileInput) fileInput.value = '';
+              
+              showToast(state.language === 'th' ? "บันทึกและอัปโหลดหลักฐานสำเร็จ" : "Transaction saved and slip uploaded successfully", 'success');
+              renderAdminDashboard();
+            } else {
+              throw new Error(r.message || "Failed to upload to Google Drive");
+            }
+          } catch (err) {
+            console.error("Ledger file upload failed:", err);
+            showToast(state.language === 'th' ? "อัปโหลดรูปภาพล้มเหลว บันทึกเฉพาะข้อมูลธุรกรรม..." : "Slip upload failed. Saving transaction data only...", 'error');
+            
+            const newTx = {
+              id: Math.random().toString(36).substr(2, 9),
+              date: date,
+              type: type,
+              category: category,
+              amount: amount,
+              description: desc || category
+            };
 
-      showToast(translations[state.language].toastTxSaved, 'success');
-      renderAdminDashboard();
+            await addTransactionToSupabase(newTx);
+            
+            amountEl.value = '';
+            descEl.value = '';
+            if (fileInput) fileInput.value = '';
+            
+            renderAdminDashboard();
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const newTx = {
+          id: Math.random().toString(36).substr(2, 9),
+          date: date,
+          type: type,
+          category: category,
+          amount: amount,
+          description: desc || category
+        };
+
+        await addTransactionToSupabase(newTx);
+        
+        amountEl.value = '';
+        descEl.value = '';
+        
+        showToast(translations[state.language].toastTxSaved, 'success');
+        renderAdminDashboard();
+      }
     });
   }
 
@@ -1959,8 +2098,8 @@ function renderBookingsTable() {
   tbody.innerHTML = '';
 
   // Get Admin filters
-  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
-  const yearFilter = document.getElementById('adminYearFilter')?.value || '';
+  const monthFilter = document.getElementById('bookingMonthFilter')?.value || '';
+  const yearFilter = document.getElementById('bookingYearFilter')?.value || '';
 
   // Filter bookings first
   let filteredBookings = [...state.bookings];
@@ -2004,7 +2143,14 @@ function renderBookingsTable() {
         <div style="font-size: 0.75rem; color: var(--text-secondary);">${booking.email || ''}</div>
       </td>
       <td>${booking.phone}</td>
-      <td><span class="${coachBadgeClass}">${coachBadgeText}</span></td>
+      <td>
+        <span class="${coachBadgeClass} clickable-coach-badge" 
+              data-booking-id="${booking.id}" 
+              style="cursor: pointer; user-select: none; transition: opacity 0.2s;" 
+              title="${state.language === 'th' ? 'คลิกเพื่อเปลี่ยนสถานะโค้ช' : 'Click to toggle coach status'}">
+          ${coachBadgeText}
+        </span>
+      </td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td>
         <input type="text" class="form-control admin-booking-note" 
@@ -2027,6 +2173,18 @@ function renderBookingsTable() {
       }
     });
 
+    const coachBadge = row.querySelector('.clickable-coach-badge');
+    if (coachBadge) {
+      coachBadge.addEventListener('click', () => {
+        const confirmMsg = state.language === 'th'
+          ? `ต้องการเปลี่ยนสถานะของ โค้ช เป็น "${booking.requireCoach ? 'ไม่รับโค้ช' : 'รับโค้ช'}" ใช่หรือไม่?`
+          : `Do you want to change coach status to "${booking.requireCoach ? 'No Coach' : 'Need Coach'}"?`;
+        if (confirm(confirmMsg)) {
+          toggleCoachStatus(booking.id);
+        }
+      });
+    }
+
     const noteInput = row.querySelector('.admin-booking-note');
     if (noteInput) {
       noteInput.addEventListener('change', async (e) => {
@@ -2040,6 +2198,14 @@ function renderBookingsTable() {
     }
 
     tbody.appendChild(row);
+  });
+}
+
+function formatDescriptionWithLinks(desc) {
+  if (!desc) return '';
+  const urlRegex = /(https?:\/\/[^\s\)]+)/g;
+  return desc.replace(urlRegex, (url) => {
+    return `<a href="${url}" target="_blank" style="color: #a3e635; text-decoration: underline; font-weight: 600;"><i class="fa-solid fa-file-arrow-up"></i> ${state.language === 'th' ? 'ดูหลักฐาน' : 'View Slip'}</a>`;
   });
 }
 
@@ -2092,7 +2258,7 @@ function renderLedgerTable(filteredTxs) {
       <td>${typeBadge}</td>
       <td style="font-weight: 500;">${labelCat}</td>
       <td class="${amountColor}" style="font-weight: 600;">${amountPrefix}${amountVal.toLocaleString()} ฿</td>
-      <td style="font-size: 0.85rem; color: var(--text-secondary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tx.description}</td>
+      <td style="font-size: 0.85rem; color: var(--text-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis;">${formatDescriptionWithLinks(tx.description)}</td>
       <td>
         <button class="btn-danger-sm" data-tx-id="${tx.id}"><i class="fa-solid fa-xmark"></i></button>
       </td>
@@ -2155,6 +2321,66 @@ async function cancelBooking(bookingId) {
   renderCalendar();
   renderTimeSlots();
   renderAdminDashboard();
+}
+
+async function toggleCoachStatus(bookingId) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+
+  const newRequireCoach = !booking.requireCoach;
+  
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from('bookings')
+        .update({ require_coach: newRequireCoach })
+        .eq('id', bookingId);
+      if (error) throw error;
+    } catch (e) {
+      console.error("Failed to update coach status in Supabase:", e);
+      showToast(state.language === 'th' ? "อัปเดตสถานะโค้ชล้มเหลว" : "Failed to update coach status", 'error');
+      return;
+    }
+  }
+
+  // Update local state
+  booking.requireCoach = newRequireCoach;
+  saveStateToStorage();
+  
+  // Notify Google Apps Script to update sheet and calendar event
+  if (state.config.gasUrl) {
+    showToast(state.language === 'th' ? "กำลังซิงก์ข้อมูลไปที่ Google..." : "Syncing to Google...", 'info');
+    fetch(state.config.gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: "updateNotes",
+        name: booking.name,
+        phone: booking.phone,
+        date: booking.date,
+        slot: booking.slot,
+        receiptNo: booking.receiptNo,
+        requireCoach: newRequireCoach,
+        adminNotes: booking.adminNotes || ''
+      })
+    })
+    .then(async res => {
+      const r = await res.json();
+      if (r.status === 'success') {
+        showToast(state.language === 'th' ? "อัปเดตข้อมูลบน Google สำเร็จ" : "Successfully synced with Google", 'success');
+      } else {
+        console.warn("GAS update status:", r);
+      }
+    })
+    .catch(err => {
+      console.error("GAS booking update trigger failed:", err);
+      showToast(state.language === 'th' ? "อัปเดตบน Google ล้มเหลว" : "Google sync failed", 'error');
+    });
+  }
+
+  // Rerender dashboard, calendar, slots
+  renderAdminDashboard();
+  renderCalendar();
+  renderTimeSlots();
 }
 
 async function updateBookingNoteInSupabase(bookingId, noteText) {
@@ -2467,6 +2693,43 @@ async function init() {
       if (monthFilter) monthFilter.value = '';
       if (yearFilter) yearFilter.value = '';
       renderAdminDashboard();
+    });
+  }
+
+  // Set up Bookings Table Filters
+  const bookingMonthFilter = document.getElementById('bookingMonthFilter');
+  const bookingYearFilter = document.getElementById('bookingYearFilter');
+  const clearBookingFiltersBtn = document.getElementById('btnClearBookingFilters');
+
+  if (bookingMonthFilter) {
+    bookingMonthFilter.addEventListener('change', () => {
+      if (bookingMonthFilter.value) {
+        const year = bookingMonthFilter.value.split('-')[0];
+        if (bookingYearFilter) {
+          bookingYearFilter.value = year;
+        }
+      }
+      renderBookingsTable();
+    });
+  }
+
+  if (bookingYearFilter) {
+    bookingYearFilter.addEventListener('change', () => {
+      if (bookingMonthFilter && bookingMonthFilter.value) {
+        const monthYear = bookingMonthFilter.value.split('-')[0];
+        if (monthYear !== bookingYearFilter.value) {
+          bookingMonthFilter.value = '';
+        }
+      }
+      renderBookingsTable();
+    });
+  }
+
+  if (clearBookingFiltersBtn) {
+    clearBookingFiltersBtn.addEventListener('click', () => {
+      if (bookingMonthFilter) bookingMonthFilter.value = '';
+      if (bookingYearFilter) bookingYearFilter.value = '';
+      renderBookingsTable();
     });
   }
 
