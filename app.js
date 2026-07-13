@@ -2481,11 +2481,6 @@ async function initLiff() {
           const name = document.getElementById('liffProfileName');
           if (name) name.textContent = profile.displayName;
         }
-        
-        const custNameInput = document.getElementById('custName');
-        if (custNameInput && !custNameInput.value) {
-          custNameInput.value = profile.displayName;
-        }
       } else {
         if (liffProfileBox) liffProfileBox.style.display = 'none';
         if (btnLiffLogin) {
