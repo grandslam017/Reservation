@@ -1,4 +1,4 @@
-﻿// app.js - Core application logic for The Grand Slam Tennis Court Booking App
+// app.js - Core application logic for The Grand Slam Tennis Court Booking App
 
 // Language Translations Dictionary
 const translations = {
@@ -1994,57 +1994,39 @@ function initAdminForms() {
       showToast(state.language === 'th' ? "กำลังเชื่อมต่อ..." : "Testing connection...", 'info');
 
       try {
-        const testCli                placeholder="จดโน้ต...">
-      </td>
-      <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
-        <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
-          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'เลื่อนเวลา' : 'Reschedule'}
-        </button>
-        <button class="btn-danger-sm" data-cancel-id="${booking.id}">
-          <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
-        </button>
-      </td>
-    `;
-
-    row.querySelector('.btn-danger-sm').addEventListener('click', () => {
-      const confirmMsg = translations[state.language].confirmCancelBookingPrompt;
-      if (confirm(confirmMsg)) {
-        cancelBooking(booking.id);
+        const testClient = window.supabase.createClient(url, key);
+        const { error } = await testClient.from('bookings').select('id').limit(1);
+        if (error && error.code !== 'PGRST116') { // PGRST116 is just empty table error, which is fine
+          throw error;
+        }
+        showToast(state.language === 'th' ? "การเชื่อมต่อสำเร็จ!" : "Connection successful!", 'success');
+      } catch (err) {
+        console.error("Test connection failed:", err);
+        showToast(state.language === 'th' ? "การเชื่อมต่อล้มเหลว ตรวจสอบ URL, Key หรือ การเปิดสิทธิ์ RLS" : "Connection failed. Check URL, Key or RLS settings.", 'error');
       }
     });
+  }
 
-    const rescheduleBtn = row.querySelector('.btn-reschedule');
-    if (rescheduleBtn) {
-      rescheduleBtn.addEventListener('click', () => {
-        openRescheduleModal(booking);
-      });
-    }
+  const btnSaveGasConfig = document.getElementById('btnSaveGasConfig');
+  if (btnSaveGasConfig) {
+    btnSaveGasConfig.addEventListener('click', () => {
+      const gasInput = document.getElementById('gasUrlInput');
+      if (gasInput) {
+        state.config.gasUrl = gasInput.value.trim();
+        saveStateToStorage();
+        showToast(translations[state.language].toastConfigSaved, 'success');
+      }
+    });
+  }
 
-    const coachBadge = row.querySelector('.clickable-coach-badge');
-    if (coachBadge) {
-      coachBadge.addEventListener('click', () => {
-        const confirmMsg = state.language === 'th'
-          ? `ต้องการเปลี่ยนสถานะของ โค้ช เป็น "${booking.requireCoach ? 'ไม่รับโค้ช' : 'รับโค้ช'}" ใช่หรือไม่?`
-          : `Do you want to change coach status to "${booking.requireCoach ? 'No Coach' : 'Need Coach'}"?`;
-        if (confirm(confirmMsg)) {
-          toggleCoachStatus(booking.id);
-        }
-      });
-    }
-
-    const noteInput = row.querySelector('.admin-booking-note');
-    if (noteInput) {
-      noteInput.addEventListener('change', async (e) => {
-        const newNote = e.target.value.trim();
-        const bId = e.target.getAttribute('data-booking-id');
-        
-        showToast(state.language === 'th' ? "กำลังบันทึกโน้ต..." : "Saving note...", 'info');
-        await updateBookingNoteInSupabase(bId, newNote);
-        showToast(state.language === 'th' ? "บันทึกโน้ตเรียบร้อย" : "Note saved successfully", 'success');
-      });
-    }
-
-    tbody.appendChild(row);��โน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
+  const btnSaveAdminNotepad = document.getElementById('btnSaveAdminNotepad');
+  if (btnSaveAdminNotepad) {
+    btnSaveAdminNotepad.addEventListener('click', () => {
+      const notepadText = document.getElementById('adminNotepadText');
+      if (notepadText) {
+        state.config.adminNotepad = notepadText.value;
+        saveStateToStorage();
+        showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
       }
     });
   }
@@ -2177,10 +2159,7 @@ function renderBookingsTable() {
                style="width: 150px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: var(--text-primary);" 
                placeholder="จดโน้ต...">
       </td>
-      <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
-        <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
-          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'à¹€à¸¥à¸·à¹ˆà¸­à¸™à¹€à¸§à¸¥à¸²' : 'Reschedule'}
-        </button>
+      <td>
         <button class="btn-danger-sm" data-cancel-id="${booking.id}">
           <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
         </button>
@@ -2193,13 +2172,6 @@ function renderBookingsTable() {
         cancelBooking(booking.id);
       }
     });
-
-    const rescheduleBtn = row.querySelector('.btn-reschedule');
-    if (rescheduleBtn) {
-      rescheduleBtn.addEventListener('click', () => {
-        openRescheduleModal(booking);
-      });
-    }
 
     const coachBadge = row.querySelector('.clickable-coach-badge');
     if (coachBadge) {
@@ -2349,150 +2321,6 @@ async function cancelBooking(bookingId) {
   renderCalendar();
   renderTimeSlots();
   renderAdminDashboard();
-}
-
-// === Reschedule Booking functions ===
-function openRescheduleModal(booking) {
-  const modal = document.getElementById('rescheduleModal');
-  const txtId = document.getElementById('rescheduleBookingId');
-  const txtName = document.getElementById('rescheduleCustName');
-  const txtOld = document.getElementById('rescheduleOldDateTime');
-  const inputDate = document.getElementById('rescheduleNewDate');
-  const selectSlot = document.getElementById('rescheduleNewSlot');
-
-  if (modal && txtId && txtName && txtOld && inputDate && selectSlot) {
-    txtId.value = booking.id;
-    txtName.textContent = booking.name;
-    txtOld.textContent = `${booking.date} [${booking.slot}]`;
-    inputDate.value = booking.date;
-    selectSlot.value = booking.slot;
-    modal.style.display = 'flex';
-  }
-}
-
-async function handleRescheduleSave() {
-  const bookingId = document.getElementById('rescheduleBookingId')?.value;
-  const newDate = document.getElementById('rescheduleNewDate')?.value;
-  const newSlot = document.getElementById('rescheduleNewSlot')?.value;
-
-  if (!bookingId || !newDate || !newSlot) {
-    showToast(state.language === 'th' ? "à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸«à¹‰à¸„à¸£à¸šà¸–à¹‰à¸§à¸™" : "Please fill in all required fields", 'error');
-    return;
-  }
-
-  const booking = state.bookings.find(b => b.id === bookingId);
-  if (!booking) return;
-
-  // 1. Check double booking collision in active bookings
-  const isColliding = state.bookings.some(b => 
-    b.date === newDate && 
-    b.slot === newSlot && 
-    b.id !== bookingId
-  );
-
-  if (isColliding) {
-    showToast(state.language === 'th' 
-      ? "à¸§à¸±à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¸™à¸µà¹‰à¸¡à¸µà¸œà¸¹à¹‰à¸ˆà¸­à¸‡à¸ªà¸™à¸²à¸¡à¹à¸¥à¹‰à¸§ à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸§à¸±à¸™à¸«à¸£à¸·à¸­à¹€à¸§à¸¥à¸²à¸­à¸·à¹ˆà¸™" 
-      : "This slot is already booked. Please choose another date or time.", 'error');
-    return;
-  }
-
-  showToast(state.language === 'th' ? "à¸à¸³à¸¥à¸±à¸‡à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸§à¸¥à¸²..." : "Rescheduling booking...", 'info');
-
-  const oldDate = booking.date;
-  const oldSlot = booking.slot;
-
-  // 2. Update date/time in Supabase
-  if (supabaseClient) {
-    try {
-      const { error } = await supabaseClient
-        .from('bookings')
-        .update({ 
-          booking_date: newDate, 
-          time_slot: newSlot 
-        })
-        .eq('id', bookingId);
-
-      if (error) throw error;
-      
-      // Update transaction in Supabase
-      const newDesc = `à¸„à¹ˆà¸²à¹€à¸Šà¹ˆà¸²à¸ªà¸™à¸²à¸¡: à¸„à¸¸à¸“ ${booking.name} (${newSlot}) [Receipt: ${booking.receiptNo}]` + (booking.requireCoach ? ' (+à¹‚à¸„à¹‰à¸Š)' : '');
-      await supabaseClient
-        .from('transactions')
-        .update({ 
-          transaction_date: newDate,
-          description: newDesc
-        })
-        .eq('booking_id', bookingId);
-    } catch (e) {
-      console.error("Failed to update booking date/time in Supabase:", e);
-      showToast(state.language === 'th' ? "à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸šà¸™à¹€à¸‹à¸´à¸£à¹Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œ" : "Server error occurred", 'error');
-      return;
-    }
-  }
-
-  // 3. Update local state
-  booking.date = newDate;
-  booking.slot = newSlot;
-  
-  const localTx = state.transactions.find(tx => tx.bookingId === bookingId || tx.id === 'tx_b_' + bookingId);
-  if (localTx) {
-    localTx.date = newDate;
-    localTx.description = `à¸„à¹ˆà¸²à¹€à¸Šà¹ˆà¸²à¸ªà¸™à¸²à¸¡: à¸„à¸¸à¸“ ${booking.name} (${newSlot}) [Receipt: ${booking.receiptNo}]` + (booking.requireCoach ? ' (+à¹‚à¸„à¹‰à¸Š)' : '');
-  }
-
-  // 4. Update Google Sheets and Google Calendar via GAS
-  if (state.config.gasUrl) {
-    try {
-      // Step A: Cancel the old booking in Google Sheets & Google Calendar
-      await fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "cancelBooking",
-          name: booking.name,
-          date: oldDate,
-          slot: oldSlot
-        })
-      });
-
-      // Step B: Send new confirmation for the rescheduled booking details
-      await fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "sendConfirmation",
-          name: booking.name,
-          phone: booking.phone,
-          email: booking.email || "",
-          date: newDate,
-          slots: [newSlot],
-          invoiceNo: booking.invoiceNo,
-          receiptNo: booking.receiptNo,
-          lineUserId: booking.lineUserId || "",
-          requireCoach: booking.requireCoach,
-          slipUrl: booking.slipUrl || "",
-          lineIdInput: booking.lineIdInput || ""
-        })
-      });
-    } catch (err) {
-      console.error("Failed to sync reschedule with Google Apps Script:", err);
-    }
-  }
-
-  saveStateToStorage();
-  document.getElementById('rescheduleModal').style.display = 'none';
-  showToast(state.language === 'th' ? "à¹€à¸¥à¸·à¹ˆà¸­à¸™à¸§à¸±à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§!" : "Rescheduled successfully!", 'success');
-
-  // 5. Reload and re-render
-  await fetchBookingsFromSupabase(true);
-  if (state.isAdminLoggedIn) {
-    await fetchTransactionsFromSupabase();
-  }
-  renderCalendar();
-  renderTimeSlots();
-  renderBookingsTable();
-  if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
-    renderAdminDashboard();
-  }
 }
 
 async function toggleCoachStatus(bookingId) {
@@ -2898,26 +2726,6 @@ async function init() {
       if (bookingYearFilter) bookingYearFilter.value = '';
       renderBookingsTable();
     });
-  }
-
-  // === Reschedule Modal Event Handlers ===
-  const rescheduleModal = document.getElementById('rescheduleModal');
-  const btnRescheduleClose = document.getElementById('btnRescheduleClose');
-  const btnRescheduleCancel = document.getElementById('btnRescheduleCancel');
-  const btnRescheduleSave = document.getElementById('btnRescheduleSave');
-
-  if (btnRescheduleClose) {
-    btnRescheduleClose.addEventListener('click', () => {
-      rescheduleModal.style.display = 'none';
-    });
-  }
-  if (btnRescheduleCancel) {
-    btnRescheduleCancel.addEventListener('click', () => {
-      rescheduleModal.style.display = 'none';
-    });
-  }
-  if (btnRescheduleSave) {
-    btnRescheduleSave.addEventListener('click', handleRescheduleSave);
   }
 
   // === Auto-refresh mechanism ===
