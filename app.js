@@ -2135,6 +2135,29 @@ function renderBookingsTable() {
       translations[state.language].txtNeedCoach : translations[state.language].txtNoCoach;
     const coachBadgeClass = booking.requireCoach ? 'badge coach' : 'badge no-coach';
 
+    // Check if booking has already passed
+    const slotEndTimeStr = booking.slot.split(' - ')[1];
+    const bookingEndDateTime = new Date(`${booking.date}T${slotEndTimeStr}:00`);
+    const isPast = bookingEndDateTime < new Date();
+
+    let actionCellHTML = '';
+    if (isPast) {
+      actionCellHTML = `
+        <span class="badge" style="background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+          <i class="fa-solid fa-circle-check"></i> ${state.language === 'th' ? 'สำเร็จ' : 'Completed'}
+        </span>
+      `;
+    } else {
+      actionCellHTML = `
+        <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
+          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'เลื่อนเวลา' : 'Reschedule'}
+        </button>
+        <button class="btn-danger-sm" data-cancel-id="${booking.id}">
+          <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
+        </button>
+      `;
+    }
+
     row.innerHTML = `
       <td style="font-weight: 500;">${formattedDate}</td>
       <td class="text-accent" style="font-weight: 600;">${booking.slot}</td>
@@ -2160,21 +2183,19 @@ function renderBookingsTable() {
                placeholder="จดโน้ต...">
       </td>
       <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
-        <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
-          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'เลื่อนเวลา' : 'Reschedule'}
-        </button>
-        <button class="btn-danger-sm" data-cancel-id="${booking.id}">
-          <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
-        </button>
+        ${actionCellHTML}
       </td>
     `;
 
-    row.querySelector('.btn-danger-sm').addEventListener('click', () => {
-      const confirmMsg = translations[state.language].confirmCancelBookingPrompt;
-      if (confirm(confirmMsg)) {
-        cancelBooking(booking.id);
-      }
-    });
+    const cancelBtn = row.querySelector('.btn-danger-sm');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        const confirmMsg = translations[state.language].confirmCancelBookingPrompt;
+        if (confirm(confirmMsg)) {
+          cancelBooking(booking.id);
+        }
+      });
+    }
 
     const rescheduleBtn = row.querySelector('.btn-reschedule');
     if (rescheduleBtn) {
@@ -2334,6 +2355,76 @@ async function cancelBooking(bookingId) {
 }
 
 // === Reschedule Booking functions ===
+function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
+  const gridContainer = document.getElementById('rescheduleAvailabilityGrid');
+  const selectSlot = document.getElementById('rescheduleNewSlot');
+  if (!gridContainer || !selectSlot) return;
+
+  gridContainer.innerHTML = '';
+
+  const allSlots = [
+    "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+    "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+    "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
+    "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
+  ];
+
+  // Get active bookings for this date (excluding the booking itself)
+  const bookingsOnDate = state.bookings.filter(b => b.date === dateStr && b.id !== currentBookingId);
+
+  allSlots.forEach(slot => {
+    const isBooked = bookingsOnDate.some(b => b.slot === slot);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = slot;
+    
+    // Style base
+    btn.style.padding = '0.5rem 0.25rem';
+    btn.style.fontSize = '0.75rem';
+    btn.style.fontWeight = '600';
+    btn.style.borderRadius = '6px';
+    btn.style.border = 'none';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = 'all 0.2s';
+    btn.style.textAlign = 'center';
+
+    if (isBooked) {
+      // Booked slot: Red, disabled
+      btn.style.background = 'rgba(239, 68, 68, 0.1)';
+      btn.style.color = '#ef4444';
+      btn.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      btn.style.cursor = 'not-allowed';
+      btn.disabled = true;
+    } else if (slot === selectedSlot) {
+      // Selected slot: Active/Green-highlighted
+      btn.style.background = 'var(--accent-color)';
+      btn.style.color = '#000';
+      btn.style.boxShadow = '0 0 8px var(--accent-color)';
+    } else {
+      // Free slot: Dark green/grey, clickable
+      btn.style.background = 'rgba(255,255,255,0.05)';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.border = '1px solid var(--panel-border)';
+      
+      btn.addEventListener('mouseover', () => {
+        btn.style.background = 'rgba(255,255,255,0.1)';
+        btn.style.color = 'var(--text-primary)';
+      });
+      btn.addEventListener('mouseout', () => {
+        btn.style.background = 'rgba(255,255,255,0.05)';
+        btn.style.color = 'var(--text-secondary)';
+      });
+
+      btn.addEventListener('click', () => {
+        selectSlot.value = slot;
+        renderRescheduleAvailability(dateStr, currentBookingId, slot);
+      });
+    }
+
+    gridContainer.appendChild(btn);
+  });
+}
+
 function openRescheduleModal(booking) {
   const modal = document.getElementById('rescheduleModal');
   const txtId = document.getElementById('rescheduleBookingId');
@@ -2345,10 +2436,18 @@ function openRescheduleModal(booking) {
   if (modal && txtId && txtName && txtOld && inputDate && selectSlot) {
     txtId.value = booking.id;
     txtName.textContent = booking.name;
-    txtOld.textContent = `${booking.date} [${booking.slot}]`;
+    
+    // Format YYYY-MM-DD to DD-MM-YYYY
+    const parts = booking.date.split('-');
+    const formattedOldDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    txtOld.textContent = `${formattedOldDate} [${booking.slot}]`;
+    
     inputDate.value = booking.date;
     selectSlot.value = booking.slot;
     modal.style.display = 'flex';
+
+    // Render availability grid
+    renderRescheduleAvailability(booking.date, booking.id, booking.slot);
   }
 }
 
@@ -2900,6 +2999,38 @@ async function init() {
   }
   if (btnRescheduleSave) {
     btnRescheduleSave.addEventListener('click', handleRescheduleSave);
+  }
+
+  const rescheduleNewDateInput = document.getElementById('rescheduleNewDate');
+  if (rescheduleNewDateInput) {
+    rescheduleNewDateInput.addEventListener('change', (e) => {
+      const bookingId = document.getElementById('rescheduleBookingId')?.value;
+      const selectSlot = document.getElementById('rescheduleNewSlot');
+      if (selectSlot) {
+        // If current slot is occupied on new date, switch selection to first free slot
+        const isColliding = state.bookings.some(b => 
+          b.date === e.target.value && 
+          b.slot === selectSlot.value && 
+          b.id !== bookingId
+        );
+        let activeSlot = selectSlot.value;
+        if (isColliding) {
+          const bookingsOnDate = state.bookings.filter(b => b.date === e.target.value && b.id !== bookingId);
+          const allSlots = [
+            "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+            "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+            "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
+            "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
+          ];
+          const freeSlot = allSlots.find(slot => !bookingsOnDate.some(b => b.slot === slot));
+          if (freeSlot) {
+            selectSlot.value = freeSlot;
+            activeSlot = freeSlot;
+          }
+        }
+        renderRescheduleAvailability(e.target.value, bookingId, activeSlot);
+      }
+    });
   }
 
   // === Auto-refresh mechanism ===
