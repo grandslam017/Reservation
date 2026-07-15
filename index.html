@@ -394,31 +394,23 @@
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="rescheduleNewDate" class="form-label" style="font-weight: 600;">เลือกวันที่ใหม่ (New Date) *</label>
-              <input type="date" id="rescheduleNewDate" class="form-control" style="padding: 0.75rem;">
+            <!-- Full Month Calendar View for Reschedule -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 1rem; border-radius: 10px;">
+              <div class="calendar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <button type="button" id="reschedulePrevMonthBtn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border); color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="rescheduleMonthYearTitle" style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem;">-</span>
+                <button type="button" id="rescheduleNextMonthBtn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border); color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; gap: 0.25rem;">
+                <div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div>
+              </div>
+              <div id="rescheduleCalendarGrid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem;">
+              </div>
             </div>
-            
-            <div class="form-group" style="display: none; margin-top: 1rem;">
-              <label for="rescheduleNewSlot" class="form-label">เลือกเวลาใหม่ (New Time Slot) *</label>
-              <select id="rescheduleNewSlot" class="form-control">
-                <option value="08:00 - 09:00">08:00 - 09:00</option>
-                <option value="09:00 - 10:00">09:00 - 10:00</option>
-                <option value="10:00 - 11:00">10:00 - 11:00</option>
-                <option value="11:00 - 12:00">11:00 - 12:00</option>
-                <option value="12:00 - 13:00">12:00 - 13:00</option>
-                <option value="13:00 - 14:00">13:00 - 14:00</option>
-                <option value="14:00 - 15:00">14:00 - 15:00</option>
-                <option value="15:00 - 16:00">15:00 - 16:00</option>
-                <option value="16:00 - 17:00">16:00 - 17:00</option>
-                <option value="17:00 - 18:00">17:00 - 18:00</option>
-                <option value="18:00 - 19:00">18:00 - 19:00</option>
-                <option value="19:00 - 20:00">19:00 - 20:00</option>
-                <option value="20:00 - 21:00">20:00 - 21:00</option>
-                <option value="21:00 - 22:00">21:00 - 22:00</option>
-                <option value="22:00 - 23:00">22:00 - 23:00</option>
-              </select>
-            </div>
+
+            <!-- Hidden input fields to back state -->
+            <input type="date" id="rescheduleNewDate" style="display: none;">
+            <select id="rescheduleNewSlot" style="display: none;"></select>
           </div>
 
           <!-- Right side: Interactive Availability Grid -->
@@ -927,7 +919,7 @@
 
   <!-- Charts & Core Scripts -->
   <script src="charts.js?v=6"></script>
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>
 

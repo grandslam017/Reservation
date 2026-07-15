@@ -2355,6 +2355,113 @@ async function cancelBooking(bookingId) {
 }
 
 // === Reschedule Booking functions ===
+let rescheduleCalendarDate = new Date();
+let rescheduleSelectedDateStr = "";
+
+function renderRescheduleCalendar(bookingId) {
+  const grid = document.getElementById('rescheduleCalendarGrid');
+  const monthTitle = document.getElementById('rescheduleMonthYearTitle');
+  if (!grid || !monthTitle) return;
+
+  grid.innerHTML = '';
+
+  const year = rescheduleCalendarDate.getFullYear();
+  const month = rescheduleCalendarDate.getMonth();
+
+  const thaiMonths = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  const enMonths = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  if (state.language === 'th') {
+    monthTitle.textContent = `${thaiMonths[month]} ${year + 543}`;
+  } else {
+    monthTitle.textContent = `${enMonths[month]} ${year}`;
+  }
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 0; i < firstDayIndex; i++) {
+    const emptyDiv = document.createElement('div');
+    grid.appendChild(emptyDiv);
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = day;
+    
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    btn.style.padding = '0.5rem 0.2rem';
+    btn.style.fontSize = '0.8rem';
+    btn.style.fontWeight = '500';
+    btn.style.borderRadius = '6px';
+    btn.style.border = 'none';
+    btn.style.background = 'rgba(255,255,255,0.03)';
+    btn.style.color = 'var(--text-primary)';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = 'all 0.15s';
+    
+    if (dateStr === rescheduleSelectedDateStr) {
+      btn.style.border = '1px solid var(--accent-color)';
+      btn.style.background = 'rgba(163, 230, 53, 0.15)';
+    }
+
+    btn.addEventListener('mouseover', () => {
+      btn.style.background = 'rgba(255,255,255,0.08)';
+    });
+    btn.addEventListener('mouseout', () => {
+      if (dateStr === rescheduleSelectedDateStr) {
+        btn.style.background = 'rgba(163, 230, 53, 0.15)';
+      } else {
+        btn.style.background = 'rgba(255,255,255,0.03)';
+      }
+    });
+
+    btn.addEventListener('click', () => {
+      rescheduleSelectedDateStr = dateStr;
+      const inputDate = document.getElementById('rescheduleNewDate');
+      if (inputDate) {
+        inputDate.value = dateStr;
+      }
+      
+      const selectSlot = document.getElementById('rescheduleNewSlot');
+      let activeSlot = selectSlot ? selectSlot.value : "08:00 - 09:00";
+      
+      const isColliding = state.bookings.some(b => 
+        b.date === dateStr && 
+        b.slot === activeSlot && 
+        b.id !== bookingId
+      );
+      if (isColliding && selectSlot) {
+        const bookingsOnDate = state.bookings.filter(b => b.date === dateStr && b.id !== bookingId);
+        const allSlots = [
+          "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+          "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+          "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
+          "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
+        ];
+        const freeSlot = allSlots.find(slot => !bookingsOnDate.some(b => b.slot === slot));
+        if (freeSlot) {
+          selectSlot.value = freeSlot;
+          activeSlot = freeSlot;
+        }
+      }
+      
+      renderRescheduleCalendar(bookingId);
+      renderRescheduleAvailability(dateStr, bookingId, activeSlot);
+    });
+
+    grid.appendChild(btn);
+  }
+}
+
 function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
   const gridContainer = document.getElementById('rescheduleAvailabilityGrid');
   const selectSlot = document.getElementById('rescheduleNewSlot');
@@ -2369,7 +2476,6 @@ function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
     "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
   ];
 
-  // Get active bookings for this date (excluding the booking itself)
   const bookingsOnDate = state.bookings.filter(b => b.date === dateStr && b.id !== currentBookingId);
 
   allSlots.forEach(slot => {
@@ -2378,10 +2484,10 @@ function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
     btn.type = 'button';
     btn.textContent = slot;
     
-    // Style base
-    btn.style.padding = '1.7rem 1rem';
-    btn.style.fontSize = '1.25rem';
-    btn.style.fontWeight = '600';
+    // Style base (restored to smaller, thin text layout)
+    btn.style.padding = '1.0rem 0.5rem';
+    btn.style.fontSize = '1.05rem';
+    btn.style.fontWeight = '500';
     btn.style.borderRadius = '6px';
     btn.style.border = 'none';
     btn.style.cursor = 'pointer';
@@ -2389,19 +2495,16 @@ function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
     btn.style.textAlign = 'center';
 
     if (isBooked) {
-      // Booked slot: Red, disabled
       btn.style.background = 'rgba(239, 68, 68, 0.1)';
       btn.style.color = '#ef4444';
       btn.style.border = '1px solid rgba(239, 68, 68, 0.3)';
       btn.style.cursor = 'not-allowed';
       btn.disabled = true;
     } else if (slot === selectedSlot) {
-      // Selected slot: Active/Green-highlighted
       btn.style.background = 'var(--accent-color)';
       btn.style.color = '#000';
       btn.style.boxShadow = '0 0 8px var(--accent-color)';
     } else {
-      // Free slot: Dark green/grey, clickable
       btn.style.background = 'rgba(255,255,255,0.05)';
       btn.style.color = 'var(--text-secondary)';
       btn.style.border = '1px solid var(--panel-border)';
@@ -2437,16 +2540,18 @@ function openRescheduleModal(booking) {
     txtId.value = booking.id;
     txtName.textContent = booking.name;
     
-    // Format YYYY-MM-DD to DD-MM-YYYY
     const parts = booking.date.split('-');
     const formattedOldDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
     txtOld.textContent = `${formattedOldDate} [${booking.slot}]`;
     
     inputDate.value = booking.date;
+    rescheduleSelectedDateStr = booking.date;
+    rescheduleCalendarDate = new Date(booking.date);
     selectSlot.value = booking.slot;
     modal.style.display = 'flex';
 
-    // Render availability grid
+    // Render monthly calendar and availability grid
+    renderRescheduleCalendar(booking.id);
     renderRescheduleAvailability(booking.date, booking.id, booking.slot);
   }
 }
@@ -3001,35 +3106,22 @@ async function init() {
     btnRescheduleSave.addEventListener('click', handleRescheduleSave);
   }
 
-  const rescheduleNewDateInput = document.getElementById('rescheduleNewDate');
-  if (rescheduleNewDateInput) {
-    rescheduleNewDateInput.addEventListener('change', (e) => {
+  const reschedulePrevMonthBtn = document.getElementById('reschedulePrevMonthBtn');
+  const rescheduleNextMonthBtn = document.getElementById('rescheduleNextMonthBtn');
+
+  if (reschedulePrevMonthBtn) {
+    reschedulePrevMonthBtn.addEventListener('click', () => {
+      rescheduleCalendarDate.setMonth(rescheduleCalendarDate.getMonth() - 1);
       const bookingId = document.getElementById('rescheduleBookingId')?.value;
-      const selectSlot = document.getElementById('rescheduleNewSlot');
-      if (selectSlot) {
-        // If current slot is occupied on new date, switch selection to first free slot
-        const isColliding = state.bookings.some(b => 
-          b.date === e.target.value && 
-          b.slot === selectSlot.value && 
-          b.id !== bookingId
-        );
-        let activeSlot = selectSlot.value;
-        if (isColliding) {
-          const bookingsOnDate = state.bookings.filter(b => b.date === e.target.value && b.id !== bookingId);
-          const allSlots = [
-            "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
-            "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
-            "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
-            "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
-          ];
-          const freeSlot = allSlots.find(slot => !bookingsOnDate.some(b => b.slot === slot));
-          if (freeSlot) {
-            selectSlot.value = freeSlot;
-            activeSlot = freeSlot;
-          }
-        }
-        renderRescheduleAvailability(e.target.value, bookingId, activeSlot);
-      }
+      renderRescheduleCalendar(bookingId);
+    });
+  }
+
+  if (rescheduleNextMonthBtn) {
+    rescheduleNextMonthBtn.addEventListener('click', () => {
+      rescheduleCalendarDate.setMonth(rescheduleCalendarDate.getMonth() + 1);
+      const bookingId = document.getElementById('rescheduleBookingId')?.value;
+      renderRescheduleCalendar(bookingId);
     });
   }
 
