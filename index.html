@@ -373,57 +373,62 @@
     </div>
     <!-- Reschedule Booking Modal (Admin Only) -->
     <div id="rescheduleModal" class="modal-overlay">
-      <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-content" style="max-width: 850px; width: 90%;">
         <div class="modal-header">
           <div class="modal-title"><i class="fa-regular fa-calendar-days"></i> เลื่อนวันและเวลาจอง (Reschedule)</div>
           <button id="btnRescheduleClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="modal-body" style="padding: 1.5rem;">
+        <div class="modal-body" style="padding: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
           <input type="hidden" id="rescheduleBookingId">
           
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-              <span style="color: var(--text-secondary);">ชื่อลูกค้า:</span>
-              <span id="rescheduleCustName" style="font-weight:600; color: var(--text-primary);">-</span>
+          <!-- Left side: Form Info -->
+          <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 1rem;">
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 1rem; border-radius: 10px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">ชื่อลูกค้า:</span>
+                <span id="rescheduleCustName" style="font-weight:600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">วันและเวลาเดิม:</span>
+                <span id="rescheduleOldDateTime" style="font-weight:600; color: var(--accent-color);">-</span>
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-              <span style="color: var(--text-secondary);">วันและเวลาเดิม:</span>
-              <span id="rescheduleOldDateTime" style="font-weight:600; color: var(--accent-color);">-</span>
+
+            <div class="form-group">
+              <label for="rescheduleNewDate" class="form-label" style="font-weight: 600;">เลือกวันที่ใหม่ (New Date) *</label>
+              <input type="date" id="rescheduleNewDate" class="form-control" style="padding: 0.75rem;">
+            </div>
+            
+            <div class="form-group" style="display: none; margin-top: 1rem;">
+              <label for="rescheduleNewSlot" class="form-label">เลือกเวลาใหม่ (New Time Slot) *</label>
+              <select id="rescheduleNewSlot" class="form-control">
+                <option value="08:00 - 09:00">08:00 - 09:00</option>
+                <option value="09:00 - 10:00">09:00 - 10:00</option>
+                <option value="10:00 - 11:00">10:00 - 11:00</option>
+                <option value="11:00 - 12:00">11:00 - 12:00</option>
+                <option value="12:00 - 13:00">12:00 - 13:00</option>
+                <option value="13:00 - 14:00">13:00 - 14:00</option>
+                <option value="14:00 - 15:00">14:00 - 15:00</option>
+                <option value="15:00 - 16:00">15:00 - 16:00</option>
+                <option value="16:00 - 17:00">16:00 - 17:00</option>
+                <option value="17:00 - 18:00">17:00 - 18:00</option>
+                <option value="18:00 - 19:00">18:00 - 19:00</option>
+                <option value="19:00 - 20:00">19:00 - 20:00</option>
+                <option value="20:00 - 21:00">20:00 - 21:00</option>
+                <option value="21:00 - 22:00">21:00 - 22:00</option>
+                <option value="22:00 - 23:00">22:00 - 23:00</option>
+              </select>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="rescheduleNewDate" class="form-label">เลือกวันที่ใหม่ (New Date) *</label>
-            <input type="date" id="rescheduleNewDate" class="form-control">
-          </div>
-
-          <div class="form-group" style="margin-top: 1rem; display: none;">
-            <label for="rescheduleNewSlot" class="form-label">เลือกเวลาใหม่ (New Time Slot) *</label>
-            <select id="rescheduleNewSlot" class="form-control">
-              <option value="08:00 - 09:00">08:00 - 09:00</option>
-              <option value="09:00 - 10:00">09:00 - 10:00</option>
-              <option value="10:00 - 11:00">10:00 - 11:00</option>
-              <option value="11:00 - 12:00">11:00 - 12:00</option>
-              <option value="12:00 - 13:00">12:00 - 13:00</option>
-              <option value="13:00 - 14:00">13:00 - 14:00</option>
-              <option value="14:00 - 15:00">14:00 - 15:00</option>
-              <option value="15:00 - 16:00">15:00 - 16:00</option>
-              <option value="16:00 - 17:00">16:00 - 17:00</option>
-              <option value="17:00 - 18:00">17:00 - 18:00</option>
-              <option value="18:00 - 19:00">18:00 - 19:00</option>
-              <option value="19:00 - 20:00">19:00 - 20:00</option>
-              <option value="20:00 - 21:00">20:00 - 21:00</option>
-              <option value="21:00 - 22:00">21:00 - 22:00</option>
-              <option value="22:00 - 23:00">22:00 - 23:00</option>
-            </select>
-          </div>
-
-          <div style="margin-top: 1.25rem;">
-            <label class="form-label" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
-              ตรวจสอบวันเวลาที่ว่าง (Availability Grid) *
+          <!-- Right side: Interactive Availability Grid -->
+          <div style="flex: 1.5; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem;">
+            <label class="form-label" style="font-weight: 600; display: block; margin-bottom: 0;">
+              ตารางเวลาของวันที่เลือก (Time Availability Grid) *
             </label>
+            
             <!-- Legend -->
-            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.75rem;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.75rem;">
               <span style="display: flex; align-items: center; gap: 0.25rem; color: var(--text-secondary);">
                 <span style="width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border); display: inline-block;"></span> ว่าง (Available)
               </span>
@@ -434,14 +439,16 @@
                 <span style="width: 10px; height: 10px; border-radius: 3px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); display: inline-block;"></span> จองแล้ว (Booked)
               </span>
             </div>
-            <!-- Grid container -->
-            <div id="rescheduleAvailabilityGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding-right: 0.25rem;">
+
+            <!-- Grid container without scroll, large buttons -->
+            <div id="rescheduleAvailabilityGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.25rem;">
             </div>
           </div>
+
         </div>
-        <div class="modal-footer" style="justify-content: flex-end; padding: 1rem 1.5rem;">
-          <button id="btnRescheduleCancel" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">ยกเลิก</button>
-          <button id="btnRescheduleSave" class="btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.9rem;">
+        <div class="modal-footer" style="justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid var(--panel-border);">
+          <button id="btnRescheduleCancel" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.9rem;">ยกเลิก</button>
+          <button id="btnRescheduleSave" class="btn-primary" style="padding: 0.65rem 1.5rem; font-size: 0.9rem; background: var(--accent-color); color: #000; font-weight: bold; border: none; border-radius: 8px;">
             <i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนเวลา
           </button>
         </div>
@@ -920,7 +927,7 @@
 
   <!-- Charts & Core Scripts -->
   <script src="charts.js?v=6"></script>
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
 
