@@ -2379,8 +2379,8 @@ function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
     btn.textContent = slot;
     
     // Style base
-    btn.style.padding = '0.5rem 0.25rem';
-    btn.style.fontSize = '0.75rem';
+    btn.style.padding = '0.85rem 0.5rem';
+    btn.style.fontSize = '0.9rem';
     btn.style.fontWeight = '600';
     btn.style.borderRadius = '6px';
     btn.style.border = 'none';
