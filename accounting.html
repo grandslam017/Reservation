@@ -662,14 +662,25 @@
   </div>
 
   <script>
+    // Parse config from local storage (matching app.js)
+    const localConfigStr = localStorage.getItem('tennis_config');
+    let localConfig = {};
+    try {
+      if (localConfigStr) {
+        localConfig = JSON.parse(localConfigStr);
+      }
+    } catch(e) {
+      console.error("Failed to parse local config:", e);
+    }
+
     const state = {
       language: 'th',
       bookings: [],
       transactions: [],
       config: {
-        supabaseUrl: localStorage.getItem('tennis_supabase_url') || '',
-        supabaseKey: localStorage.getItem('tennis_supabase_key') || '',
-        adminPassword: localStorage.getItem('tennis_admin_password') || ''
+        supabaseUrl: localConfig.supabaseUrl || 'https://eqwmodrhorcbwsshbepg.supabase.co',
+        supabaseKey: localConfig.supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY',
+        adminPassword: localConfig.adminPassword || 'Zxcv1234'
       },
       accounting: {
         depreciationRate: 5,
