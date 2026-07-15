@@ -1998,7 +1998,7 @@ function initAdminForms() {
       </td>
       <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
         <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
-          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'เลื่อนเวลา' : 'Reschedule'}
+          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? '\u0e40\u0e25\u0e37\u0e48\u0e2d\u0e19\u0e40\u0e27\u0e25\u0e32' : 'Reschedule'}
         </button>
         <button class="btn-danger-sm" data-cancel-id="${booking.id}">
           <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
@@ -2179,7 +2179,7 @@ function renderBookingsTable() {
       </td>
       <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
         <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
-          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'à¹€à¸¥à¸·à¹ˆà¸­à¸™à¹€à¸§à¸¥à¸²' : 'Reschedule'}
+          <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? '\u0e40\u0e25\u0e37\u0e48\u0e2d\u0e19\u0e40\u0e27\u0e25\u0e32' : 'Reschedule'}
         </button>
         <button class="btn-danger-sm" data-cancel-id="${booking.id}">
           <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
@@ -2376,7 +2376,7 @@ async function handleRescheduleSave() {
   const newSlot = document.getElementById('rescheduleNewSlot')?.value;
 
   if (!bookingId || !newDate || !newSlot) {
-    showToast(state.language === 'th' ? "à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸«à¹‰à¸„à¸£à¸šà¸–à¹‰à¸§à¸™" : "Please fill in all required fields", 'error');
+    showToast(state.language === 'th' ? "\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e43\u0e2b\u0e49\u0e04\u0e23\u0e1a\u0e16\u0e49\u0e27\u0e19" : "Please fill in all required fields", 'error');
     return;
   }
 
@@ -2392,12 +2392,12 @@ async function handleRescheduleSave() {
 
   if (isColliding) {
     showToast(state.language === 'th' 
-      ? "à¸§à¸±à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¸™à¸µà¹‰à¸¡à¸µà¸œà¸¹à¹‰à¸ˆà¸­à¸‡à¸ªà¸™à¸²à¸¡à¹à¸¥à¹‰à¸§ à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸§à¸±à¸™à¸«à¸£à¸·à¸­à¹€à¸§à¸¥à¸²à¸­à¸·à¹ˆà¸™" 
+      ? "\u0e27\u0e31\u0e19\u0e41\u0e25\u0e30\u0e40\u0e27\u0e25\u0e32\u0e19\u0e35\u0e49\u0e21\u0e35\u0e1c\u0e39\u0e49\u0e08\u0e2d\u0e07\u0e2a\u0e19\u0e32\u0e21\u0e41\u0e25\u0e49\u0e27 \u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e27\u0e31\u0e19\u0e2b\u0e23\u0e37\u0e2d\u0e40\u0e27\u0e25\u0e32\u0e2d\u0e37\u0e48\u0e19" 
       : "This slot is already booked. Please choose another date or time.", 'error');
     return;
   }
 
-  showToast(state.language === 'th' ? "à¸à¸³à¸¥à¸±à¸‡à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸§à¸¥à¸²..." : "Rescheduling booking...", 'info');
+  showToast(state.language === 'th' ? "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23\u0e40\u0e1b\u0e25\u0e37\u0e48\u0e2d\u0e19\u0e40\u0e27\u0e25\u0e32..." : "Rescheduling booking...", 'info');
 
   const oldDate = booking.date;
   const oldSlot = booking.slot;
@@ -2416,7 +2416,7 @@ async function handleRescheduleSave() {
       if (error) throw error;
       
       // Update transaction in Supabase
-      const newDesc = `à¸„à¹ˆà¸²à¹€à¸Šà¹ˆà¸²à¸ªà¸™à¸²à¸¡: à¸„à¸¸à¸“ ${booking.name} (${newSlot}) [Receipt: ${booking.receiptNo}]` + (booking.requireCoach ? ' (+à¹‚à¸„à¹‰à¸Š)' : '');
+      const newDesc = "\u0e04\u0e48\u0e32\u0e40\u0e0a\u0e48\u0e32\u0e2a\u0e19\u0e32\u0e21: \u0e04\u0e38\u0e13 " + booking.name + " (" + newSlot + ") [Receipt: " + booking.receiptNo + "]" + (booking.requireCoach ? ' (+\u0e42\u0e04\u0e49\u0e0a)' : '');
       await supabaseClient
         .from('transactions')
         .update({ 
@@ -2426,7 +2426,7 @@ async function handleRescheduleSave() {
         .eq('booking_id', bookingId);
     } catch (e) {
       console.error("Failed to update booking date/time in Supabase:", e);
-      showToast(state.language === 'th' ? "à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸šà¸™à¹€à¸‹à¸´à¸£à¹Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œ" : "Server error occurred", 'error');
+      showToast(state.language === 'th' ? "\u0e40\u0e01\u0e34\u0e14\u0e02\u0e49\u0e2d\u0e1c\u0e34\u0e14\u0e1e\u0e25\u0e32\u0e14\u0e1a\u0e19\u0e40\u0e0b\u0e34\u0e23\u0e4c\u0e1f\u0e40\u0e27\u0e2d\u0e23\u0e4c" : "Server error occurred", 'error');
       return;
     }
   }
@@ -2438,7 +2438,7 @@ async function handleRescheduleSave() {
   const localTx = state.transactions.find(tx => tx.bookingId === bookingId || tx.id === 'tx_b_' + bookingId);
   if (localTx) {
     localTx.date = newDate;
-    localTx.description = `à¸„à¹ˆà¸²à¹€à¸Šà¹ˆà¸²à¸ªà¸™à¸²à¸¡: à¸„à¸¸à¸“ ${booking.name} (${newSlot}) [Receipt: ${booking.receiptNo}]` + (booking.requireCoach ? ' (+à¹‚à¸„à¹‰à¸Š)' : '');
+    localTx.description = "\u0e04\u0e48\u0e32\u0e40\u0e0a\u0e48\u0e32\u0e2a\u0e19\u0e32\u0e21: \u0e04\u0e38\u0e13 " + booking.name + " (" + newSlot + ") [Receipt: " + booking.receiptNo + "]" + (booking.requireCoach ? ' (+\u0e42\u0e04\u0e49\u0e0a)' : '');
   }
 
   // 4. Update Google Sheets and Google Calendar via GAS
@@ -2480,7 +2480,7 @@ async function handleRescheduleSave() {
 
   saveStateToStorage();
   document.getElementById('rescheduleModal').style.display = 'none';
-  showToast(state.language === 'th' ? "à¹€à¸¥à¸·à¹ˆà¸­à¸™à¸§à¸±à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§!" : "Rescheduled successfully!", 'success');
+  showToast(state.language === 'th' ? "\u0e40\u0e25\u0e37\u0e48\u0e2d\u0e19\u0e27\u0e31\u0e19\u0e41\u0e25\u0e30\u0e40\u0e27\u0e25\u0e32\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22\u0e41\u0e25\u0e49\u0e27!" : "Rescheduled successfully!", 'success');
 
   // 5. Reload and re-render
   await fetchBookingsFromSupabase(true);
