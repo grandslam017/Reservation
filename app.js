@@ -277,12 +277,40 @@ function getYearMonthString(date) {
   return `${y}-${m}`;
 }
 
-// Helper: Check if month is locked for booking
+// Helper: Check if month or date is locked for booking
 function isMonthLocked(date) {
   const today = new Date();
-  const monthsDiff = (date.getFullYear() - today.getFullYear()) * 12 + (date.getMonth() - today.getMonth());
+  today.setHours(0, 0, 0, 0); // normalize today to midnight
+
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  // Past dates or today are never locked
+  if (targetDate <= today) {
+    return false;
+  }
+
+  // Check Sunday 14 days advance booking option
+  if (state.config.advanceBookingMonths === "14_days_sunday") {
+    // Find the most recent Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+    const currentDay = today.getDay(); 
+    const recentSunday = new Date(today);
+    recentSunday.setDate(today.getDate() - currentDay);
+    recentSunday.setHours(0, 0, 0, 0);
+
+    // Max bookable date is 14 days from that Sunday
+    const maxDate = new Date(recentSunday);
+    maxDate.setDate(recentSunday.getDate() + 14);
+    maxDate.setHours(23, 59, 59, 999);
+
+    return targetDate > maxDate;
+  }
+
+  const monthsDiff = (targetDate.getFullYear() - today.getFullYear()) * 12 + (targetDate.getMonth() - today.getMonth());
   
-  const maxAdvance = state.config.advanceBookingMonths !== undefined ? parseInt(state.config.advanceBookingMonths) : 1;
+  const maxAdvance = state.config.advanceBookingMonths !== undefined 
+    ? (state.config.advanceBookingMonths === "99" ? 999 : parseInt(state.config.advanceBookingMonths)) 
+    : 1;
   
   // Current month and past months are always unlocked
   if (monthsDiff <= 0) {
@@ -1823,7 +1851,9 @@ function renderAdminDashboard() {
   if (advanceSelect) {
     advanceSelect.value = state.config.advanceBookingMonths !== undefined ? state.config.advanceBookingMonths : 1;
     advanceSelect.onchange = (e) => {
-      state.config.advanceBookingMonths = parseInt(e.target.value);
+      const val = e.target.value;
+      // Do not parse int if it's the Sunday 14 days option string
+      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
       saveStateToStorage();
       renderCalendar();
       renderTimeSlots();
