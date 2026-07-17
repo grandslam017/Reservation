@@ -626,7 +626,7 @@ header {
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.95rem;
-  font-family: var(--font-family);
+  font-family: 'Sarabun', 'Inter', sans-serif;
   transition: border-color var(--transition-speed) ease;
 }
 
