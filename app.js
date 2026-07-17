@@ -255,7 +255,7 @@ const state = {
     gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
-    advanceBookingMonths: 1    // Default 1 month
+    advanceBookingMonths: 0    // Default 0 (เฉพาะเดือนปัจจุบัน)
   },
   currentDate: new Date(),          // For calendar view navigations
   selectedDate: new Date(),         // Selected booking date
@@ -687,7 +687,20 @@ async function fetchBookingsFromSupabase(silent = false) {
         adminNotes: b.admin_notes || ""
       }));
       
-      state.bookings = dbBookings;
+      // ดึงการตั้งค่าล็อกเดือนจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
+      const configRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'config');
+      if (configRow) {
+        const val = configRow.name;
+        state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
+        // อัปเดตตัวเลือกในดรอปดาวน์ของแอดมินด้วยหากแสดงผลอยู่
+        const advanceSelect = document.getElementById('advanceBookingMonths');
+        if (advanceSelect) {
+          advanceSelect.value = state.config.advanceBookingMonths;
+        }
+      }
+      
+      // กรองแถวตั้งค่านี้ออกจากรายการจองจริง เพื่อไม่แสดงผลบนตาราง
+      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && b.slot === 'config'));
       saveStateToStorage();
     }
   } catch (error) {
@@ -1862,11 +1875,34 @@ function renderAdminDashboard() {
   const advanceSelect = document.getElementById('advanceBookingMonths');
   if (advanceSelect) {
     advanceSelect.value = state.config.advanceBookingMonths !== undefined ? state.config.advanceBookingMonths : 1;
-    advanceSelect.onchange = (e) => {
+    advanceSelect.onchange = async (e) => {
       const val = e.target.value;
       // Do not parse int if it's the Sunday 14 days option string
       state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
       saveStateToStorage();
+      
+      // บันทึกการตั้งค่าลง Supabase เพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้
+      if (supabaseClient) {
+        try {
+          await supabaseClient
+            .from('bookings')
+            .upsert([{
+              id: 'cfg_advance_months',
+              booking_date: '1970-01-01',
+              time_slot: 'config',
+              customer_name: String(val),
+              phone: '000-000-0000',
+              email: 'config@system.local',
+              court: 'System',
+              require_coach: false,
+              fee: 0,
+              status: 'confirmed'
+            }], { onConflict: 'id' });
+        } catch (err) {
+          console.error("Failed to save advance booking config to Supabase:", err);
+        }
+      }
+      
       renderCalendar();
       renderTimeSlots();
       showToast(state.language === 'th' ? 'บันทึกการตั้งค่าล่วงหน้าเรียบร้อยแล้ว' : 'Advance booking settings saved', 'success');
