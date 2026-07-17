@@ -7,6 +7,7 @@
   <!-- Google Fonts: Inter and Sarabun -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -209,7 +210,7 @@
         <div style="display: flex; gap: 0.75rem; align-items: center; width: 100%;">
           <div style="flex-grow: 1; position: relative;">
             <i class="fa-solid fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 0.95rem;"></i>
-            <input type="text" id="custSearchInput" class="form-control" style="width: 100%; padding-left: 2.5rem; font-family: var(--font-family);" data-translate-placeholder="searchPlaceholderName" placeholder="ระบุชื่อ-นามสกุลลูกค้าที่ใช้จอง (เช่น สมชาย รักเรียน)">
+            <input type="text" id="custSearchInput" class="form-control" style="width: 100%; padding-left: 2.5rem; font-family: var(--font-family);" data-translate-placeholder="searchPlaceholderName" placeholder="ระบุชื่อ-นามสกุลลูกค้าที่ใช้จอง (เช่น สมชาย รักเรียน)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
           </div>
           <button id="btnSearchBooking" class="btn-primary" style="width: auto; padding: 0.75rem 1.5rem; white-space: nowrap;">
             <i class="fa-solid fa-magnifying-glass"></i>
@@ -276,12 +277,12 @@
           
           <div class="form-group">
             <label for="custName" class="form-label" data-translate="labelCustName">ชื่อลูกค้า *</label>
-            <input type="text" id="custName" class="form-control" data-translate-placeholder="placeholderName" placeholder="เช่น หนูดี" lang="th" required>
+            <input type="text" id="custName" class="form-control" data-translate-placeholder="placeholderName" placeholder="เช่น หนูดี" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
           </div>
           
           <div class="form-group">
             <label for="custVehicle" class="form-label">ทะเบียนรถ</label>
-            <input type="text" id="custVehicle" class="form-control" placeholder="กรณีมีเหตุสุดวิสัยจะได้สามารถติดต่อได้สะดวก" autocomplete="on" lang="th">
+            <input type="text" id="custVehicle" class="form-control" placeholder="กรณีมีเหตุสุดวิสัยจะได้สามารถติดต่อได้สะดวก" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
           </div>
 
           <div class="form-group">
