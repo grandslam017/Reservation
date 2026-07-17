@@ -487,7 +487,21 @@
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 0.4rem 0.75rem; border-radius: 10px;">
               <i class="fa-solid fa-filter" style="color: var(--accent-color); font-size: 0.85rem;"></i>
-              <input type="month" id="adminMonthFilter" class="form-control" style="background: transparent; border: none; padding: 0.25rem; font-size: 0.85rem; color: var(--text-primary); width: 160px;">
+              <select id="adminMonthFilter" class="form-control" style="background: transparent; border: none; padding: 0.25rem; font-size: 0.85rem; color: var(--text-primary); width: 160px; outline: none; cursor: pointer;">
+                <option value="" style="background: #1e293b;">ทุกเดือน (All Months)</option>
+                <option value="01" style="background: #1e293b;">มกราคม (Jan)</option>
+                <option value="02" style="background: #1e293b;">กุมภาพันธ์ (Feb)</option>
+                <option value="03" style="background: #1e293b;">มีนาคม (Mar)</option>
+                <option value="04" style="background: #1e293b;">เมษายน (Apr)</option>
+                <option value="05" style="background: #1e293b;">พฤษภาคม (May)</option>
+                <option value="06" style="background: #1e293b;">มิถุนายน (Jun)</option>
+                <option value="07" style="background: #1e293b;">กรกฎาคม (Jul)</option>
+                <option value="08" style="background: #1e293b;">สิงหาคม (Aug)</option>
+                <option value="09" style="background: #1e293b;">กันยายน (Sep)</option>
+                <option value="10" style="background: #1e293b;">ตุลาคม (Oct)</option>
+                <option value="11" style="background: #1e293b;">พฤศจิกายน (Nov)</option>
+                <option value="12" style="background: #1e293b;">ธันวาคม (Dec)</option>
+              </select>
               <button id="btnClearMonthFilter" class="btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 6px; white-space: nowrap;">ทั้งหมด</button>
             </div>
             <a href="accounting.html" target="_blank" class="btn-primary" style="padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: bold; background: var(--accent-color); color: #000; display: inline-flex; align-items: center; gap: 0.35rem; transition: transform 0.2s;">
@@ -784,7 +798,21 @@
               <!-- Month filter -->
               <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 0.4rem 0.75rem; border-radius: 8px; height: 38px;">
                 <i class="fa-solid fa-filter" style="color: var(--accent-color); font-size: 0.85rem;"></i>
-                <input type="month" id="bookingMonthFilter" class="form-control" style="background: transparent; border: none; padding: 0.25rem; font-size: 0.85rem; color: var(--text-primary); width: 150px; height: auto;">
+                <select id="bookingMonthFilter" class="form-control" style="background: transparent; border: none; padding: 0.25rem; font-size: 0.85rem; color: var(--text-primary); width: 150px; height: auto; outline: none; cursor: pointer;">
+                  <option value="" style="background: #1e293b;">ทุกเดือน (All Months)</option>
+                  <option value="01" style="background: #1e293b;">มกราคม (Jan)</option>
+                  <option value="02" style="background: #1e293b;">กุมภาพันธ์ (Feb)</option>
+                  <option value="03" style="background: #1e293b;">มีนาคม (Mar)</option>
+                  <option value="04" style="background: #1e293b;">เมษายน (Apr)</option>
+                  <option value="05" style="background: #1e293b;">พฤษภาคม (May)</option>
+                  <option value="06" style="background: #1e293b;">มิถุนายน (Jun)</option>
+                  <option value="07" style="background: #1e293b;">กรกฎาคม (Jul)</option>
+                  <option value="08" style="background: #1e293b;">สิงหาคม (Aug)</option>
+                  <option value="09" style="background: #1e293b;">กันยายน (Sep)</option>
+                  <option value="10" style="background: #1e293b;">ตุลาคม (Oct)</option>
+                  <option value="11" style="background: #1e293b;">พฤศจิกายน (Nov)</option>
+                  <option value="12" style="background: #1e293b;">ธันวาคม (Dec)</option>
+                </select>
                 <button id="btnClearBookingFilters" class="btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 6px; white-space: nowrap; border: none; background: rgba(255,255,255,0.1); color: var(--text-primary); cursor: pointer;">ล้าง</button>
               </div>
             </div>

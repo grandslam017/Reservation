@@ -7,6 +7,10 @@ const LINE_CHANNEL_ACCESS_TOKEN = "ROLcBgCgfSEGWtxZaUA8Ua8iZw50lnLVHQVRuDlzL9qS9
 // ไอดี LINE ส่วนตัวของแอดมิน (ขึ้นต้นด้วย U...) สำหรับรับรูปสลิปแจ้งชำระเงิน
 const ADMIN_LINE_USER_ID = "U30c55060b9041d638b7a7759eeb29876";
 
+// อีเมลปฏิทินของโค้ช (ตัวอย่าง: coach_email@gmail.com)
+// เพื่อให้ข้อมูลการสอนวิ่งไปเข้าปฏิทินของโค้ชโดยตรง (หากไม่ใช้งานให้ปล่อยว่างเป็น "")
+const COACH_CALENDAR_ID = "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่";
+
 // ==========================================
 // CORE WEB APP GATEWAY (รับ Request จากระบบจอง)
 // ==========================================
@@ -75,7 +79,7 @@ function handleSendConfirmation(data) {
   let emailSent = false;
   if (email) {
     try {
-      sendEmailConfirmation(email, name, formattedDate, slots, invoiceNo, receiptNo);
+      sendEmailConfirmation(email, name, formattedDate, slots, invoiceNo, receiptNo, requireCoach);
       emailSent = true;
     } catch (e) {
       console.error("Email send failed: ", e.toString());
@@ -86,7 +90,7 @@ function handleSendConfirmation(data) {
   let lineSent = false;
   if (lineUserId && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
-      sendLineMessageConfirmation(lineUserId, name, formattedDate, slots, receiptNo);
+      sendLineMessageConfirmation(lineUserId, name, formattedDate, slots, receiptNo, requireCoach);
       lineSent = true;
     } catch (e) {
       console.error("LINE send failed: ", e.toString());
@@ -115,7 +119,7 @@ function handleSendConfirmation(data) {
   if (ADMIN_LINE_USER_ID && ADMIN_LINE_USER_ID !== "ใส่_LINE_USER_ID_ส่วนตัวของแอดมิน_ที่นี่" && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
       const slipUrl = data.slipUrl || "";
-      sendAdminSlipNotification(name, formattedDate, slots, receiptNo, slipUrl);
+      sendAdminSlipNotification(name, formattedDate, slots, receiptNo, slipUrl, requireCoach);
     } catch (e) {
       console.error("Admin LINE notification failed: ", e.toString());
     }
@@ -191,9 +195,10 @@ function formatDateString(dateStr) {
 }
 
 // ฟังก์ชันส่งอีเมลด้วย GmailApp
-function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, receiptNo) {
+function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, receiptNo, requireCoach) {
   const subject = "ยืนยันการจองสนามสำเร็จ - The Grand Slam Tennis Court";
   const formattedSlots = slots.join(", ");
+  const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
   
   const htmlBody = `
     <div style="font-family: 'Sarabun', sans-serif, Arial; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
@@ -222,6 +227,10 @@ function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, 
             <td style="padding: 6px 0; color: #718096;">ช่วงเวลาใช้บริการ:</td>
             <td style="padding: 6px 0; font-weight: bold; color: #10b981;">${formattedSlots}</td>
           </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #718096;">ผู้ฝึกสอน (โค้ช):</td>
+            <td style="padding: 6px 0; font-weight: bold; color: #1a202c;">${coachText}</td>
+          </tr>
         </table>
       </div>
       
@@ -246,16 +255,18 @@ function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, 
 }
 
 // ฟังก์ชันส่ง LINE Push Message แจ้งเตือนจองสำเร็จ
-function sendLineMessageConfirmation(lineUserId, name, dateStr, slots, receiptNo) {
+function sendLineMessageConfirmation(lineUserId, name, dateStr, slots, receiptNo, requireCoach) {
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
+  const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
   
   const textMessage = `🎾 ยืนยันการจองสนามสำเร็จ!
 
 👤 คุณ: ${name}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
-🧾 เลขที่ใบเสร็จ: ${receiptNo}
+🧸 โค้ช: ${coachText}
+📄 เลขที่ใบเสร็จ: ${receiptNo}
 
 กรณีมีความจำเป็นต้องการเลื่อน กรุณาแจ้งแอดมินล่วงหน้าอย่างน้อย 2วันนะครับ 💚`;
 
@@ -293,6 +304,16 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
   
   const calendar = CalendarApp.getDefaultCalendar();
   
+  // ปฏิทินของโค้ช (ถ้ามีสิทธิ์และเปิดใช้งาน)
+  let coachCalendar = null;
+  if (requireCoach && typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+    try {
+      coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
+    } catch(err) {
+      console.error("Failed to access coach calendar: " + err.toString());
+    }
+  }
+  
   slots.forEach(slotStr => {
     try {
       const timeParts = slotStr.split(' - ');
@@ -319,9 +340,19 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
                           "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
                           "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌");
       
+      // 1. บันทึกในปฏิทินหลักของสนาม
       calendar.createEvent(title, startTime, endTime, {
         description: description
       });
+      
+      // 2. บันทึกในปฏิทินของโค้ช (เฉพาะเคสที่ต้องการโค้ช)
+      if (coachCalendar) {
+        const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
+        coachCalendar.createEvent(coachTitle, startTime, endTime, {
+          description: description
+        });
+        console.log("Created Coach Calendar event successfully.");
+      }
     } catch(e) {
       console.error("Calendar event failed: " + e.toString());
     }
@@ -474,6 +505,7 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
     const startTime = new Date(year, month, day, startHour, startMin, 0);
     const endTime = new Date(year, month, day, endHour, endMin, 0);
     
+    // 1. ลบจากปฏิทินหลัก
     const calendar = CalendarApp.getDefaultCalendar();
     const events = calendar.getEvents(startTime, endTime);
     
@@ -484,6 +516,25 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
         console.log("Deleted Google Calendar event: " + title);
       }
     });
+
+    // 2. ลบจากปฏิทินโค้ช
+    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+      try {
+        const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
+        if (coachCalendar) {
+          const coachEvents = coachCalendar.getEvents(startTime, endTime);
+          coachEvents.forEach(event => {
+            const title = event.getTitle();
+            if (title.indexOf(name) !== -1 && (title.indexOf("สอนเทนนิส") !== -1)) {
+              event.deleteEvent();
+              console.log("Deleted Coach Calendar event: " + title);
+            }
+          });
+        }
+      } catch(err) {
+        console.error("Failed to delete coach calendar event: " + err.toString());
+      }
+    }
   } catch (e) {
     console.error("Failed to delete Calendar event: " + e.toString());
   }
@@ -547,23 +598,64 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
     const startTime = new Date(year, month, day, startHour, startMin, 0);
     const endTime = new Date(year, month, day, endHour, endMin, 0);
     
+    const description = "ชื่อผู้จอง: " + name + "\n" +
+                        "เบอร์โทร: " + phone + "\n" +
+                        "เวลาจอง: " + slotStr + "\n" +
+                        "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
+                        "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌") + "\n" +
+                        "โน้ตเพิ่มเติมจากแอดมิน: " + (adminNotes || "-");
+
+    // 1. อัปเดตในปฏิทินหลัก
     const calendar = CalendarApp.getDefaultCalendar();
     const events = calendar.getEvents(startTime, endTime);
     
     events.forEach(event => {
       const title = event.getTitle();
       if (title.indexOf(name) !== -1 && (title.indexOf("จองสนาม") !== -1)) {
-        const description = "ชื่อผู้จอง: " + name + "\n" +
-                            "เบอร์โทร: " + phone + "\n" +
-                            "เวลาจอง: " + slotStr + "\n" +
-                            "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
-                            "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌") + "\n" +
-                            "โน้ตเพิ่มเติมจากแอดมิน: " + (adminNotes || "-");
-        
+        const icon = requireCoach ? "🧸" : "🎾";
+        event.setTitle(icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")");
         event.setDescription(description);
         console.log("Updated Google Calendar event description: " + title);
       }
     });
+
+    // 2. จัดการข้อมูลปฏิทินของโค้ช
+    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+      try {
+        const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
+        if (coachCalendar) {
+          const coachEvents = coachCalendar.getEvents(startTime, endTime);
+          let coachEvent = null;
+          
+          coachEvents.forEach(event => {
+            const title = event.getTitle();
+            if (title.indexOf(name) !== -1 && title.indexOf("สอนเทนนิส") !== -1) {
+              coachEvent = event;
+            }
+          });
+          
+          if (requireCoach) {
+            if (!coachEvent) {
+              const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
+              coachCalendar.createEvent(coachTitle, startTime, endTime, {
+                description: description
+              });
+              console.log("Created Coach Calendar event via notes update.");
+            } else {
+              coachEvent.setDescription(description);
+              console.log("Updated Coach Calendar event description.");
+            }
+          } else {
+            if (coachEvent) {
+              coachEvent.deleteEvent();
+              console.log("Deleted Coach Calendar event as coach is no longer required.");
+            }
+          }
+        }
+      } catch(err) {
+        console.error("Failed to sync coach calendar during update notes: " + err.toString());
+      }
+    }
   } catch (e) {
     console.error("Failed to update Calendar event notes: " + e.toString());
   }
@@ -749,15 +841,17 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
 }
 
 // ฟังก์ชันส่งสลิปและรายละเอียดการจองไปยัง LINE ส่วนตัวของแอดมิน
-function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl) {
+function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, requireCoach) {
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
+  const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
   
   const textMessage = `🔔 มีรายการจองใหม่เข้ามาและแจ้งชำระเงิน!
 
 👤 ลูกค้า: คุณ ${name}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
+🧸 โค้ช: ${coachText}
 🧾 เลขที่ใบเสร็จ: ${receiptNo || "-"}`;
 
   const messages = [

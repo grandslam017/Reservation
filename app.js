@@ -1731,8 +1731,12 @@ function renderAdminDashboard() {
 
   // 1. Filter Transactions for Stats and Category Doughnuts
   const filteredTxsForMetrics = state.transactions.filter(tx => {
+    if (monthFilter && yearFilter) {
+      return tx.date.startsWith(`${yearFilter}-${monthFilter}`);
+    }
     if (monthFilter) {
-      return tx.date.startsWith(monthFilter);
+      const parts = tx.date.split('-');
+      return parts.length >= 2 && parts[1] === monthFilter;
     }
     if (yearFilter) {
       return tx.date.startsWith(yearFilter);
@@ -1747,8 +1751,8 @@ function renderAdminDashboard() {
       return tx.date.startsWith(yearFilter);
     }
     if (monthFilter) {
-      const year = monthFilter.split('-')[0];
-      return tx.date.startsWith(year);
+      const yr = yearFilter || new Date().getFullYear().toString();
+      return tx.date.startsWith(yr);
     }
     return true;
   });
@@ -1772,11 +1776,19 @@ function renderAdminDashboard() {
   let occupancyRate = 0;
   if (monthFilter) {
     // Calculate for the specific month
-    const [year, month] = monthFilter.split('-').map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const yr = yearFilter ? Number(yearFilter) : new Date().getFullYear();
+    const month = Number(monthFilter);
+    const daysInMonth = new Date(yr, month, 0).getDate();
     const totalSlotsInMonth = daysInMonth * 15; // 15 slots/day (08:00 to 23:00)
     
-    const bookingsInMonth = state.bookings.filter(b => b.date.startsWith(monthFilter));
+    const bookingsInMonth = state.bookings.filter(b => {
+      if (yearFilter) {
+        return b.date.startsWith(`${yearFilter}-${monthFilter}`);
+      } else {
+        const parts = b.date.split('-');
+        return parts.length >= 2 && parts[1] === monthFilter;
+      }
+    });
     occupancyRate = Math.min(100, Math.round((bookingsInMonth.length / totalSlotsInMonth) * 100));
   } else if (yearFilter) {
     // Calculate for the specific year
@@ -2133,8 +2145,13 @@ function renderBookingsTable() {
 
   // Filter bookings first
   let filteredBookings = [...state.bookings];
-  if (monthFilter) {
-    filteredBookings = filteredBookings.filter(b => b.date.startsWith(monthFilter));
+  if (monthFilter && yearFilter) {
+    filteredBookings = filteredBookings.filter(b => b.date.startsWith(`${yearFilter}-${monthFilter}`));
+  } else if (monthFilter) {
+    filteredBookings = filteredBookings.filter(b => {
+      const parts = b.date.split('-');
+      return parts.length >= 2 && parts[1] === monthFilter;
+    });
   } else if (yearFilter) {
     filteredBookings = filteredBookings.filter(b => b.date.startsWith(yearFilter));
   }
@@ -3047,26 +3064,12 @@ async function init() {
 
   if (monthFilter) {
     monthFilter.addEventListener('change', () => {
-      // Sync year filter if month is selected
-      if (monthFilter.value) {
-        const year = monthFilter.value.split('-')[0];
-        if (yearFilter) {
-          yearFilter.value = year;
-        }
-      }
       renderAdminDashboard();
     });
   }
 
   if (yearFilter) {
     yearFilter.addEventListener('change', () => {
-      // Clear month filter if it doesn't match the selected year
-      if (monthFilter && monthFilter.value) {
-        const monthYear = monthFilter.value.split('-')[0];
-        if (monthYear !== yearFilter.value) {
-          monthFilter.value = '';
-        }
-      }
       renderAdminDashboard();
     });
   }
@@ -3086,24 +3089,12 @@ async function init() {
 
   if (bookingMonthFilter) {
     bookingMonthFilter.addEventListener('change', () => {
-      if (bookingMonthFilter.value) {
-        const year = bookingMonthFilter.value.split('-')[0];
-        if (bookingYearFilter) {
-          bookingYearFilter.value = year;
-        }
-      }
       renderBookingsTable();
     });
   }
 
   if (bookingYearFilter) {
     bookingYearFilter.addEventListener('change', () => {
-      if (bookingMonthFilter && bookingMonthFilter.value) {
-        const monthYear = bookingMonthFilter.value.split('-')[0];
-        if (monthYear !== bookingYearFilter.value) {
-          bookingMonthFilter.value = '';
-        }
-      }
       renderBookingsTable();
     });
   }
