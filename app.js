@@ -761,8 +761,7 @@ async function fetchBookingsFromSupabase(silent = false) {
   try {
     const { data, error } = await supabaseClient
       .from('bookings')
-      .select('*')
-      .neq('id', 'cb_' + Date.now());
+      .select('*');
 
     if (error) throw error;
     
