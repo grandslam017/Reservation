@@ -9,7 +9,7 @@ const ADMIN_LINE_USER_ID = "U30c55060b9041d638b7a7759eeb29876";
 
 // อีเมลปฏิทินของโค้ช (ตัวอย่าง: coach_email@gmail.com)
 // เพื่อให้ข้อมูลการสอนวิ่งไปเข้าปฏิทินของโค้ชโดยตรง (หากไม่ใช้งานให้ปล่อยว่างเป็น "")
-const COACH_CALENDAR_ID = "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่";
+const COACH_CALENDAR_ID = "nongpolchaisangsila@gmail.com";
 
 // ==========================================
 // CORE WEB APP GATEWAY (รับ Request จากระบบจอง)
@@ -163,8 +163,8 @@ function handleUpdateNotes(data) {
   const requireCoach = data.requireCoach === true || data.requireCoach === "true";
   const adminNotes = data.adminNotes;
   
-  // 1. อัปเดตข้อมูลในชีต
-  updateBookingNoteInSheet(dateStr, slotStr, adminNotes);
+  // 1. อัปเดตข้อมูลในชีต (โน้ตแอดมิน และ สถานะต้องการโค้ช)
+  updateBookingNoteInSheet(dateStr, slotStr, adminNotes, requireCoach);
   
   // 2. อัปเดตข้อมูลในปฏิทิน
   updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes);
@@ -505,9 +505,13 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
     const startTime = new Date(year, month, day, startHour, startMin, 0);
     const endTime = new Date(year, month, day, endHour, endMin, 0);
     
+    // กำหนดช่วงเวลาค้นหาให้กว้างขึ้น ±15 นาที เพื่อแก้ไขเรื่องเศษวินาทีหรือการเหลื่อมทับเขตเวลา
+    const searchStart = new Date(startTime.getTime() - 15 * 60 * 1000);
+    const searchEnd = new Date(endTime.getTime() + 15 * 60 * 1000);
+    
     // 1. ลบจากปฏิทินหลัก
     const calendar = CalendarApp.getDefaultCalendar();
-    const events = calendar.getEvents(startTime, endTime);
+    const events = calendar.getEvents(searchStart, searchEnd);
     
     events.forEach(event => {
       const title = event.getTitle();
@@ -522,7 +526,7 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
       try {
         const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
         if (coachCalendar) {
-          const coachEvents = coachCalendar.getEvents(startTime, endTime);
+          const coachEvents = coachCalendar.getEvents(searchStart, searchEnd);
           coachEvents.forEach(event => {
             const title = event.getTitle();
             if (title.indexOf(name) !== -1 && (title.indexOf("สอนเทนนิส") !== -1)) {
@@ -540,8 +544,8 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
   }
 }
 
-// อัปเดตโน้ตแอดมินลงในชีตแท็บ Bookings คอลัมน์ที่ 16
-function updateBookingNoteInSheet(dateStr, slotStr, adminNotes) {
+// อัปเดตโน้ตแอดมินและสถานะโค้ชลงในชีตแท็บ Bookings
+function updateBookingNoteInSheet(dateStr, slotStr, adminNotes, requireCoach) {
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const bookingSheet = spreadsheet.getSheetByName("Bookings");
@@ -565,13 +569,20 @@ function updateBookingNoteInSheet(dateStr, slotStr, adminNotes) {
       }
       
       if (rowDateStr === dateStr && rowSlot === slotStr) {
+        // คอลัมน์ที่ 8 คือ H (Require Coach)
+        if (typeof requireCoach !== "undefined") {
+          bookingSheet.getRange(i + 2, 8).setValue(requireCoach ? "Yes" : "No");
+        }
+        
         // คอลัมน์ที่ 16 คือ P (Admin Notes)
-        bookingSheet.getRange(i + 2, 16).setValue(adminNotes || "");
-        console.log("Updated Google Sheet note at row " + (i + 2));
+        if (typeof adminNotes !== "undefined") {
+          bookingSheet.getRange(i + 2, 16).setValue(adminNotes || "");
+        }
+        console.log("Updated Google Sheet note and coach status at row " + (i + 2));
       }
     }
   } catch (e) {
-    console.error("Failed to update sheet note: " + e.toString());
+    console.error("Failed to update sheet note and coach status: " + e.toString());
   }
 }
 
@@ -598,6 +609,10 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
     const startTime = new Date(year, month, day, startHour, startMin, 0);
     const endTime = new Date(year, month, day, endHour, endMin, 0);
     
+    // กำหนดช่วงเวลาค้นหาให้กว้างขึ้น ±15 นาที เพื่อแก้ไขเรื่องเศษวินาทีหรือการเหลื่อมทับเขตเวลา
+    const searchStart = new Date(startTime.getTime() - 15 * 60 * 1000);
+    const searchEnd = new Date(endTime.getTime() + 15 * 60 * 1000);
+    
     const description = "ชื่อผู้จอง: " + name + "\n" +
                         "เบอร์โทร: " + phone + "\n" +
                         "เวลาจอง: " + slotStr + "\n" +
@@ -607,7 +622,7 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
 
     // 1. อัปเดตในปฏิทินหลัก
     const calendar = CalendarApp.getDefaultCalendar();
-    const events = calendar.getEvents(startTime, endTime);
+    const events = calendar.getEvents(searchStart, searchEnd);
     
     events.forEach(event => {
       const title = event.getTitle();
@@ -624,7 +639,7 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
       try {
         const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
         if (coachCalendar) {
-          const coachEvents = coachCalendar.getEvents(startTime, endTime);
+          const coachEvents = coachCalendar.getEvents(searchStart, searchEnd);
           let coachEvent = null;
           
           coachEvents.forEach(event => {
