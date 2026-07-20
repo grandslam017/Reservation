@@ -1,0 +1,8 @@
+﻿
+app.js:3086:  const prevBtn = document.getElementById('prevMonthBtn');
+app.js:3087:  const nextBtn = document.getElementById('nextMonthBtn');
+app.js:3089:  if (prevBtn && nextBtn) {
+app.js:3090:    prevBtn.addEventListener('click', () => {
+app.js:3097:    nextBtn.addEventListener('click', () => {
+
+
