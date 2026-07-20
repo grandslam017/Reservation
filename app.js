@@ -699,8 +699,18 @@ async function fetchBookingsFromSupabase(silent = false) {
         }
       }
       
-      // กรองแถวตั้งค่านี้ออกจากรายการจองจริง เพื่อไม่แสดงผลบนตาราง
-      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && b.slot === 'config'));
+      // ดึงข้อความโน้ตแอดมินจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
+      const notepadRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'notepad');
+      if (notepadRow) {
+        state.config.adminNotepad = notepadRow.name || "";
+        const notepadText = document.getElementById('adminNotepadText');
+        if (notepadText && !notepadText.matches(':focus')) {
+          notepadText.value = state.config.adminNotepad;
+        }
+      }
+      
+      // กรองแถวตั้งค่าเหล่านี้ออกจากรายการจองจริง เพื่อไม่แสดงผลบนตาราง
+      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && (b.slot === 'config' || b.slot === 'notepad')));
       saveStateToStorage();
     }
   } catch (error) {
@@ -2099,11 +2109,34 @@ function initAdminForms() {
 
   const btnSaveAdminNotepad = document.getElementById('btnSaveAdminNotepad');
   if (btnSaveAdminNotepad) {
-    btnSaveAdminNotepad.addEventListener('click', () => {
+    btnSaveAdminNotepad.addEventListener('click', async () => {
       const notepadText = document.getElementById('adminNotepadText');
       if (notepadText) {
-        state.config.adminNotepad = notepadText.value;
+        const textVal = notepadText.value;
+        state.config.adminNotepad = textVal;
         saveStateToStorage();
+        
+        // บันทึกโน้ตแอดมินลง Supabase เพื่อซิงก์ข้ามเครื่องและเบราว์เซอร์
+        if (supabaseClient) {
+          try {
+            await supabaseClient
+              .from('bookings')
+              .upsert([{
+                id: 'cfg_admin_notepad',
+                booking_date: '1970-01-01',
+                time_slot: 'notepad',
+                customer_name: textVal,
+                phone: '000-000-0000',
+                email: 'config@system.local',
+                court: 'System',
+                require_coach: false,
+                fee: 0,
+                status: 'confirmed'
+              }], { onConflict: 'id' });
+          } catch (err) {
+            console.error("Failed to save admin notepad to Supabase:", err);
+          }
+        }
         showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
       }
     });
