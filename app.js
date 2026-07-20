@@ -762,13 +762,15 @@ async function fetchBookingsFromSupabase(silent = false) {
     const { data, error } = await supabaseClient
       .from('bookings')
       .select('*')
-      .neq('status', 'cancelled')
       .neq('id', 'cb_' + Date.now());
 
     if (error) throw error;
     
     if (data) {
-      const dbBookings = data.map(b => ({
+      // Filter out cancelled bookings in JavaScript to preserve rows where status is NULL/undefined (legacy bookings)
+      const activeData = data.filter(b => b.status !== 'cancelled');
+      
+      const dbBookings = activeData.map(b => ({
         id: b.id,
         date: b.booking_date,
         slot: b.time_slot,
