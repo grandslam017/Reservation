@@ -119,7 +119,7 @@ const translations = {
     searchViewDesc: "ใส่ชื่อของคุณที่ใช้จองสนามเพื่อสรุปวันเวลาและรายละเอียดการจองทั้งหมดของคุณ",
     searchPlaceholderName: "ระบุชื่อ-นามสกุลลูกค้าที่ใช้จอง (เช่น หนูดี)",
     btnSearch: "ค้นหา",
-    thInvoiceNumber: "หมายเลขใบแจ้งหนี้",
+    thInvoiceNumber: "โน้ตเพิ่มเติม",
     thReceiptNumber: "หมายเลขใบเสร็จ"
   },
   en: {
@@ -239,7 +239,7 @@ const translations = {
     searchViewDesc: "Enter the customer name used for booking to see your reserved times and summary.",
     searchPlaceholderName: "Enter the customer name (e.g. John Doe)",
     btnSearch: "Search",
-    thInvoiceNumber: "Invoice No.",
+    thInvoiceNumber: "Admin Notes",
     thReceiptNumber: "Receipt No."
   }
 };
@@ -604,7 +604,15 @@ function initSupabaseClient() {
   try {
     if (state.config.supabaseUrl && state.config.supabaseKey) {
       if (window.supabase) {
-        supabaseClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
+        supabaseClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey, {
+          global: {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          }
+        });
       } else {
         console.error("Supabase SDK is not loaded from CDN.");
       }
@@ -664,7 +672,8 @@ async function fetchBookingsFromSupabase(silent = false) {
     const { data, error } = await supabaseClient
       .from('bookings')
       .select('*')
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled')
+      .neq('id', 'cb_' + Date.now());
 
     if (error) throw error;
     
@@ -1378,10 +1387,26 @@ function initBookingWizard() {
           return;
         }
 
+        const file = fileInput.files[0];
+        
+        // 1. ตรวจสอบขนาดไฟล์ (ไม่เกิน 1MB)
+        if (file.size > 1024 * 1024) {
+          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 1MB' : 'Image size cannot exceed 1MB', 'error');
+          return;
+        }
+
+        // 2. ตรวจสอบนามสกุลและประเภทไฟล์ (jpeg, png, jpg)
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        const allowedExts = ['jpeg', 'jpg', 'png'];
+        if (!allowedTypes.includes(file.type) && !allowedExts.includes(fileExt)) {
+          showToast(state.language === 'th' ? 'รองรับเฉพาะไฟล์รูปภาพ (jpeg, png, jpg) เท่านั้น' : 'Only image files (jpeg, png, jpg) are allowed', 'error');
+          return;
+        }
+
         btnConfirmPayment.style.display = 'none';
         document.getElementById('slipValidationLoader').style.display = 'block';
         
-        const file = fileInput.files[0];
         const reader = new FileReader();
         reader.onloadend = () => {
           const img = new Image();
@@ -1919,38 +1944,7 @@ function renderAdminDashboard() {
     };
   }
 
-  // Sync config values to Supabase automatically in the background to keep database state updated
-  if (state.isAdminLoggedIn && supabaseClient) {
-    const val = document.getElementById('advanceBookingMonths')?.value || state.config.advanceBookingMonths;
-    const textVal = state.config.adminNotepad || '';
-    
-    supabaseClient.from('bookings').upsert([
-      {
-        id: 'cfg_advance_months',
-        booking_date: '1970-01-01',
-        time_slot: 'config',
-        customer_name: String(val),
-        phone: '000-000-0000',
-        email: 'config@system.local',
-        court: 'System',
-        require_coach: false,
-        fee: 0,
-        status: 'confirmed'
-      },
-      {
-        id: 'cfg_admin_notepad',
-        booking_date: '1970-01-01',
-        time_slot: 'notepad',
-        customer_name: textVal,
-        phone: '000-000-0000',
-        email: 'config@system.local',
-        court: 'System',
-        require_coach: false,
-        fee: 0,
-        status: 'confirmed'
-      }
-    ], { onConflict: 'id' }).catch(err => console.warn("Auto-sync config to Supabase failed:", err));
-  }
+
 
   renderBookingsTable();
   renderLedgerTable(filteredTxsForMetrics);
@@ -1993,6 +1987,21 @@ function initAdminForms() {
 
       // Check if file is selected for upload to Google Drive
       if (file) {
+        // 1. ตรวจสอบขนาดไฟล์ (ไม่เกิน 1MB)
+        if (file.size > 1024 * 1024) {
+          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 1MB' : 'Image size cannot exceed 1MB', 'error');
+          return;
+        }
+
+        // 2. ตรวจสอบนามสกุลและประเภทไฟล์ (jpeg, png, jpg)
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        const allowedExts = ['jpeg', 'jpg', 'png'];
+        if (!allowedTypes.includes(file.type) && !allowedExts.includes(fileExt)) {
+          showToast(state.language === 'th' ? 'รองรับเฉพาะไฟล์รูปภาพ (jpeg, png, jpg) เท่านั้น' : 'Only image files (jpeg, png, jpg) are allowed', 'error');
+          return;
+        }
+
         if (!state.config.gasUrl) {
           showToast(state.language === 'th' ? "กรุณาตั้งค่า Google Apps Script Web App URL ก่อนแนบหลักฐาน" : "Please configure Google Apps Script Web App URL first", 'error');
           return;
@@ -2311,7 +2320,12 @@ function renderBookingsTable() {
       <td style="font-weight: 500;">${formattedDate}</td>
       <td class="text-accent" style="font-weight: 600;">${booking.slot}</td>
       <td>
-        <div style="font-weight: 600; color: var(--text-primary);">${booking.name}</div>
+        <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+          <span>${booking.name}</span>
+          <button class="btn-edit-cust-info" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; font-size: 0.85rem; display: inline-flex; align-items: center; transition: color 0.2s;" title="${state.language === 'th' ? 'แก้ไขข้อมูลลูกค้า' : 'Edit Customer Info'}">
+            <i class="fa-regular fa-pen-to-square"></i>
+          </button>
+        </div>
         <div style="font-size: 0.75rem; color: var(--text-secondary);">${booking.email || ''}</div>
       </td>
       <td>${booking.phone}</td>
@@ -2350,6 +2364,13 @@ function renderBookingsTable() {
     if (rescheduleBtn) {
       rescheduleBtn.addEventListener('click', () => {
         openRescheduleModal(booking);
+      });
+    }
+
+    const editCustBtn = row.querySelector('.btn-edit-cust-info');
+    if (editCustBtn) {
+      editCustBtn.addEventListener('click', () => {
+        openEditBookingModal(booking);
       });
     }
 
@@ -2830,6 +2851,104 @@ async function handleRescheduleSave() {
   }
 }
 
+function openEditBookingModal(booking) {
+  const modal = document.getElementById('editBookingModal');
+  const txtId = document.getElementById('editBookingId');
+  const inputName = document.getElementById('editCustName');
+  const inputPhone = document.getElementById('editCustPhone');
+  const inputEmail = document.getElementById('editCustEmail');
+  const inputLineId = document.getElementById('editCustLineId');
+
+  if (modal && txtId && inputName && inputPhone && inputEmail && inputLineId) {
+    txtId.value = booking.id;
+    inputName.value = booking.name || "";
+    inputPhone.value = booking.phone || "";
+    inputEmail.value = booking.email || "";
+    inputLineId.value = booking.lineUserId || "";
+    modal.style.display = 'flex';
+  }
+}
+
+async function handleEditBookingSave() {
+  const bookingId = document.getElementById('editBookingId')?.value;
+  const newName = document.getElementById('editCustName')?.value.trim();
+  const newPhone = document.getElementById('editCustPhone')?.value.trim();
+  const newEmail = document.getElementById('editCustEmail')?.value.trim();
+  const newLineUserId = document.getElementById('editCustLineId')?.value.trim();
+
+  if (!bookingId || !newName || !newPhone) {
+    showToast(state.language === 'th' ? "กรุณากรอกชื่อและเบอร์โทรศัพท์" : "Please fill in Name and Phone number", 'error');
+    return;
+  }
+
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+
+  showToast(state.language === 'th' ? "กำลังบันทึกข้อมูล..." : "Saving customer info...", 'info');
+
+  // 1. Update details in Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from('bookings')
+        .update({ 
+          customer_name: newName, 
+          phone: newPhone,
+          email: newEmail || null,
+          line_user_id: newLineUserId || null
+        })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+    } catch (e) {
+      console.error("Failed to update customer info in Supabase:", e);
+      showToast(state.language === 'th' ? "บันทึกล้มเหลวในฐานข้อมูล" : "Failed to save to database", 'error');
+      return;
+    }
+  }
+
+  // Update local state
+  booking.name = newName;
+  booking.phone = newPhone;
+  booking.email = newEmail;
+  booking.lineUserId = newLineUserId;
+  saveStateToStorage();
+
+  // 2. Notify Google Apps Script to update sheet and calendar event
+  if (state.config.gasUrl) {
+    try {
+      await fetch(state.config.gasUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: "updateNotes",
+          name: newName,
+          phone: newPhone,
+          email: newEmail || '',
+          lineUserId: newLineUserId || '',
+          date: booking.date,
+          slot: booking.slot,
+          receiptNo: booking.receiptNo,
+          requireCoach: booking.requireCoach,
+          adminNotes: booking.adminNotes || ''
+        })
+      });
+    } catch (err) {
+      console.error("Failed to sync customer info update with GAS:", err);
+    }
+  }
+
+  document.getElementById('editBookingModal').style.display = 'none';
+  showToast(state.language === 'th' ? "แก้ไขข้อมูลลูกค้าเรียบร้อยแล้ว!" : "Customer info updated successfully!", 'success');
+
+  // Reload and rerender UI
+  renderCalendar();
+  renderTimeSlots();
+  renderBookingsTable();
+  if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+    renderAdminDashboard();
+  }
+}
+
 async function toggleCoachStatus(bookingId) {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (!booking) return;
@@ -3077,7 +3196,7 @@ function performBookingSearch(query, isSilent = false) {
       <td class="text-accent" style="font-weight: 600;">${booking.slot}</td>
       <td><span class="${coachBadgeClass}">${coachBadgeText}</span></td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
-      <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">${booking.invoiceNo || '-'}</td>
+      <td style="font-size: 0.85rem; color: var(--text-secondary);">${booking.adminNotes || '-'}</td>
       <td style="font-family: monospace; font-size: 0.85rem; color: #00e676;">${booking.receiptNo || '-'}</td>
     `;
     tbody.appendChild(row);
@@ -3227,6 +3346,26 @@ async function init() {
   }
   if (btnRescheduleSave) {
     btnRescheduleSave.addEventListener('click', handleRescheduleSave);
+  }
+
+  // === Edit Customer Info Modal Event Handlers ===
+  const editBookingModal = document.getElementById('editBookingModal');
+  const btnEditBookingClose = document.getElementById('btnEditBookingClose');
+  const btnEditBookingCancel = document.getElementById('btnEditBookingCancel');
+  const btnEditBookingSave = document.getElementById('btnEditBookingSave');
+
+  if (btnEditBookingClose) {
+    btnEditBookingClose.addEventListener('click', () => {
+      editBookingModal.style.display = 'none';
+    });
+  }
+  if (btnEditBookingCancel) {
+    btnEditBookingCancel.addEventListener('click', () => {
+      editBookingModal.style.display = 'none';
+    });
+  }
+  if (btnEditBookingSave) {
+    btnEditBookingSave.addEventListener('click', handleEditBookingSave);
   }
 
   const reschedulePrevMonthBtn = document.getElementById('reschedulePrevMonthBtn');

@@ -235,7 +235,7 @@
                   <th data-translate="thBookTime">เวลา</th>
                   <th data-translate="thBookCoach">โค้ช</th>
                   <th data-translate="thBookFee">ค่าบริการ</th>
-                  <th data-translate="thInvoiceNumber">หมายเลขใบแจ้งหนี้</th>
+                  <th data-translate="thInvoiceNumber">โน้ตเพิ่มเติม</th>
                   <th data-translate="thReceiptNumber">หมายเลขใบเสร็จ</th>
                 </tr>
               </thead>
@@ -443,6 +443,45 @@
           <button id="btnRescheduleCancel" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.9rem;">ยกเลิก</button>
           <button id="btnRescheduleSave" class="btn-primary" style="padding: 0.65rem 1.5rem; font-size: 0.9rem; background: var(--accent-color); color: #000; font-weight: bold; border: none; border-radius: 8px;">
             <i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนเวลา
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Booking Info Modal (Admin Only) -->
+    <div id="editBookingModal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 500px; width: 95%;">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-regular fa-pen-to-square"></i> แก้ไขข้อมูลลูกค้า (Edit Customer Info)</div>
+          <button id="btnEditBookingClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+          <input type="hidden" id="editBookingId">
+          
+          <div class="form-group">
+            <label for="editCustName" class="form-label">ชื่อผู้จอง (Customer Name) *</label>
+            <input type="text" id="editCustName" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);">
+          </div>
+          
+          <div class="form-group">
+            <label for="editCustPhone" class="form-label">เบอร์โทรศัพท์ (Phone) *</label>
+            <input type="text" id="editCustPhone" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);">
+          </div>
+
+          <div class="form-group">
+            <label for="editCustEmail" class="form-label">อีเมล (Email)</label>
+            <input type="email" id="editCustEmail" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);">
+          </div>
+
+          <div class="form-group">
+            <label for="editCustLineId" class="form-label">LINE User ID</label>
+            <input type="text" id="editCustLineId" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);">
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid var(--panel-border);">
+          <button id="btnEditBookingCancel" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.9rem;">ยกเลิก</button>
+          <button id="btnEditBookingSave" class="btn-primary" style="padding: 0.65rem 1.5rem; font-size: 0.9rem; background: var(--accent-color); color: #000; font-weight: bold; border: none; border-radius: 8px;">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล
           </button>
         </div>
       </div>
