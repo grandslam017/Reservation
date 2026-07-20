@@ -1919,6 +1919,39 @@ function renderAdminDashboard() {
     };
   }
 
+  // Sync config values to Supabase automatically in the background to keep database state updated
+  if (state.isAdminLoggedIn && supabaseClient) {
+    const val = document.getElementById('advanceBookingMonths')?.value || state.config.advanceBookingMonths;
+    const textVal = state.config.adminNotepad || '';
+    
+    supabaseClient.from('bookings').upsert([
+      {
+        id: 'cfg_advance_months',
+        booking_date: '1970-01-01',
+        time_slot: 'config',
+        customer_name: String(val),
+        phone: '000-000-0000',
+        email: 'config@system.local',
+        court: 'System',
+        require_coach: false,
+        fee: 0,
+        status: 'confirmed'
+      },
+      {
+        id: 'cfg_admin_notepad',
+        booking_date: '1970-01-01',
+        time_slot: 'notepad',
+        customer_name: textVal,
+        phone: '000-000-0000',
+        email: 'config@system.local',
+        court: 'System',
+        require_coach: false,
+        fee: 0,
+        status: 'confirmed'
+      }
+    ], { onConflict: 'id' }).catch(err => console.warn("Auto-sync config to Supabase failed:", err));
+  }
+
   renderBookingsTable();
   renderLedgerTable(filteredTxsForMetrics);
 }
