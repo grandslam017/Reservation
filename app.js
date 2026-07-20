@@ -253,6 +253,7 @@ const state = {
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
     liffId: "2010398825-4Z3Ff2Gf",
     gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
+    webhookSecret: "grandslam_secret_key_2026", // คีย์รหัสความปลอดภัยสำหรับ Webhook
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 0    // Default 0 (เฉพาะเดือนปัจจุบัน)
@@ -269,6 +270,94 @@ const state = {
   isFetchingBookings: false,
   autoRefreshTimer: null
 };
+
+// UUID Generator (RFC 4122 Compliant v4)
+// UUID Generator (RFC 4122 Compliant v4)
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Client Fingerprinting for Rate Limiting
+function getClientFingerprint() {
+  let fp = localStorage.getItem('client_fingerprint');
+  if (!fp) {
+    fp = 'fp_' + generateUUID();
+    localStorage.setItem('client_fingerprint', fp);
+  }
+  return fp;
+}
+
+// Deterministic Object Key Sorter for signature integrity
+function sortObjectKeys(obj) {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return obj;
+  }
+  const sorted = {};
+  Object.keys(obj).sort().forEach(key => {
+    sorted[key] = sortObjectKeys(obj[key]);
+  });
+  return sorted;
+}
+
+// Cryptographically Secure HMAC SHA-256 Generator using native SubtleCrypto
+async function generateHMACSignature(message, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: { name: "SHA-256" } },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(message)
+  );
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Secure Wrapper for sending signed requests to Google Apps Script
+async function sendGasRequest(payload) {
+  if (!state.config.gasUrl) {
+    console.warn("Google Apps Script Web App URL is not configured.");
+    return null;
+  }
+  try {
+    const timestamp = Date.now().toString();
+    payload.timestamp = timestamp;
+    payload.clientFingerprint = getClientFingerprint();
+    
+    // Sort properties to ensure deterministic JSON representation
+    const sortedPayload = sortObjectKeys(payload);
+    const unsignedRaw = JSON.stringify(sortedPayload);
+    
+    let signature = "";
+    if (state.config.webhookSecret) {
+      signature = await generateHMACSignature(unsignedRaw, state.config.webhookSecret);
+    }
+    
+    payload.signature = signature;
+    
+    const response = await fetch(state.config.gasUrl, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    
+    return await response.json();
+  } catch (err) {
+    console.error("GAS request failed:", err);
+    throw err;
+  }
+}
 
 // Helper: Get Year-Month String (e.g., "2026-05")
 function getYearMonthString(date) {
@@ -431,6 +520,7 @@ function loadStateFromStorage() {
       if (!parsedConfig.supabaseKey) parsedConfig.supabaseKey = state.config.supabaseKey;
       if (!parsedConfig.liffId) parsedConfig.liffId = state.config.liffId;
       if (!parsedConfig.gasUrl) parsedConfig.gasUrl = state.config.gasUrl;
+      if (!parsedConfig.webhookSecret) parsedConfig.webhookSecret = state.config.webhookSecret;
       state.config = { ...state.config, ...parsedConfig };
     }
   } catch (err) {
@@ -735,7 +825,7 @@ async function fetchBookingsFromSupabase(silent = false) {
 async function addTransactionToSupabase(tx) {
   if (!supabaseClient) {
     state.transactions.push({
-      id: tx.id || Math.random().toString(36).substr(2, 9),
+      id: tx.id || generateUUID(),
       ...tx
     });
     saveStateToStorage();
@@ -1491,9 +1581,11 @@ function initBookingWizard() {
         // Close modal after successful upload
         document.getElementById('invoiceSlipModal').style.display = 'none';
 
+        const bookingKey = "bk_" + generateUUID();
+
         // 2. Insert bookings
         for (const slot of slotsBooked) {
-          const bookingId = Math.random().toString(36).substr(2, 9);
+          const bookingId = generateUUID();
           const slotPrice = getSlotPrice(slot);
 
           const newBooking = {
@@ -1570,6 +1662,7 @@ function initBookingWizard() {
            // Trigger notifications via GAS
            if (state.config.gasUrl) {
              sendBookingConfirmationNotifications({
+               bookingKey: bookingKey,
                name: name,
                phone: phone,
                email: email,
@@ -1580,7 +1673,8 @@ function initBookingWizard() {
                lineIdInput: lineIdInput,
                lineUserId: state.liffProfile ? state.liffProfile.userId : '',
                requireCoach: state.requireCoach,
-               slipUrl: slipUrl
+               slipUrl: slipUrl,
+               court: "Main Court"
              });
            }
         }
@@ -1605,10 +1699,13 @@ function initBookingWizard() {
             action: "sendConfirmation",
             ...info
           };
-          fetch(state.config.gasUrl, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          }).catch(err => console.error("GAS notification trigger failed:", err));
+          sendGasRequest(payload)
+            .then(res => {
+              if (res && res.status === "warning" && res.warnings) {
+                console.warn("GAS notification warnings:", res.warnings);
+              }
+            })
+            .catch(err => console.error("GAS notification trigger failed:", err));
         } catch (e) {
           console.error("Error triggering booking notifications:", e);
         }
@@ -1894,6 +1991,10 @@ function renderAdminDashboard() {
   if (gasUrlInput) {
     gasUrlInput.value = state.config.gasUrl || '';
   }
+  const webhookSecretInput = document.getElementById('webhookSecretInput');
+  if (webhookSecretInput) {
+    webhookSecretInput.value = state.config.webhookSecret || '';
+  }
 
   const notepadText = document.getElementById('adminNotepadText');
   if (notepadText && !notepadText.matches(':focus')) {
@@ -2013,23 +2114,19 @@ function initAdminForms() {
         reader.onloadend = async () => {
           const base64Data = reader.result.split(',')[1];
           try {
-            const res = await fetch(state.config.gasUrl, {
-              method: 'POST',
-              body: JSON.stringify({
-                action: "uploadLedgerSlip",
-                fileData: base64Data,
-                fileName: `ledger_slip_${Date.now()}_${file.name}`,
-                mimeType: file.type,
-                folderName: "Slip บันทึกรายรับ - รายจ่าย"
-              })
+            const r = await sendGasRequest({
+              action: "uploadLedgerSlip",
+              fileData: base64Data,
+              fileName: `ledger_slip_${Date.now()}_${file.name}`,
+              mimeType: file.type,
+              folderName: "Slip บันทึกรายรับ - รายจ่าย"
             });
-            const r = await res.json();
-            if (r.status === 'success' && r.fileUrl) {
+            if (r && r.status === 'success' && r.fileUrl) {
               const driveUrl = r.fileUrl;
               const finalDesc = desc ? `${desc} (หลักฐาน: ${driveUrl})` : `${category} (หลักฐาน: ${driveUrl})`;
               
               const newTx = {
-                id: Math.random().toString(36).substr(2, 9),
+                id: generateUUID(),
                 date: date,
                 type: type,
                 category: category,
@@ -2053,7 +2150,7 @@ function initAdminForms() {
             showToast(state.language === 'th' ? "อัปโหลดรูปภาพล้มเหลว บันทึกเฉพาะข้อมูลธุรกรรม..." : "Slip upload failed. Saving transaction data only...", 'error');
             
             const newTx = {
-              id: Math.random().toString(36).substr(2, 9),
+              id: generateUUID(),
               date: date,
               type: type,
               category: category,
@@ -2073,7 +2170,7 @@ function initAdminForms() {
         reader.readAsDataURL(file);
       } else {
         const newTx = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: generateUUID(),
           date: date,
           type: type,
           category: category,
@@ -2141,11 +2238,15 @@ function initAdminForms() {
   if (btnSaveGasConfig) {
     btnSaveGasConfig.addEventListener('click', () => {
       const gasInput = document.getElementById('gasUrlInput');
+      const secretInput = document.getElementById('webhookSecretInput');
       if (gasInput) {
         state.config.gasUrl = gasInput.value.trim();
-        saveStateToStorage();
-        showToast(translations[state.language].toastConfigSaved, 'success');
       }
+      if (secretInput) {
+        state.config.webhookSecret = secretInput.value.trim();
+      }
+      saveStateToStorage();
+      showToast(translations[state.language].toastConfigSaved, 'success');
     });
   }
 
@@ -2223,16 +2324,17 @@ function initAdminForms() {
       if (state.config.gasUrl) {
         showToast(state.language === 'th' ? "กำลังซิงก์ข้อมูลไปที่ Google Sheet..." : "Syncing data to Google Sheet...", 'info');
         try {
-          const payload = {
+          const r = await sendGasRequest({
+            action: "backup",
             bookings: state.bookings,
             transactions: state.transactions
-          };
-          const response = await fetch(state.config.gasUrl, {
-            method: 'POST',
-            body: JSON.stringify(payload)
           });
           
-          showToast(state.language === 'th' ? "ซิงก์ข้อมูลไปที่ Google Sheet สำเร็จ" : "Synced to Google Sheet successfully", 'success');
+          if (r && r.status === 'success') {
+            showToast(state.language === 'th' ? "ซิงก์ข้อมูลไปที่ Google Sheet สำเร็จ" : "Synced to Google Sheet successfully", 'success');
+          } else {
+            throw new Error(r ? r.message : "Sync failed");
+          }
         } catch (error) {
           console.error("Backup to GAS failed:", error);
           showToast(state.language === 'th' ? "การซิงก์ข้อมูลล้มเหลว กรุณาตรวจสอบ URL หรือสิทธิ์การเข้าถึง" : "Sync failed. Check URL and permissions.", 'error');
@@ -2480,14 +2582,12 @@ async function cancelBooking(bookingId) {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (booking && state.config.gasUrl) {
     // Notify Apps Script to delete calendar event and sheet row
-    fetch(state.config.gasUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: "cancelBooking",
-        name: booking.name,
-        date: booking.date,
-        slot: booking.slot
-      })
+    sendGasRequest({
+      action: "cancelBooking",
+      name: booking.name,
+      date: booking.date,
+      slot: booking.slot,
+      court: booking.court || "Main Court"
     }).catch(err => console.error("GAS booking cancellation trigger failed:", err));
   }
 
@@ -2801,33 +2901,30 @@ async function handleRescheduleSave() {
   if (state.config.gasUrl) {
     try {
       // Step A: Cancel the old booking in Google Sheets & Google Calendar
-      await fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "cancelBooking",
-          name: booking.name,
-          date: oldDate,
-          slot: oldSlot
-        })
+      await sendGasRequest({
+        action: "cancelBooking",
+        name: booking.name,
+        date: oldDate,
+        slot: oldSlot,
+        court: booking.court || "Main Court"
       });
 
       // Step B: Send new confirmation for the rescheduled booking details
-      await fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "sendConfirmation",
-          name: booking.name,
-          phone: booking.phone,
-          email: booking.email || "",
-          date: newDate,
-          slots: [newSlot],
-          invoiceNo: booking.invoiceNo,
-          receiptNo: booking.receiptNo,
-          lineUserId: booking.lineUserId || "",
-          requireCoach: booking.requireCoach,
-          slipUrl: booking.slipUrl || "",
-          lineIdInput: booking.lineIdInput || ""
-        })
+      await sendGasRequest({
+        action: "sendConfirmation",
+        bookingKey: "reschedule_" + bookingId + "_" + Date.now(),
+        name: booking.name,
+        phone: booking.phone,
+        email: booking.email || "",
+        date: newDate,
+        slots: [newSlot],
+        invoiceNo: booking.invoiceNo,
+        receiptNo: booking.receiptNo,
+        lineUserId: booking.lineUserId || "",
+        requireCoach: booking.requireCoach,
+        slipUrl: booking.slipUrl || "",
+        lineIdInput: booking.lineIdInput || "",
+        court: booking.court || "Main Court"
       });
     } catch (err) {
       console.error("Failed to sync reschedule with Google Apps Script:", err);
@@ -2917,20 +3014,17 @@ async function handleEditBookingSave() {
   // 2. Notify Google Apps Script to update sheet and calendar event
   if (state.config.gasUrl) {
     try {
-      await fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "updateNotes",
-          name: newName,
-          phone: newPhone,
-          email: newEmail || '',
-          lineUserId: newLineUserId || '',
-          date: booking.date,
-          slot: booking.slot,
-          receiptNo: booking.receiptNo,
-          requireCoach: booking.requireCoach,
-          adminNotes: booking.adminNotes || ''
-        })
+      await sendGasRequest({
+        action: "updateNotes",
+        name: newName,
+        phone: newPhone,
+        email: newEmail || '',
+        lineUserId: newLineUserId || '',
+        date: booking.date,
+        slot: booking.slot,
+        receiptNo: booking.receiptNo,
+        requireCoach: booking.requireCoach,
+        adminNotes: booking.adminNotes || ''
       });
     } catch (err) {
       console.error("Failed to sync customer info update with GAS:", err);
@@ -2976,22 +3070,18 @@ async function toggleCoachStatus(bookingId) {
   // Notify Google Apps Script to update sheet and calendar event
   if (state.config.gasUrl) {
     showToast(state.language === 'th' ? "กำลังซิงก์ข้อมูลไปที่ Google..." : "Syncing to Google...", 'info');
-    fetch(state.config.gasUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: "updateNotes",
-        name: booking.name,
-        phone: booking.phone,
-        date: booking.date,
-        slot: booking.slot,
-        receiptNo: booking.receiptNo,
-        requireCoach: newRequireCoach,
-        adminNotes: booking.adminNotes || ''
-      })
+    sendGasRequest({
+      action: "updateNotes",
+      name: booking.name,
+      phone: booking.phone,
+      date: booking.date,
+      slot: booking.slot,
+      receiptNo: booking.receiptNo,
+      requireCoach: newRequireCoach,
+      adminNotes: booking.adminNotes || ''
     })
-    .then(async res => {
-      const r = await res.json();
-      if (r.status === 'success') {
+    .then(r => {
+      if (r && r.status === 'success') {
         showToast(state.language === 'th' ? "อัปเดตข้อมูลบน Google สำเร็จ" : "Successfully synced with Google", 'success');
       } else {
         console.warn("GAS update status:", r);
@@ -3033,18 +3123,15 @@ async function updateBookingNoteInSupabase(bookingId, noteText) {
     
     // Notify Apps Script to update note on Google Sheets and Google Calendar
     if (state.config.gasUrl) {
-      fetch(state.config.gasUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: "updateNotes",
-          name: booking.name,
-          phone: booking.phone,
-          date: booking.date,
-          slot: booking.slot,
-          receiptNo: booking.receiptNo,
-          requireCoach: booking.requireCoach,
-          adminNotes: noteText
-        })
+      sendGasRequest({
+        action: "updateNotes",
+        name: booking.name,
+        phone: booking.phone,
+        date: booking.date,
+        slot: booking.slot,
+        receiptNo: booking.receiptNo,
+        requireCoach: booking.requireCoach,
+        adminNotes: noteText
       }).catch(err => console.error("GAS booking notes update trigger failed:", err));
     }
   }

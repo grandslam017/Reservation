@@ -3,57 +3,361 @@
 // ==========================================
 const scriptProperties = PropertiesService.getScriptProperties();
 
-// โหลดรหัส LINE Channel Access Token
-const LINE_CHANNEL_ACCESS_TOKEN = scriptProperties.getProperty("LINE_CHANNEL_ACCESS_TOKEN") || "ROLcBgCgfSEGWtxZaUA8Ua8iZw50lnLVHQVRuDlzL9qS9xEdNNuEf7HNqj+lkFsfcOdZZ6OlnCPjVj3tB35GzbnXzlNWsarirFTPTi7Rmg+BSY4NyI/ZCIyyIkrHrzjycET91QaUMbs7wfBM/uyRcQdB04t89/1O/w1cDnyilFU=";
+// โหลดรหัส LINE Channel Access Token - Throw error if missing
+const LINE_CHANNEL_ACCESS_TOKEN = scriptProperties.getProperty("LINE_CHANNEL_ACCESS_TOKEN");
+if (!LINE_CHANNEL_ACCESS_TOKEN) {
+  throw new Error("CRITICAL: LINE_CHANNEL_ACCESS_TOKEN is missing in Script Properties.");
+}
 
-// ไอดี LINE ส่วนตัวของแอดมินสำหรับส่งรูปสลิป
-const ADMIN_LINE_USER_ID = scriptProperties.getProperty("ADMIN_LINE_USER_ID") || "U30c55060b9041d638b7a7759eeb29876";
+// ไอดี LINE ส่วนตัวของแอดมินสำหรับส่งรูปสลิป - Throw error if missing
+const ADMIN_LINE_USER_ID = scriptProperties.getProperty("ADMIN_LINE_USER_ID");
+if (!ADMIN_LINE_USER_ID) {
+  throw new Error("CRITICAL: ADMIN_LINE_USER_ID is missing in Script Properties.");
+}
 
-// อีเมลปฏิทินของโค้ช
-const COACH_CALENDAR_ID = scriptProperties.getProperty("COACH_CALENDAR_ID") || "nongpolchaisangsila@gmail.com";
+// อีเมลปฏิทินของโค้ช - Throw error if missing
+const COACH_CALENDAR_ID = scriptProperties.getProperty("COACH_CALENDAR_ID");
+if (!COACH_CALENDAR_ID) {
+  throw new Error("CRITICAL: COACH_CALENDAR_ID is missing in Script Properties.");
+}
+
+// คีย์รหัสสำหรับตรวจสอบความปลอดภัยของ Webhook (HMAC Secret) - Throw error if missing
+const WEBHOOK_SECRET = scriptProperties.getProperty("WEBHOOK_SECRET");
+if (!WEBHOOK_SECRET) {
+  throw new Error("CRITICAL: WEBHOOK_SECRET is missing in Script Properties.");
+}
+
+// อีเมลปฏิทินหลัก (MAIN_CALENDAR_ID) - เลือกกรอกได้ หากว่างจะใช้ปฏิทินเริ่มต้น (Default Calendar)
+const MAIN_CALENDAR_ID = scriptProperties.getProperty("MAIN_CALENDAR_ID");
+
+// การตั้งค่าราคาเช่าสนามผ่าน Script Properties
+const OFF_PEAK_PRICE = parseFloat(scriptProperties.getProperty("OFF_PEAK_PRICE") || "250");
+const PEAK_PRICE = parseFloat(scriptProperties.getProperty("PEAK_PRICE") || "350");
 
 // ==========================================
 // CORE WEB APP GATEWAY (รับ Request จากระบบจอง)
 // ==========================================
 function doPost(e) {
-  const lock = LockService.getScriptLock();
-  // พยายามขอล็อค 30 วินาที เพื่อหลีกเลี่ยงการบันทึกทับกัน (Concurrency Lock)
-  try {
-    lock.waitLock(30000);
-  } catch (err) {
-    console.error("Lock timeout error: " + err.toString());
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server is busy, please try again later." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
   try {
     const rawContent = e.postData.contents;
     const data = JSON.parse(rawContent);
     
-    // ตรวจสอบแอ็กชันการทำงาน
-    if (data.action === "sendConfirmation") {
-      return handleSendConfirmation(data);
-    } else if (data.action === "cancelBooking") {
-      return handleCancelBooking(data);
-    } else if (data.action === "updateNotes") {
-      return handleUpdateNotes(data);
-    } else if (data.action === "uploadLedgerSlip") {
-      return handleUploadLedgerSlip(data);
+    // 5. ป้องกันสแปมด้วยระบบจำกัดคำสั่งจอง (Rate Limiting)
+    const rateLimitError = checkRateLimit(data);
+    if (rateLimitError) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: rateLimitError }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
-    // หากไม่ใช่การส่งแจ้งเตือน ให้ทำงานเป็นระบบสำรองข้อมูล (Backup)
-    return handleBackup(data);
+    // 2. ตรวจสอบความปลอดภัย Webhook (HMAC Signature & Timestamp Verification)
+    const clientSignature = data.signature;
+    const clientTimestamp = data.timestamp;
+    
+    if (!clientSignature || !clientTimestamp) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Missing signature or timestamp." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // ตรวจสอบ Replay Attack (ต้องส่งคำขอในเวลาไม่เกิน 5 นาที)
+    if (Math.abs(Date.now() - parseInt(clientTimestamp, 10)) > 5 * 60 * 1000) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Request expired (timestamp skew too high)." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // ถอดและประกอบโครงสร้างข้อมูลเพื่อตรวจสอบลายเซ็นแบบ Deterministic
+    const unsignedData = {...data};
+    delete unsignedData.signature;
+    const sortedData = sortObjectKeys(unsignedData);
+    const rawUnsigned = JSON.stringify(sortedData);
+    
+    const verified = verifyHMACSignature(rawUnsigned, clientSignature, WEBHOOK_SECRET);
+    if (!verified) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid signature." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 9. ตรวจสอบความถูกต้องของข้อมูล (Input Validation)
+    const valError = validateInput(data);
+    if (valError) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Validation failed: " + valError }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    let response;
+    // เลือกประมวลผลตามแอ็กชันที่กำหนด
+    if (data.action === "sendConfirmation") {
+      response = handleSendConfirmation(data);
+    } else if (data.action === "cancelBooking") {
+      response = handleCancelBooking(data);
+    } else if (data.action === "updateNotes") {
+      response = handleUpdateNotes(data);
+    } else if (data.action === "uploadLedgerSlip") {
+      response = handleUploadLedgerSlip(data);
+    } else if (data.action === "backup") {
+      response = handleBackup(data);
+    } else {
+      response = handleBackup(data);
+    }
+    
+    return response;
   } catch (error) {
+    logError("Runtime doPost Error", "doPost", error.toString(), "CRITICAL");
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    // ปลดล็อคกุญแจเสมอ
-    lock.releaseLock();
   }
 }
 
-// จัดการการอัปโหลดไฟล์สลิปหลักฐานรายรับ-รายจ่ายไปยัง Google Drive
+// Constant-Time String Comparison Helper (Timing Attack Protection)
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  var result = 0;
+  for (var i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+// ยืนยันลายเซ็น HMAC SHA-256 ร่วมกับการเปรียบเทียบค่าแบบ Timing-Safe
+function verifyHMACSignature(message, clientSignature, secret) {
+  if (!clientSignature) return false;
+  try {
+    const byteSignature = Utilities.computeHmacSignature(
+      Utilities.MacAlgorithm.HMAC_SHA_256,
+      message,
+      secret,
+      Utilities.Charset.UTF_8
+    );
+    const serverSignature = byteSignature.map(function(byte) {
+      return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+    }).join('');
+    return safeCompare(serverSignature, clientSignature);
+  } catch (e) {
+    logError("Signature Verification Error", "verifyHMACSignature", e.toString(), "WARNING");
+    return false;
+  }
+}
+
+// 5. ป้องกันสแปมด้วยระบบจำกัดคำสั่งจอง (Rate Limiting) ผ่าน CacheService
+function checkRateLimit(data) {
+  const cache = CacheService.getScriptCache();
+  // ข้อมูลลูกค้าทั้งหมดได้รับการลงลายเซ็น HMAC ป้องกันการปลอมแปลงค่า
+  const identifier = data.lineUserId || data.phone || data.email || data.clientFingerprint || "anonymous";
+  
+  if (data.action === "backup") {
+    return null;
+  }
+  
+  const cacheKey = "rate_" + identifier.replace(/[^a-zA-Z0-9_]/g, "");
+  const countStr = cache.get(cacheKey);
+  
+  if (countStr) {
+    const count = parseInt(countStr, 10);
+    if (count >= 5) {
+      return "Rate limit exceeded. Please wait 1 minute.";
+    }
+    cache.put(cacheKey, String(count + 1), 60);
+  } else {
+    cache.put(cacheKey, "1", 60);
+  }
+  return null;
+}
+
+// ตัวจัดเรียงคีย์ออบเจกต์แบบ Deterministic สำหรับลายเซ็น
+function sortObjectKeys(obj) {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return obj;
+  }
+  const sorted = {};
+  Object.keys(obj).sort().forEach(function(key) {
+    sorted[key] = sortObjectKeys(obj[key]);
+  });
+  return sorted;
+}
+
+// Helper ตรวจสอบรูปแบบและขอบเขตชั่วโมงเวลาบริการ
+function isValidTimeSlot(slotStr) {
+  const match = slotStr.match(/^(\d{2}):(\d{2}) - (\d{2}):(\d{2})$/);
+  if (!match) return false;
+  
+  const startHour = parseInt(match[1], 10);
+  const startMin = parseInt(match[2], 10);
+  const endHour = parseInt(match[3], 10);
+  const endMin = parseInt(match[4], 10);
+  
+  // ตรวจสอบชั่วโมงสนามเปิดให้บริการ (08:00 - 22:00)
+  if (startHour < 8 || startHour > 22) return false;
+  if (endHour < 8 || endHour > 22) return false;
+  if (startMin !== 0 && startMin !== 30) return false;
+  if (endMin !== 0 && endMin !== 30) return false;
+  
+  const startVal = startHour * 60 + startMin;
+  const endVal = endHour * 60 + endMin;
+  
+  return startVal < endVal; // ตรวจให้แน่ใจว่าเวลาเริ่มก่อนเวลาสิ้นสุด
+}
+
+// 9 & 10. ฟังก์ชันคัดกรองข้อมูลนำเข้าอย่างเคร่งครัด (Strict Input Validation)
+function validateInput(data) {
+  if (!data.action) return "Missing action.";
+  
+  if (data.action === "sendConfirmation" || data.action === "cancelBooking" || data.action === "updateNotes") {
+    if (!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+      return "Invalid date format (expected YYYY-MM-DD).";
+    }
+  }
+  
+  if (data.action === "sendConfirmation") {
+    if (!data.name || data.name.trim().length === 0) return "Name is required.";
+    if (!data.phone || !/^[0-9\-\+\s]{9,15}$/.test(data.phone)) return "Invalid phone number format.";
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return "Invalid email format.";
+    if (!data.slots || !Array.isArray(data.slots) || data.slots.length === 0) return "At least one time slot is required.";
+    
+    // ตรวจสอบความถูกต้องของสล็อตเวลาอย่างระมัดระวัง
+    for (let i = 0; i < data.slots.length; i++) {
+      if (!isValidTimeSlot(data.slots[i])) {
+        return "Invalid time slot values or chronologically incorrect: " + data.slots[i];
+      }
+    }
+    
+    // ตรวจสอบรูปแบบ invoiceNo และ receiptNo
+    if (data.invoiceNo && !/^INV\.\d+$/.test(data.invoiceNo)) {
+      return "Invalid invoice format. Expected 'INV.YYYYMMNNN'.";
+    }
+    if (data.receiptNo && !/^R\.\d+$/.test(data.receiptNo)) {
+      return "Invalid receipt format. Expected 'R.YYYYMMNNN'.";
+    }
+  }
+  
+  if (data.action === "cancelBooking" || data.action === "updateNotes") {
+    if (!data.slot || !isValidTimeSlot(data.slot)) {
+      return "Invalid time slot format or bounds: " + data.slot;
+    }
+  }
+  
+  return null;
+}
+
+// 13. บันทึกข้อผิดพลาดเข้าชีต Logs (เฉพาะระดับวิกฤต CRITICAL เท่านั้นเพื่อกันโควตาการเขียนเต็ม)
+function logError(type, functionName, errorDescription, severity) {
+  const currentSeverity = severity || "CRITICAL";
+  
+  if (currentSeverity === "CRITICAL") {
+    console.error("[" + type + "] in " + functionName + ": " + errorDescription);
+  } else {
+    console.warn("[" + type + "] in " + functionName + ": " + errorDescription);
+  }
+  
+  // บันทึกเข้าชีตเฉพาะเคสวิกฤต
+  if (currentSeverity !== "CRITICAL") {
+    return;
+  }
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = spreadsheet.getSheetByName("Logs");
+    if (!logSheet) {
+      logSheet = spreadsheet.insertSheet("Logs");
+      const headers = ["Timestamp", "Execution ID", "Type", "Function", "Description"];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+    
+    // จำกัดขนาดล็อกชีตไม่เกิน 1,000 แถว
+    const lastRow = logSheet.getLastRow();
+    if (lastRow >= 1000) {
+      logSheet.deleteRows(2, 200); 
+    }
+    
+    const executionId = Utilities.getUuid();
+    const timestamp = new Date();
+    
+    logSheet.getRange(logSheet.getLastRow() + 1, 1, 1, 5).setValues([[
+      timestamp,
+      executionId,
+      type,
+      functionName,
+      errorDescription
+    ]]);
+  } catch (e) {
+    console.error("CRITICAL: Failed to write log to sheet: " + e.toString());
+  }
+}
+
+// สร้างดัชนีชั่วคราวในเมมโมรี (In-Memory Index Map) หลีกเลี่ยงความซับซ้อนของการวนซ้ำอ่าน API หลายรอบ O(N)
+// รองรับการทำงาน Multi-Court โดยใช้คีย์ผสม date_court_slot
+function getBookingsIndexMap(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { dateSlotMap: {}, uuidRowMap: {} };
+  
+  const values = sheet.getRange(2, 1, lastRow - 1, 17).getValues();
+  const dateSlotMap = {};
+  const uuidRowMap = {};
+  
+  for (let i = 0; i < values.length; i++) {
+    const rowNum = i + 2;
+    const uuid = String(values[i][0] || "").trim();
+    const dateVal = values[i][1];
+    const slot = String(values[i][2] || "").trim();
+    const court = String(values[i][6] || "Main Court").trim(); // คอลัมน์ที่ 7 คือ Court (สนาม)
+    
+    let dateStr = "";
+    if (dateVal instanceof Date) {
+      dateStr = Utilities.formatDate(dateVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    } else {
+      dateStr = String(dateVal);
+    }
+    
+    // คีย์ผสมเพื่อเช็คซ้ำหลายสนามพร้อมกัน: date_court_slot
+    const key = dateStr + "_" + court + "_" + slot;
+    dateSlotMap[key] = rowNum;
+    
+    if (uuid) {
+      uuidRowMap[uuid] = rowNum;
+    }
+  }
+  
+  return { dateSlotMap: dateSlotMap, uuidRowMap: uuidRowMap };
+}
+
+// 3 & 4. อัปโหลดไฟล์สลิปขึ้น Drive คัดกรองและ Re-encode ป้องกันมัลแวร์
 function handleUploadLedgerSlip(data) {
+  if (!data.fileData || !data.mimeType || !data.fileName) {
+    throw new Error("Missing file data parameters.");
+  }
+  
+  const approxSize = data.fileData.length * 0.75;
+  if (approxSize > 1024 * 1024) {
+    throw new Error("File size exceeds 1MB limit.");
+  }
+  
+  // ตรวจเช็คความถูกต้องของนามสกุลไฟล์นำเข้า (Strict Extension matching)
+  const extMatch = data.fileName.match(/\.([^.]+)$/);
+  if (!extMatch) {
+    throw new Error("Security Error: Uploaded file has no extension.");
+  }
+  const ext = extMatch[1].toLowerCase();
+  if (ext !== "png" && ext !== "jpg" && ext !== "jpeg") {
+    throw new Error("Security Error: Invalid file extension.");
+  }
+  
+  const decoded = Utilities.base64Decode(data.fileData);
+  
+  // ตรวจสอบ Magic Numbers
+  const magicError = validateMagicNumbers(decoded, data.mimeType);
+  if (magicError) {
+    throw new Error(magicError);
+  }
+  
+  // ทำการ Re-encode รูปภาพผ่าน Google Web Engine เพื่อถอดล้างข้อมูลแฝง (EXIF/Steganography Malware)
+  let sanitizedBlob;
+  try {
+    const rawBlob = Utilities.newBlob(decoded, data.mimeType, data.fileName);
+    sanitizedBlob = rawBlob.getAs(MimeType.PNG); // บีบอัดแปลงเป็น PNG สะอาด
+    sanitizedBlob.setName(data.fileName.replace(/\.[^.]+$/, ".png")); // อัปเดตนามสกุล
+  } catch(e) {
+    throw new Error("Security Error: Failed to re-encode and sanitize the image. File might be corrupted or malicious.");
+  }
+  
   const folderName = data.folderName || "Slip บันทึกรายรับ - รายจ่าย";
   let folder;
   const folders = DriveApp.getFoldersByName(folderName);
@@ -63,10 +367,7 @@ function handleUploadLedgerSlip(data) {
     folder = DriveApp.createFolder(folderName);
   }
   
-  const decoded = Utilities.base64Decode(data.fileData);
-  const blob = Utilities.newBlob(decoded, data.mimeType, data.fileName);
-  const file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const file = folder.createFile(sanitizedBlob);
   
   return ContentService.createTextOutput(JSON.stringify({ 
     status: "success", 
@@ -74,7 +375,44 @@ function handleUploadLedgerSlip(data) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// จัดการการส่งการยืนยันจองทาง Email, LINE และบันทึกปฏิทิน
+// ฟังก์ชันคัดกรองไบนารี Magic Numbers รองรับ variants ต่างๆ รวมถึง JPEG2000
+function validateMagicNumbers(byteArray, declaredMime) {
+  if (!byteArray || byteArray.length < 4) {
+    return "Security Error: File payload is too small.";
+  }
+  
+  const isPNG = (byteArray[0] === -119 && byteArray[1] === 80 && byteArray[2] === 78 && byteArray[3] === 71);
+  const isJPEGStandard = (byteArray[0] === -1 && byteArray[1] === -40 && byteArray[2] === -1);
+  const isJPEG2000 = (byteArray[0] === 0 && byteArray[1] === 0 && byteArray[2] === 0 && byteArray[3] === 12 && byteArray[4] === 106 && byteArray[5] === 80);
+  
+  const isJPEG = isJPEGStandard || (byteArray.length >= 6 && isJPEG2000);
+  const mimeLower = declaredMime.toLowerCase();
+  
+  if (isPNG) {
+    if (mimeLower !== "image/png") {
+      return "Security Error: MIME mismatch (expected image/png for PNG magic number).";
+    }
+    return null;
+  }
+  
+  if (isJPEG) {
+    if (mimeLower !== "image/jpeg" && mimeLower !== "image/jpg") {
+      return "Security Error: MIME mismatch (expected image/jpeg or image/jpg for JPEG magic number).";
+    }
+    return null;
+  }
+  
+  return "Security Error: Uploaded file is not a valid PNG or JPEG image (magic numbers check failed).";
+}
+
+// ตัวสร้าง Booking Key ID แบบเฉพาะตัวคัดแยกตามสนามและวันเวลา ป้องกันปัญหาการสลับตำแหน่งอาเรย์ตอน Retry
+function generateSlotId(bookingKey, dateStr, court, slotStr) {
+  const cleanCourt = String(court).replace(/[^a-zA-Z0-9]/g, "");
+  const cleanSlot = String(slotStr).replace(/[^a-zA-Z0-9-:]/g, "");
+  return bookingKey + "_" + dateStr + "_" + cleanCourt + "_" + cleanSlot;
+}
+
+// 6 & 7 & 8. จัดการส่งการยืนยันจอง (พร้อมกลไกป้องกันจองซ้ำ Idempotency Key, Batch Calendar IDs, และระบบ Rollback)
 function handleSendConfirmation(data) {
   const name = data.name;
   const phone = data.phone;
@@ -85,81 +423,221 @@ function handleSendConfirmation(data) {
   const receiptNo = data.receiptNo;
   const lineUserId = data.lineUserId;
   const requireCoach = data.requireCoach === true || data.requireCoach === "true";
+  const bookingKey = data.bookingKey || "";
+  const court = data.court || "Main Court";
   
-  // แปลงวันที่จาก 2026-08-02 เป็น 02 AUG 2026
   const formattedDate = formatDateString(dateStr);
+  const warnings = [];
   
-  // 1. ส่งอีเมลยืนยันหากลูกค้ากรอกอีเมล
+  // 1. กรองสล็อตเวลาซ้ำภายในคำขอเดียวกัน (Same-request slot deduplication)
+  const uniqueSlots = [];
+  const slotSeen = {};
+  slots.forEach(function(slot) {
+    if (slot && !slotSeen[slot]) {
+      slotSeen[slot] = true;
+      uniqueSlots.push(slot);
+    }
+  });
+  
+  if (uniqueSlots.length === 0) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No unique time slots provided." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // A. ขอบเขตการล็อคขนาดเล็ก (Micro-Lock Scope) เฉพาะตรวจสอบสล็อตว่างและจองแถว
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); 
+  } catch (err) {
+    logError("Lock Timeout Error", "handleSendConfirmation", "Could not acquire lock for sheet write.", "CRITICAL");
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server busy. Please try again later." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  let bookingSheet;
+  let lastRow = 0;
+  let uuids = [];
+  let indexMap;
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    bookingSheet = spreadsheet.getSheetByName("Bookings");
+    if (!bookingSheet) {
+      bookingSheet = spreadsheet.insertSheet("Bookings");
+      const headers = ["ID", "Date", "Time Slot", "Customer", "Phone", "Email", "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", "Admin Notes", "Calendar Event ID"];
+      bookingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+    
+    // ดึงดัชนีข้อมูลจองเดิมใน memory
+    indexMap = getBookingsIndexMap(bookingSheet);
+    
+    // 2. ตรวจสอบเช็ค BookingKey ระดับทั้งรายการจองเพื่อป้องกันธุรกรรมซ้ำอย่างถูกต้อง
+    if (bookingKey) {
+      let allExist = true;
+      for (let i = 0; i < uniqueSlots.length; i++) {
+        const expectedId = generateSlotId(bookingKey, dateStr, court, uniqueSlots[i]);
+        if (!indexMap.uuidRowMap[expectedId]) {
+          allExist = false;
+          break;
+        }
+      }
+      
+      if (allExist) {
+        lock.releaseLock();
+        return ContentService.createTextOutput(JSON.stringify({ 
+          status: "success", 
+          message: "Idempotent request already processed." 
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
+    // ตรวจสอบเช็คจองซ้ำข้ามสนาม (Multi-Court check)
+    const duplicates = [];
+    uniqueSlots.forEach(function(slot) {
+      if (isBookingDuplicate(indexMap, dateStr, court, slot)) {
+        duplicates.push(slot);
+      }
+    });
+    
+    if (duplicates.length > 0) {
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: "error", 
+        message: "Time slots already booked: " + duplicates.join(", ") 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // เขียนข้อมูลการจองลงชีต (Batch Write)
+    const newRows = [];
+    uniqueSlots.forEach(function(slot) {
+      const uuid = bookingKey ? generateSlotId(bookingKey, dateStr, court, slot) : Utilities.getUuid();
+      uuids.push(uuid);
+      const fee = getSlotFee(slot);
+      
+      newRows.push([
+        uuid,
+        dateStr,
+        slot,
+        name,
+        phone,
+        email || "",
+        court,
+        requireCoach ? "Yes" : "No",
+        fee,
+        invoiceNo || "",
+        receiptNo || "",
+        data.slipUrl || "",
+        lineUserId || "",
+        data.lineIdInput || "",
+        "", 
+        "", 
+        "PENDING"  // ป้องกันการเกิด Partial Booking โดยกำหนดสถานะเริ่มต้นในปฏิทินเป็น PENDING
+      ]);
+    });
+    
+    lastRow = bookingSheet.getLastRow();
+    bookingSheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+  } catch (e) {
+    logError("Sheet Batch Write Error", "handleSendConfirmation", e.toString(), "CRITICAL");
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Failed to save booking to Sheets: " + e.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock(); 
+  }
+  
+  // B. บันทึกกิจกรรมปฏิทิน Google Calendar อัตโนมัติ (พร้อมกลไกโยน Exception และ Rollback แถว Sheets อัตโนมัติหากสร้างไม่ครบทุกสล็อต)
+  let calendarEventIds = [];
+  try {
+    calendarEventIds = createGoogleCalendarEvents(name, phone, dateStr, uniqueSlots, receiptNo, requireCoach, court);
+    
+    // อัปเดตข้อมูล Event IDs แบบคำสั่งเดียว (Contiguous Batch Write) โดยเก็บเป็นโครงสร้าง JSON
+    const calendarValues = calendarEventIds.map(function(id) { return [id]; });
+    bookingSheet.getRange(lastRow + 1, 17, calendarValues.length, 1).setValues(calendarValues);
+  } catch (e) {
+    logError("Calendar Creation Failure - Initiating ROLLBACK", "handleSendConfirmation", e.toString(), "CRITICAL");
+    
+    // Rollback 1: ลบแถวข้อมูลที่เพิ่งเขียนลง Sheets คืนค่าเดิม
+    try {
+      if (bookingSheet && lastRow > 0) {
+        bookingSheet.deleteRows(lastRow + 1, uniqueSlots.length);
+      }
+    } catch(sheetErr) {
+      logError("Rollback Sheets Delete Failure", "handleSendConfirmation", sheetErr.toString(), "CRITICAL");
+    }
+    
+    // Rollback 2: ลบปฏิทินที่สร้างเสร็จบางส่วน
+    calendarEventIds.forEach(function(eventId) {
+      if (eventId) {
+        try {
+          deleteGoogleCalendarEvent("", dateStr, "", eventId);
+        } catch(calErr) {
+          logError("Rollback Calendar Delete Failure", "handleSendConfirmation", calErr.toString(), "CRITICAL");
+        }
+      }
+    });
+    
+    return ContentService.createTextOutput(JSON.stringify({ 
+      status: "error", 
+      message: "Booking failed due to calendar synchronization error. Rolled back." 
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // C. แจ้งเตือนลูกค้าและแอดมิน (Warnings are caught and logged, not failing the transaction)
   let emailSent = false;
   if (email) {
     try {
-      sendEmailConfirmation(email, name, formattedDate, slots, invoiceNo, receiptNo, requireCoach);
+      sendEmailConfirmation(email, name, formattedDate, uniqueSlots, invoiceNo, receiptNo, requireCoach);
       emailSent = true;
     } catch (e) {
-      console.error("Email send failed: ", e.toString());
+      logError("Email Send Error", "sendEmailConfirmation", e.toString(), "WARNING");
+      warnings.push("Email send failed: " + e.toString());
     }
   }
   
-  // 2. ส่งข้อความ LINE หากจองผ่าน LIFF (มี lineUserId)
   let lineSent = false;
   if (lineUserId && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
-      sendLineMessageConfirmation(lineUserId, name, formattedDate, slots, receiptNo, requireCoach);
+      sendLineMessageConfirmation(lineUserId, name, formattedDate, uniqueSlots, receiptNo, requireCoach);
       lineSent = true;
     } catch (e) {
-      console.error("LINE send failed: ", e.toString());
+      logError("LINE User Notification Error", "sendLineMessageConfirmation", e.toString(), "WARNING");
+      warnings.push("LINE user push failed: " + e.toString());
     }
   }
   
-  // 3. บันทึกปฏิทิน Google Calendar อัตโนมัติ (ใส่หมี 🧸 หรือ ไม้เทนนิส 🎾)
-  let calendarCreated = false;
-  try {
-    createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requireCoach);
-    calendarCreated = true;
-  } catch (e) {
-    console.error("Google Calendar failed: ", e.toString());
-  }
-
-  // 4. บันทึกข้อมูลการจองลงใน Google Sheets โดยตรงทันที
-  let sheetSaved = false;
-  try {
-    addBookingToSheet(data);
-    sheetSaved = true;
-  } catch (e) {
-    console.error("Google Sheets direct save failed: ", e.toString());
-  }
-
-  // 5. ส่งสลิปและข้อมูลการจองไปที่ LINE ส่วนตัวของแอดมินเพื่อตรวจสอบ
+  let adminLineSent = false;
   if (ADMIN_LINE_USER_ID && ADMIN_LINE_USER_ID !== "ใส่_LINE_USER_ID_ส่วนตัวของแอดมิน_ที่นี่" && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
       const slipUrl = data.slipUrl || "";
-      sendAdminSlipNotification(name, formattedDate, slots, receiptNo, slipUrl, requireCoach);
+      sendAdminSlipNotification(name, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach);
+      adminLineSent = true;
     } catch (e) {
-      console.error("Admin LINE notification failed: ", e.toString());
+      logError("Admin LINE Notification Error", "sendAdminSlipNotification", e.toString(), "WARNING");
+      warnings.push("Admin LINE alert failed: " + e.toString());
     }
   }
   
   return ContentService.createTextOutput(JSON.stringify({ 
-    status: "success", 
-    message: "Notifications processed",
+    status: warnings.length === 0 ? "success" : "warning", 
+    warnings: warnings,
     emailSent: emailSent,
     lineSent: lineSent,
-    calendarCreated: calendarCreated,
-    sheetSaved: sheetSaved
+    calendarCreated: calendarEventIds.length > 0,
+    sheetSaved: uuids.length > 0
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// จัดการการยกเลิกการจอง (ลบแถวชีต และลบปฏิทิน)
+// ตรวจสอบเช็คว่ามีแถวบันทึกจองนี้อยู่แล้วในชีตหรือไม่โดยใช้ตำแหน่งสนามและวัน-เวลา
+function isBookingDuplicate(indexMap, dateStr, courtStr, slotStr) {
+  const key = dateStr + "_" + courtStr + "_" + slotStr;
+  return !!indexMap.dateSlotMap[key];
+}
+
+// 6. จัดการการยกเลิกการจอง (แบบใช้ Micro-Lock Scope ดึงคีย์ลบปฏิทินนอกล็อค)
 function handleCancelBooking(data) {
-  const name = data.name;
   const dateStr = data.date;
   const slotStr = data.slot;
+  const courtStr = data.court || "Main Court";
   
-  // 1. ลบจาก Google Sheets
-  removeBookingFromSheet(dateStr, slotStr);
-  
-  // 2. ลบจาก Google Calendar
-  deleteGoogleCalendarEvent(name, dateStr, slotStr);
+  removeBookingFromSheet(dateStr, slotStr, courtStr);
   
   return ContentService.createTextOutput(JSON.stringify({ 
     status: "success", 
@@ -167,7 +645,50 @@ function handleCancelBooking(data) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// จัดการการอัปเดตโน้ตแอดมิน (เขียนทับใน Google Sheets และปฏิทิน)
+// ลบแถวจองสนามและการจองในปฏิทินโดยรองรับ Multi-Court (ใช้คีย์ผสมระบุตัวแถว)
+function removeBookingFromSheet(dateStr, slotStr, courtStr) {
+  const activeCourt = courtStr || "Main Court";
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    logError("Lock Timeout Error", "removeBookingFromSheet", "Could not lock sheet for row deletion.", "CRITICAL");
+    throw new Error("Server busy. Failed to delete booking.");
+  }
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const bookingSheet = spreadsheet.getSheetByName("Bookings");
+    if (!bookingSheet) return;
+    
+    // โหลด map เพื่อลบใน O(1)
+    const indexMap = getBookingsIndexMap(bookingSheet);
+    
+    // ดึงสนามเพื่อค้นหาคีย์ date_court_slot
+    const key = dateStr + "_" + activeCourt + "_" + slotStr;
+    const row = indexMap.dateSlotMap[key];
+    
+    if (row) {
+      const eventId = bookingSheet.getRange(row, 17).getValue();
+      
+      // ลบแถวชีต
+      bookingSheet.deleteRow(row);
+      
+      // ปลดล็อคชีตทันทีก่อนยิงลบ Google Calendar
+      lock.releaseLock();
+      
+      deleteGoogleCalendarEvent("", dateStr, slotStr, eventId);
+      console.log("Deleted row " + row + " and synced Calendar event.");
+    }
+  } catch (e) {
+    logError("Delete Booking Error", "removeBookingFromSheet", e.toString(), "CRITICAL");
+    throw e;
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
+  }
+}
+
+// 6. จัดการการอัปเดตข้อมูลลูกค้าและโน้ตแอดมิน
 function handleUpdateNotes(data) {
   const name = data.name;
   const phone = data.phone;
@@ -178,12 +699,44 @@ function handleUpdateNotes(data) {
   const receiptNo = data.receiptNo;
   const requireCoach = data.requireCoach === true || data.requireCoach === "true";
   const adminNotes = data.adminNotes;
+  const court = data.court || "Main Court";
   
-  // 1. อัปเดตข้อมูลในชีต (ชื่อ, เบอร์, อีเมล, LINE ID, โค้ช, โน้ต)
-  updateBookingNoteInSheet(dateStr, slotStr, adminNotes, requireCoach, name, phone, email, lineUserId);
+  let eventId = "";
   
-  // 2. อัปเดตข้อมูลในปฏิทิน
-  updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes);
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    logError("Lock Timeout Error", "handleUpdateNotes", "Could not lock sheet for updating note.", "CRITICAL");
+    throw new Error("Server busy. Failed to update notes.");
+  }
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const bookingSheet = spreadsheet.getSheetByName("Bookings");
+    if (bookingSheet) {
+      const indexMap = getBookingsIndexMap(bookingSheet);
+      const key = dateStr + "_" + court + "_" + slotStr;
+      const row = indexMap.dateSlotMap[key];
+      
+      if (row) {
+        bookingSheet.getRange(row, 4).setValue(name);
+        bookingSheet.getRange(row, 5).setValue(phone);
+        bookingSheet.getRange(row, 6).setValue(email);
+        bookingSheet.getRange(row, 8).setValue(requireCoach ? "Yes" : "No");
+        bookingSheet.getRange(row, 13).setValue(lineUserId);
+        bookingSheet.getRange(row, 16).setValue(adminNotes || "");
+        eventId = bookingSheet.getRange(row, 17).getValue();
+      }
+    }
+  } catch (e) {
+    logError("Update Note Sheets Error", "handleUpdateNotes", e.toString(), "CRITICAL");
+    throw e;
+  } finally {
+    lock.releaseLock(); 
+  }
+  
+  updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventId);
   
   return ContentService.createTextOutput(JSON.stringify({ 
     status: "success", 
@@ -270,20 +823,57 @@ function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, 
   });
 }
 
-// ฟังก์ชันส่ง LINE Push Message แจ้งเตือนจองสำเร็จ
+// 14. ฟังก์ชันส่งคำสั่งเชื่อมต่อ HTTP ลองใหม่อัตโนมัติ (Retry with Exponential Backoff - กรองเฉพาะ 5xx และ 429 เท่านั้น)
+function fetchWithRetry(url, options, retries = 3) {
+  let attempt = 0;
+  let response;
+  
+  const fetchOptions = {...options};
+  fetchOptions.muteHttpExceptions = true;
+  
+  while (attempt < retries) {
+    try {
+      response = UrlFetchApp.fetch(url, fetchOptions);
+      const code = response.getResponseCode();
+      
+      if (code >= 200 && code < 300) {
+        return response;
+      }
+      
+      const shouldRetry = (code >= 500 && code <= 599) || code === 429;
+      if (!shouldRetry) {
+        console.warn("Fetch attempt " + (attempt + 1) + " returned client error " + code + ". Breaking retry loop.");
+        return response;
+      }
+      
+      console.warn("Fetch attempt " + (attempt + 1) + " returned HTTP code " + code + ". Retrying...");
+    } catch (e) {
+      console.warn("Fetch attempt " + (attempt + 1) + " failed due to network error: " + e.toString());
+    }
+    attempt++;
+    if (attempt < retries) {
+      Utilities.sleep(Math.pow(2, attempt) * 1000); 
+    }
+  }
+  
+  if (response) return response;
+  return UrlFetchApp.fetch(url, fetchOptions);
+}
+
+// ส่งข้อความ LINE Push Message แจ้งเตือนจองสำเร็จ
 function sendLineMessageConfirmation(lineUserId, name, dateStr, slots, receiptNo, requireCoach) {
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
   const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
   
   const textMessage = `🎾 ยืนยันการจองสนามสำเร็จ!
-
+ 
 👤 คุณ: ${name}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
 🧸 โค้ช: ${coachText}
 📄 เลขที่ใบเสร็จ: ${receiptNo}
-
+ 
 กรณีมีความจำเป็นต้องการเลื่อน กรุณาแจ้งแอดมินล่วงหน้าอย่างน้อย 2วันนะครับ 💚`;
 
   const payload = {
@@ -302,27 +892,41 @@ function sendLineMessageConfirmation(lineUserId, name, dateStr, slots, receiptNo
     headers: {
       "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
     },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    payload: JSON.stringify(payload)
   };
   
-  const response = UrlFetchApp.fetch(url, options);
-  console.log("LINE API Log: " + response.getContentText());
+  const response = fetchWithRetry(url, options);
+  const code = response.getResponseCode();
+  if (code !== 200) {
+    throw new Error("LINE Push API failed with response code " + code + ": " + response.getContentText());
+  }
+  console.log("LINE API Log: Success");
 }
 
-// ฟังก์ชันสร้างกิจกรรมบน Google Calendar (หมี 🧸 = ต้องการโค้ช | ไม้เทนนิส 🎾 = ไม่ต้องการโค้ช)
-function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requireCoach) {
+// สร้างกิจกรรมปฏิทิน Google Calendar อัตโนมัติ โดยโยน Exception และทำ Rollback ในตัวหากสร้างไม่ครบทุกสล็อต
+function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requireCoach, court) {
+  const activeCourt = court || "Main Court";
   const dateParts = dateStr.split('-');
-  if (dateParts.length !== 3) return;
+  if (dateParts.length !== 3) return [];
   const year = parseInt(dateParts[0], 10);
   const month = parseInt(dateParts[1], 10) - 1;
   const day = parseInt(dateParts[2], 10);
   
-  const calendar = CalendarApp.getDefaultCalendar();
+  // ตั้งค่าปฏิทินหลัก
+  let calendar = null;
+  if (typeof MAIN_CALENDAR_ID !== "undefined" && MAIN_CALENDAR_ID) {
+    try {
+      calendar = CalendarApp.getCalendarById(MAIN_CALENDAR_ID);
+    } catch (err) {
+      console.warn("Failed to get main calendar by ID: " + err.toString());
+    }
+  }
+  if (!calendar) {
+    calendar = CalendarApp.getDefaultCalendar();
+  }
   
-  // ปฏิทินของโค้ช (ถ้ามีสิทธิ์และเปิดใช้งาน)
   let coachCalendar = null;
-  if (requireCoach && typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+  if (requireCoach && typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
     try {
       coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
     } catch(err) {
@@ -330,176 +934,130 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
     }
   }
   
-  slots.forEach(slotStr => {
+  const eventIds = [];
+  
+  // โอนเปลี่ยนลูปเป็นแบบ throw exception ทันทีเมื่อเกิดการผิดพลาดสล็อตใดสล็อตหนึ่ง
+  for (let i = 0; i < slots.length; i++) {
+    const slotStr = slots[i];
     try {
       const timeParts = slotStr.split(' - ');
-      if (timeParts.length !== 2) return;
+      if (timeParts.length !== 2) continue;
       
       const startStr = timeParts[0];
       const endStr = timeParts[1];
       
-      const startHour = parseInt(startStr.split(':')[0], 10);
-      const startMin = parseInt(startStr.split(':')[1], 10);
-      const endHour = parseInt(endStr.split(':')[0], 10);
-      const endMin = parseInt(endStr.split(':')[1], 10);
+      const startTime = new Date(year, month, day, parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0);
+      const endTime = new Date(year, month, day, parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0);
       
-      const startTime = new Date(year, month, day, startHour, startMin, 0);
-      const endTime = new Date(year, month, day, endHour, endMin, 0);
-      
-      // เลือกสัญลักษณ์กิจกรรม: ต้องการโค้ช = 🧸 | ไม่ต้องการโค้ช = 🎾
       const icon = requireCoach ? "🧸" : "🎾";
-      const title = icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")";
+      const title = icon + " [" + activeCourt + "] จอง: คุณ " + name + " (" + slotStr + ")";
       
       const description = "ชื่อผู้จอง: " + name + "\n" +
                           "เบอร์โทร: " + phone + "\n" +
+                          "สนาม: " + activeCourt + "\n" +
                           "เวลาจอง: " + slotStr + "\n" +
                           "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
                           "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌");
       
-      // 1. บันทึกในปฏิทินหลักของสนาม
-      calendar.createEvent(title, startTime, endTime, {
+      const event = calendar.createEvent(title, startTime, endTime, {
         description: description
       });
+      const mainEventId = event.getId();
       
-      // 2. บันทึกในปฏิทินของโค้ช (เฉพาะเคสที่ต้องการโค้ช)
+      let coachEventId = "";
       if (coachCalendar) {
-        const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
-        coachCalendar.createEvent(coachTitle, startTime, endTime, {
+        const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
+        const cEvent = coachCalendar.createEvent(coachTitle, startTime, endTime, {
           description: description
         });
-        console.log("Created Coach Calendar event successfully.");
-      }
-    } catch(e) {
-      console.error("Calendar event failed: " + e.toString());
-    }
-  });
-}
-
-// บันทึกคิวจองลงแผ่นงาน Google Sheets โดยตรง ป้องกันปัญหาการซิงก์หลุด
-function addBookingToSheet(data) {
-  try {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    let bookingSheet = spreadsheet.getSheetByName("Bookings");
-    if (!bookingSheet) {
-      bookingSheet = spreadsheet.insertSheet("Bookings");
-      bookingSheet.appendRow(["ID", "Date", "Time Slot", "Customer", "Phone", "Email", "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", "Admin Notes"]);
-    }
-    
-    const name = data.name;
-    const phone = data.phone;
-    const email = data.email || "";
-    const dateStr = data.date;
-    const slots = data.slots || [];
-    const invoiceNo = data.invoiceNo || "";
-    const receiptNo = data.receiptNo || "";
-    const lineUserId = data.lineUserId || "";
-    const lineIdInput = data.lineIdInput || ""; // ทะเบียนรถ
-    const requireCoach = data.requireCoach === true || data.requireCoach === "true";
-    const slipUrl = data.slipUrl || "";
-    
-    slots.forEach(slot => {
-      // ตรวจสอบคิวจองที่ซ้ำซ้อนกันเพื่อป้องกันการบันทึกซ้ำ
-      if (isBookingDuplicate(bookingSheet, dateStr, slot)) {
-        console.log("Skipping duplicate booking row: " + dateStr + " - " + slot);
-        return;
+        coachEventId = cEvent.getId();
       }
       
-      const fee = getSlotFee(slot);
-      bookingSheet.appendRow([
-        "b_" + Math.random().toString(36).substr(2, 9),
-        dateStr,
-        slot,
-        name,
-        phone,
-        email,
-        "Main Court",
-        requireCoach ? "Yes" : "No",
-        fee,
-        invoiceNo,
-        receiptNo,
-        slipUrl,
-        lineUserId,
-        lineIdInput, // คอลัมน์ที่ 14 (Car Plate - ทะเบียนรถ)
-        "",          // คอลัมน์ที่ 15 (Reminder Sent)
-        ""           // คอลัมน์ที่ 16 (Admin Notes)
-      ]);
-    });
-  } catch (e) {
-    console.error("Direct save to sheet failed: " + e.toString());
+      // เก็บข้อมูล Event IDs เป็นโครงสร้าง JSON
+      eventIds.push(JSON.stringify({ main: mainEventId, coach: coachEventId }));
+    } catch(e) {
+      // ROLLBACK Local: ลบ Event ทั้งหมดที่เพิ่งถูกสร้างขึ้นมาในสายนี้ก่อนหน้านี้
+      eventIds.forEach(function(createdJson) {
+        if (createdJson) {
+          try {
+            deleteGoogleCalendarEvent("", dateStr, "", createdJson);
+          } catch(err) {}
+        }
+      });
+      throw new Error("Calendar event creation failed for slot '" + slotStr + "': " + e.toString());
+    }
   }
+  
+  return eventIds;
 }
 
-// ช่วยคำนวณค่าบริการต่อสล็อตเวลาตามกฎช่วงเวลา (08:00 - 16:00 = 250 | นอกนั้น = 350)
+// ช่วยคำนวณค่าบริการต่อสล็อตเวลาตามกฎช่วงเวลาโหลดผ่าน Script Properties
 function getSlotFee(slotStr) {
   try {
     const startHourStr = slotStr.split(' - ')[0];
     const startHour = parseInt(startHourStr.split(':')[0], 10);
-    return (startHour >= 8 && startHour < 16) ? 250 : 350;
+    return (startHour >= 8 && startHour < 16) ? OFF_PEAK_PRICE : PEAK_PRICE;
   } catch (e) {
-    return 250;
+    return OFF_PEAK_PRICE;
   }
 }
 
-// ตรวจสอบเช็คว่ามีแถวบันทึกจองนี้อยู่แล้วในชีตหรือไม่
-function isBookingDuplicate(sheet, dateStr, slotStr) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return false;
-  
-  const values = sheet.getRange(2, 2, lastRow - 1, 2).getValues(); // คอลัมน์ B (Date) และ C (Slot)
-  for (let i = 0; i < values.length; i++) {
-    let rowDateStr = "";
-    const rowDate = values[i][0];
-    const rowSlot = values[i][1];
-    
-    if (rowDate instanceof Date) {
-      rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-    } else {
-      rowDateStr = String(rowDate);
-    }
-    
-    if (rowDateStr === dateStr && rowSlot === slotStr) {
-      return true;
+// ลบกิจกรรมปฏิทิน Google Calendar โดยตรงจาก Event ID (รองรับการแกะโครงสร้าง JSON)
+function deleteGoogleCalendarEvent(name, dateStr, slotStr, eventIdStr) {
+  let calendar = null;
+  if (typeof MAIN_CALENDAR_ID !== "undefined" && MAIN_CALENDAR_ID) {
+    try {
+      calendar = CalendarApp.getCalendarById(MAIN_CALENDAR_ID);
+    } catch (err) {
+      console.warn("Failed to get main calendar by ID: " + err.toString());
     }
   }
-  return false;
-}
+  if (!calendar) {
+    calendar = CalendarApp.getDefaultCalendar();
+  }
 
-// ฟังก์ชันลบแถวการจองจาก Google Sheet
-function removeBookingFromSheet(dateStr, slotStr) {
-  try {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const bookingSheet = spreadsheet.getSheetByName("Bookings");
-    if (!bookingSheet) return;
+  if (eventIdStr) {
+    let mainId = "";
+    let coachId = "";
     
-    const lastRow = bookingSheet.getLastRow();
-    if (lastRow <= 1) return;
-    
-    const range = bookingSheet.getRange(2, 2, lastRow - 1, 2); // B (Date), C (Slot)
-    const values = range.getValues();
-    
-    for (let i = values.length - 1; i >= 0; i--) {
-      const rowDate = values[i][0];
-      const rowSlot = values[i][1];
-      
-      let rowDateStr = "";
-      if (rowDate instanceof Date) {
-        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    try {
+      const parsed = JSON.parse(eventIdStr);
+      mainId = parsed.main || "";
+      coachId = parsed.coach || "";
+    } catch(e) {
+      // โหมดเข้ากันได้ย้อนหลัง (Fallback)
+      if (eventIdStr.indexOf('|') !== -1) {
+        const parts = eventIdStr.split('|');
+        mainId = parts[0];
+        coachId = parts[1];
       } else {
-        rowDateStr = String(rowDate);
-      }
-      
-      if (rowDateStr === dateStr && rowSlot === slotStr) {
-        bookingSheet.deleteRow(i + 2);
-        console.log("Deleted Google Sheet row for booking: " + dateStr + " (" + slotStr + ")");
+        mainId = eventIdStr;
       }
     }
-  } catch (e) {
-    console.error("Failed to delete sheet row: " + e.toString());
+    
+    if (mainId) {
+      try {
+        const ev = calendar.getEventById(mainId);
+        if (ev) ev.deleteEvent();
+      } catch (err) {
+        console.warn("Failed to delete main event by ID: " + err.toString());
+      }
+    }
+    if (coachId && typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
+      try {
+        const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
+        if (coachCalendar) {
+          const ev = coachCalendar.getEventById(coachId);
+          if (ev) ev.deleteEvent();
+        }
+      } catch (err) {
+        console.warn("Failed to delete coach event by ID: " + err.toString());
+      }
+    }
+    return;
   }
-}
 
-// ฟังก์ชันลบกิจกรรมปฏิทิน Google Calendar
-function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
+  // Fallback
   try {
     const dateParts = dateStr.split('-');
     if (dateParts.length !== 3) return;
@@ -513,41 +1071,27 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
     const startStr = timeParts[0];
     const endStr = timeParts[1];
     
-    const startHour = parseInt(startStr.split(':')[0], 10);
-    const startMin = parseInt(startStr.split(':')[1], 10);
-    const endHour = parseInt(endStr.split(':')[0], 10);
-    const endMin = parseInt(endStr.split(':')[1], 10);
+    const startTime = new Date(year, month, day, parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0);
+    const endTime = new Date(year, month, day, parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0);
     
-    const startTime = new Date(year, month, day, startHour, startMin, 0);
-    const endTime = new Date(year, month, day, endHour, endMin, 0);
-    
-    // กำหนดช่วงเวลาค้นหาให้กว้างขึ้น ±15 นาที เพื่อแก้ไขเรื่องเศษวินาทีหรือการเหลื่อมทับเขตเวลา
     const searchStart = new Date(startTime.getTime() - 15 * 60 * 1000);
     const searchEnd = new Date(endTime.getTime() + 15 * 60 * 1000);
     
-    // 1. ลบจากปฏิทินหลัก
-    const calendar = CalendarApp.getDefaultCalendar();
-    const events = calendar.getEvents(searchStart, searchEnd);
-    
-    events.forEach(event => {
+    calendar.getEvents(searchStart, searchEnd).forEach(function(event) {
       const title = event.getTitle();
       if (title.indexOf(name) !== -1 && (title.indexOf("จองสนาม") !== -1)) {
         event.deleteEvent();
-        console.log("Deleted Google Calendar event: " + title);
       }
     });
 
-    // 2. ลบจากปฏิทินโค้ช
-    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
       try {
         const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
         if (coachCalendar) {
-          const coachEvents = coachCalendar.getEvents(searchStart, searchEnd);
-          coachEvents.forEach(event => {
+          coachCalendar.getEvents(searchStart, searchEnd).forEach(function(event) {
             const title = event.getTitle();
             if (title.indexOf(name) !== -1 && (title.indexOf("สอนเทนนิส") !== -1)) {
               event.deleteEvent();
-              console.log("Deleted Coach Calendar event: " + title);
             }
           });
         }
@@ -556,68 +1100,90 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr) {
       }
     }
   } catch (e) {
-    console.error("Failed to delete Calendar event: " + e.toString());
-  }
-}
-// อัปเดตข้อมูลจอง โน้ตแอดมิน สถานะโค้ช และข้อมูลผู้ติดต่อ ในชีตแท็บ Bookings
-function updateBookingNoteInSheet(dateStr, slotStr, adminNotes, requireCoach, name, phone, email, lineUserId) {
-  try {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const bookingSheet = spreadsheet.getSheetByName("Bookings");
-    if (!bookingSheet) return;
-    
-    const lastRow = bookingSheet.getLastRow();
-    if (lastRow <= 1) return;
-    
-    const range = bookingSheet.getRange(2, 2, lastRow - 1, 2);
-    const values = range.getValues();
-    
-    for (let i = 0; i < values.length; i++) {
-      const rowDate = values[i][0];
-      const rowSlot = values[i][1];
-      
-      let rowDateStr = "";
-      if (rowDate instanceof Date) {
-        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-      } else {
-        rowDateStr = String(rowDate);
-      }
-      
-      if (rowDateStr === dateStr && rowSlot === slotStr) {
-        // คอลัมน์ที่ 4 คือ D (Customer Name)
-        if (typeof name !== "undefined" && name !== null) {
-          bookingSheet.getRange(i + 2, 4).setValue(name);
-        }
-        // คอลัมน์ที่ 5 คือ E (Phone)
-        if (typeof phone !== "undefined" && phone !== null) {
-          bookingSheet.getRange(i + 2, 5).setValue(phone);
-        }
-        // คอลัมน์ที่ 6 คือ F (Email)
-        if (typeof email !== "undefined" && email !== null) {
-          bookingSheet.getRange(i + 2, 6).setValue(email);
-        }
-        // คอลัมน์ที่ 8 คือ H (Require Coach)
-        if (typeof requireCoach !== "undefined" && requireCoach !== null) {
-          bookingSheet.getRange(i + 2, 8).setValue(requireCoach ? "Yes" : "No");
-        }
-        // คอลัมน์ที่ 13 คือ M (LINE User ID)
-        if (typeof lineUserId !== "undefined" && lineUserId !== null) {
-          bookingSheet.getRange(i + 2, 13).setValue(lineUserId);
-        }
-        // คอลัมน์ที่ 16 คือ P (Admin Notes)
-        if (typeof adminNotes !== "undefined" && adminNotes !== null) {
-          bookingSheet.getRange(i + 2, 16).setValue(adminNotes || "");
-        }
-        console.log("Updated Google Sheet booking details at row " + (i + 2));
-      }
-    }
-  } catch (e) {
-    console.error("Failed to update sheet booking details: " + e.toString());
+    console.error("Failed to delete Calendar event fallback: " + e.toString());
   }
 }
 
-// ค้นหาและอัปเดตคำอธิบายเพิ่มเติม (Description) ของ Google Calendar
-function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes) {
+// อัปเดตกิจกรรมปฏิทิน Google Calendar ด้วย Event ID (รองรับโครงสร้างแบบ JSON)
+function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventIdStr) {
+  let calendar = null;
+  if (typeof MAIN_CALENDAR_ID !== "undefined" && MAIN_CALENDAR_ID) {
+    try {
+      calendar = CalendarApp.getCalendarById(MAIN_CALENDAR_ID);
+    } catch (err) {
+      console.warn("Failed to get main calendar by ID: " + err.toString());
+    }
+  }
+  if (!calendar) {
+    calendar = CalendarApp.getDefaultCalendar();
+  }
+
+  const description = "ชื่อผู้จอง: " + name + "\n" +
+                      "เบอร์โทร: " + phone + "\n" +
+                      "เวลาจอง: " + slotStr + "\n" +
+                      "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
+                      "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌") + "\n" +
+                      "โน้ตเพิ่มเติมจากแอดมิน: " + (adminNotes || "-");
+
+  let mainId = "";
+  let coachId = "";
+  if (eventIdStr) {
+    try {
+      const parsed = JSON.parse(eventIdStr);
+      mainId = parsed.main || "";
+      coachId = parsed.coach || "";
+    } catch(e) {
+      if (eventIdStr.indexOf('|') !== -1) {
+        const parts = eventIdStr.split('|');
+        mainId = parts[0];
+        coachId = parts[1];
+      } else {
+        mainId = eventIdStr;
+      }
+    }
+    
+    if (mainId) {
+      try {
+        const ev = calendar.getEventById(mainId);
+        if (ev) {
+          const icon = requireCoach ? "🧸" : "🎾";
+          ev.setTitle(icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")");
+          ev.setDescription(description);
+        }
+      } catch (err) {
+        console.warn("Failed to update main calendar event by ID: " + err.toString());
+      }
+    }
+    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
+      try {
+        const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
+        if (coachCalendar) {
+          if (coachId) {
+            const ev = coachCalendar.getEventById(coachId);
+            if (ev) {
+              if (requireCoach) {
+                ev.setTitle("🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")");
+                ev.setDescription(description);
+              } else {
+                ev.deleteEvent();
+              }
+            }
+          } else if (requireCoach) {
+            const dp = dateStr.split('-');
+            const tp = slotStr.split(' - ');
+            const st = new Date(parseInt(dp[0],10), parseInt(dp[1],10)-1, parseInt(dp[2],10), parseInt(tp[0].split(':')[0],10), parseInt(tp[0].split(':')[1],10), 0);
+            const et = new Date(parseInt(dp[0],10), parseInt(dp[1],10)-1, parseInt(dp[2],10), parseInt(tp[1].split(':')[0],10), parseInt(tp[1].split(':')[1],10), 0);
+            coachCalendar.createEvent("🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")", st, et, { description: description });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to update/create coach calendar event by ID: " + err.toString());
+      }
+    }
+    return;
+  }
+
+  // Fallback
   try {
     const dateParts = dateStr.split('-');
     if (dateParts.length !== 3) return;
@@ -631,52 +1197,32 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
     const startStr = timeParts[0];
     const endStr = timeParts[1];
     
-    const startHour = parseInt(startStr.split(':')[0], 10);
-    const startMin = parseInt(startStr.split(':')[1], 10);
-    const endHour = parseInt(endStr.split(':')[0], 10);
-    const endMin = parseInt(endStr.split(':')[1], 10);
+    const startTime = new Date(year, month, day, parseInt(startStr.split(':')[0], 10), parseInt(startStr.split(':')[1], 10), 0);
+    const endTime = new Date(year, month, day, parseInt(endStr.split(':')[0], 10), parseInt(endStr.split(':')[1], 10), 0);
     
-    const startTime = new Date(year, month, day, startHour, startMin, 0);
-    const endTime = new Date(year, month, day, endHour, endMin, 0);
-    
-    // กำหนดช่วงเวลาค้นหาให้กว้างขึ้น ±15 นาที เพื่อแก้ไขเรื่องเศษวินาทีหรือการเหลื่อมทับเขตเวลา
     const searchStart = new Date(startTime.getTime() - 15 * 60 * 1000);
     const searchEnd = new Date(endTime.getTime() + 15 * 60 * 1000);
     
-    const description = "ชื่อผู้จอง: " + name + "\n" +
-                        "เบอร์โทร: " + phone + "\n" +
-                        "เวลาจอง: " + slotStr + "\n" +
-                        "เลขที่ใบเสร็จ: " + receiptNo + "\n" +
-                        "ต้องการผู้ฝึกสอน (โค้ช): " + (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌") + "\n" +
-                        "โน้ตเพิ่มเติมจากแอดมิน: " + (adminNotes || "-");
-
-    // 1. อัปเดตในปฏิทินหลัก
-    const calendar = CalendarApp.getDefaultCalendar();
-    const events = calendar.getEvents(searchStart, searchEnd);
-    
-    events.forEach(event => {
+    calendar.getEvents(searchStart, searchEnd).forEach(function(event) {
       const title = event.getTitle() || "";
       const desc = event.getDescription() || "";
-      // ค้นหาจากเลชที่ใบเสร็จเป็นหลัก หรือชื่อลูกค้าเป็นกรณีสำรอง
       const isMatch = (receiptNo && desc.indexOf(receiptNo) !== -1) || (name && title.indexOf(name) !== -1);
       
       if (isMatch && (title.indexOf("จองสนาม") !== -1)) {
         const icon = requireCoach ? "🧸" : "🎾";
         event.setTitle(icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")");
         event.setDescription(description);
-        console.log("Updated Google Calendar event description: " + title);
       }
     });
 
-    // 2. จัดการข้อมูลปฏิทินของโค้ช
-    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID && COACH_CALENDAR_ID !== "ใส่_EMAIL_ปฏิทินของโค้ช_ที่นี่") {
+    if (typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
       try {
         const coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
         if (coachCalendar) {
           const coachEvents = coachCalendar.getEvents(searchStart, searchEnd);
           let coachEvent = null;
           
-          coachEvents.forEach(event => {
+          coachEvents.forEach(function(event) {
             const title = event.getTitle() || "";
             const desc = event.getDescription() || "";
             const isMatch = (receiptNo && desc.indexOf(receiptNo) !== -1) || (name && title.indexOf(name) !== -1);
@@ -692,17 +1238,14 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
               coachCalendar.createEvent(coachTitle, startTime, endTime, {
                 description: description
               });
-              console.log("Created Coach Calendar event via notes update.");
             } else {
               const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
               coachEvent.setTitle(coachTitle);
               coachEvent.setDescription(description);
-              console.log("Updated Coach Calendar event description.");
             }
           } else {
             if (coachEvent) {
               coachEvent.deleteEvent();
-              console.log("Deleted Coach Calendar event as coach is no longer required.");
             }
           }
         }
@@ -711,61 +1254,178 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
       }
     }
   } catch (e) {
-    console.error("Failed to update Calendar event notes: " + e.toString());
+    console.error("Failed to update Calendar event notes fallback: " + e.toString());
   }
 }
 
-// ฟังก์ชันสำหรับการซิงก์ข้อมูลทั้งหมดแบบย้อนหลัง (Backup) ไปยัง Google Sheets
+// 5. ซิงก์ข้อมูลแบบปลอดภัยสูงสุดโดยใช้ระบบ Atomic Swap Swapping พร้อมการโรลแบ็คคืนค่าสลับชื่อชีตเดิมหากล้มเหลว
 function handleBackup(data) {
-  const bookings = data.bookings || [];
-  const transactions = data.transactions || [];
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    logError("Lock Timeout Error", "handleBackup", "Could not lock sheet for backup operations.", "CRITICAL");
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server busy. Please try again." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let tempBookingSheet = null;
+  let tempTxSheet = null;
   
-  // 1. จัดการข้อมูลการจอง
-  let bookingSheet = spreadsheet.getSheetByName("Bookings");
-  if (!bookingSheet) {
-    bookingSheet = spreadsheet.insertSheet("Bookings");
-    bookingSheet.appendRow(["ID", "Date", "Time Slot", "Customer", "Phone", "Email", "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", "Admin Notes"]);
+  try {
+    const bookings = data.bookings || [];
+    tempBookingSheet = spreadsheet.insertSheet("Bookings_Temp");
+    
+    // เขียนหัวตารางคอลัมน์ (Batch write)
+    const headers = ["ID", "Date", "Time Slot", "Customer", "Phone", "Email", "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", "Admin Notes", "Calendar Event ID"];
+    tempBookingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    const bookingRows = bookings.map(function(b) {
+      return [
+        b.id,
+        b.date,
+        b.slot,
+        b.name,
+        b.phone,
+        b.email || "",
+        b.court || "Main Court",
+        b.requireCoach ? "Yes" : "No",
+        parseFloat(b.fee) || 0,
+        b.invoiceNo || "",
+        b.receiptNo || "",
+        b.slipUrl || "",
+        b.lineUserId || "",
+        b.lineIdInput || "",
+        b.reminderSent || "",
+        b.adminNotes || "",
+        b.calendarEventId || ""
+      ];
+    });
+    
+    if (bookingRows.length > 0) {
+      tempBookingSheet.getRange(2, 1, bookingRows.length, bookingRows[0].length).setValues(bookingRows);
+    }
+  } catch (e) {
+    if (tempBookingSheet) {
+      try { spreadsheet.deleteSheet(tempBookingSheet); } catch(shErr) {}
+    }
+    logError("Backup Bookings Failure", "handleBackup", e.toString(), "CRITICAL");
+    if (lock.hasLock()) lock.releaseLock();
+    throw new Error("Bookings backup failed: " + e.toString());
   }
   
-  const lastRowB = bookingSheet.getLastRow();
-  if (lastRowB > 1) {
-    bookingSheet.getRange(2, 1, lastRowB - 1, bookingSheet.getLastColumn()).clearContent();
+  try {
+    const transactions = data.transactions || [];
+    tempTxSheet = spreadsheet.insertSheet("Transactions_Temp");
+    
+    // เขียนหัวตารางคอลัมน์ (Batch write)
+    const headers = ["ID", "Date", "Type", "Category", "Amount", "Description"];
+    tempTxSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    const txRows = transactions.map(function(t) {
+      return [t.id, t.date, t.type, t.category, t.amount, t.description];
+    });
+    
+    if (txRows.length > 0) {
+      tempTxSheet.getRange(2, 1, txRows.length, txRows[0].length).setValues(txRows);
+    }
+  } catch (e) {
+    if (tempBookingSheet) {
+      try { spreadsheet.deleteSheet(tempBookingSheet); } catch(shErr) {}
+    }
+    if (tempTxSheet) {
+      try { spreadsheet.deleteSheet(tempTxSheet); } catch(shErr) {}
+    }
+    logError("Backup Transactions Failure", "handleBackup", e.toString(), "CRITICAL");
+    if (lock.hasLock()) lock.releaseLock();
+    throw new Error("Transactions backup failed: " + e.toString());
   }
   
-  const bookingRows = bookings.map(b => [
-    b.id, b.date, b.slot, b.name, b.phone, b.email || "", b.court, b.requireCoach ? "Yes" : "No", b.fee, b.invoiceNo || "", b.receiptNo || "", b.slipUrl || "", b.lineUserId || "", b.lineIdInput || "", b.reminderSent || "", b.adminNotes || ""
-  ]);
+  // สลับชื่อชีต (Atomic Swap) พร้อมลบประวัติ Old เดิมที่มีอยู่ก่อนหน้าออกก่อนเปลี่ยนชื่อเพื่อป้องกันชื่อชนล้มเหลว
+  let bookingsSwapped = false;
+  let transactionsSwapped = false;
   
-  if (bookingRows.length > 0) {
-    bookingSheet.getRange(2, 1, bookingRows.length, bookingRows[0].length).setValues(bookingRows);
-  }
-  
-  // 2. จัดการข้อมูลธุรกรรมการเงิน (Transactions)
-  let txSheet = spreadsheet.getSheetByName("Transactions");
-  if (!txSheet) {
-    txSheet = spreadsheet.insertSheet("Transactions");
-    txSheet.appendRow(["ID", "Date", "Type", "Category", "Amount", "Description"]);
-  }
-  
-  const lastRowT = txSheet.getLastRow();
-  if (lastRowT > 1) {
-    txSheet.getRange(2, 1, lastRowT - 1, txSheet.getLastColumn()).clearContent();
-  }
-  
-  const txRows = transactions.map(t => [
-    t.id, t.date, t.type, t.category, t.amount, t.description
-  ]);
-  
-  if (txRows.length > 0) {
-    txSheet.getRange(2, 1, txRows.length, txRows[0].length).setValues(txRows);
+  try {
+    const oldBookingSheet = spreadsheet.getSheetByName("Bookings");
+    if (oldBookingSheet) {
+      const existingOld = spreadsheet.getSheetByName("Bookings_Old");
+      if (existingOld) {
+        spreadsheet.deleteSheet(existingOld);
+      }
+      oldBookingSheet.setName("Bookings_Old");
+      tempBookingSheet.setName("Bookings");
+      bookingsSwapped = true;
+    } else {
+      tempBookingSheet.setName("Bookings");
+      bookingsSwapped = true;
+    }
+    
+    const oldTxSheet = spreadsheet.getSheetByName("Transactions");
+    if (oldTxSheet) {
+      const existingOld = spreadsheet.getSheetByName("Transactions_Old");
+      if (existingOld) {
+        spreadsheet.deleteSheet(existingOld);
+      }
+      oldTxSheet.setName("Transactions_Old");
+      tempTxSheet.setName("Transactions");
+      transactionsSwapped = true;
+    } else {
+      tempTxSheet.setName("Transactions");
+      transactionsSwapped = true;
+    }
+    
+    // หากสลับสำเร็จและไม่มีปัญหาคัดแยก ให้ทำการลบชีตเก่าออก
+    if (oldBookingSheet) {
+      const sheetToDelete = spreadsheet.getSheetByName("Bookings_Old");
+      if (sheetToDelete) spreadsheet.deleteSheet(sheetToDelete);
+    }
+    if (oldTxSheet) {
+      const sheetToDelete = spreadsheet.getSheetByName("Transactions_Old");
+      if (sheetToDelete) spreadsheet.deleteSheet(sheetToDelete);
+    }
+  } catch(swapErr) {
+    logError("Backup Swapping Failure - Initiating ROLLBACK", "handleBackup", swapErr.toString(), "CRITICAL");
+    
+    // ทำ Rollback เปลี่ยนชื่อกู้คืนชีตหลักกลับมาทันที
+    try {
+      if (bookingsSwapped) {
+        const activeBookings = spreadsheet.getSheetByName("Bookings");
+        if (activeBookings) spreadsheet.deleteSheet(activeBookings);
+        
+        const oldBookings = spreadsheet.getSheetByName("Bookings_Old");
+        if (oldBookings) oldBookings.setName("Bookings");
+      }
+      if (transactionsSwapped) {
+        const activeTxs = spreadsheet.getSheetByName("Transactions");
+        if (activeTxs) spreadsheet.deleteSheet(activeTxs);
+        
+        const oldTxs = spreadsheet.getSheetByName("Transactions_Old");
+        if (oldTxs) oldTxs.setName("Transactions");
+      }
+    } catch(rollErr) {
+      logError("Backup Swapping Rollback Failed - DATABASE CORRUPTED", "handleBackup", rollErr.toString(), "CRITICAL");
+    }
+    
+    // ทำความสะอาดชีต temp ที่ยังคงค้างอยู่
+    try {
+      const tempB = spreadsheet.getSheetByName("Bookings_Temp");
+      if (tempB) spreadsheet.deleteSheet(tempB);
+      const tempT = spreadsheet.getSheetByName("Transactions_Temp");
+      if (tempT) spreadsheet.deleteSheet(tempT);
+    } catch(cleanErr) {}
+    
+    if (lock.hasLock()) lock.releaseLock();
+    throw swapErr;
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Backup completed successfully" }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ฟังก์ชันสแกนและส่งข้อความเตือนความจำล่วงหน้า 24 ชั่วโมงทาง LINE
+// สแกนและส่งข้อความเตือนความจำล่วงหน้าภายใน 24 ชั่วโมงทาง LINE
 function checkAndSendReminders() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const bookingSheet = spreadsheet.getSheetByName("Bookings");
@@ -774,7 +1434,6 @@ function checkAndSendReminders() {
   const lastRow = bookingSheet.getLastRow();
   if (lastRow <= 1) return;
   
-  // โหลดช่วงข้อมูลรวมตัวเช็คแจ้งเตือน (คอลัมน์ 1 ถึง 15)
   const range = bookingSheet.getRange(2, 1, lastRow - 1, 15);
   const values = range.getValues();
   
@@ -783,35 +1442,28 @@ function checkAndSendReminders() {
   
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const bookingId = row[0];
-    const dateVal = row[1];
-    const slotStr = row[2];
-    const name = row[3];
     const lineUserId = row[12];
-    const reminderSent = row[14]; // คอลัมน์ที่ 15 คือดัชนีที่ 14 (Reminder Sent)
+    const reminderSent = row[14];
     
-    // ข้ามหากแจ้งเตือนไปแล้ว หรือไม่มี LINE User ID
     if (reminderSent === "Yes" || !lineUserId) continue;
     
-    const bookingTime = parseBookingDateTime(dateVal, slotStr);
+    const bookingTime = parseBookingDateTime(row[1], row[2]);
     if (!bookingTime) continue;
     
-    // คำนวณช่วงเวลาห่างหน่วยเป็นชั่วโมง
     const diffMs = bookingTime.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     
-    // ส่งเตือนล่วงหน้าระหว่าง 23 ถึง 24 ชั่วโมง
-    if (diffHours >= 23.0 && diffHours <= 24.0) {
-      const success = sendLineReminder(lineUserId, name, dateVal, slotStr, token);
+    // ส่งเตือนล่วงหน้าหากช่วงจองจวนจะถึงใน 24 ชั่วโมงข้างหน้า และไม่เลยกำหนดไปแล้ว ( diffHours <= 24.0 && diffHours > 0 )
+    if (diffHours > 0 && diffHours <= 24.0) {
+      const success = sendLineReminder(lineUserId, row[3], row[1], row[2], token);
       if (success) {
-        // อัปเดตคอลัมน์ O (Reminder Sent - ลำดับที่ 15) เป็น "Yes" ป้องกันส่งข้อความซ้ำ
         bookingSheet.getRange(i + 2, 15).setValue("Yes");
       }
     }
   }
 }
 
-// ผู้ช่วยแปลงวันที่และสล็อตเวลาเป็น Date Object
+// ช่วยแปลงวันที่และสล็อตเวลาเป็น Date Object
 function parseBookingDateTime(dateVal, slotStr) {
   try {
     let dateStr = "";
@@ -843,9 +1495,9 @@ function parseBookingDateTime(dateVal, slotStr) {
   }
 }
 
-// ผู้ช่วยยิง Push Message แจ้งเตือนลูกค้าล่วงหน้า 24 ชม.
+// ส่งการแจ้งเตือนทาง LINE 24 ชม ล่วงหน้า
 function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
-  if (!token || token === "YOUR_LINE_CHANNEL_ACCESS_TOKEN") return false;
+  if (!token) return false;
   
   const url = "https://api.line.me/v2/bot/message/push";
   let dateText = "";
@@ -857,11 +1509,11 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
   }
   
   const textMessage = `🔔 แจ้งเตือนการใช้บริการสนาม (ล่วงหน้า 24 ชม.)
-
+ 
 📅 วันที่: ${dateText}
 ⏰ เวลา: ${slotStr}
 📍 สถานที่: The Grand Slam Tennis Court
-
+ 
 🎾เตรียมตัวให้พร้อมแล้วเจอกันพรุ่งนี้ครับ🎾`;
 
   const payload = {
@@ -880,28 +1532,30 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
     headers: {
       "Authorization": "Bearer " + token
     },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    payload: JSON.stringify(payload)
   };
   
   try {
-    const response = UrlFetchApp.fetch(url, options);
-    console.log("Reminder Sent Status: " + response.getContentText());
-    return response.getResponseCode() === 200;
+    const response = fetchWithRetry(url, options);
+    const code = response.getResponseCode();
+    if (code !== 200) {
+      throw new Error("LINE Push API failed with response code " + code + ": " + response.getContentText());
+    }
+    return true;
   } catch (e) {
     console.error("LINE reminder push failed: " + e.toString());
     return false;
   }
 }
 
-// ฟังก์ชันส่งสลิปและรายละเอียดการจองไปยัง LINE ส่วนตัวของแอดมิน
+// ส่งแจ้งสลิปและข้อมูลการจองไปยังแอดมินทาง LINE
 function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, requireCoach) {
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
   const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
   
-  const textMessage = `🔔 มีรายการจองใหม่เข้ามาและแจ้งชำระเงิน!
-
+  const textMessage = `🔔 มีรูปภาพสลิปแจ้งชำระเงินเข้ามาใหม่!
+ 
 👤 ลูกค้า: คุณ ${name}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
@@ -915,7 +1569,6 @@ function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, req
     }
   ];
   
-  // แนบรูปภาพสลิปไปด้วยหากมีสลิปแนบมา
   if (slipUrl) {
     messages.push({
       type: "image",
@@ -935,25 +1588,27 @@ function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, req
     headers: {
       "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
     },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    payload: JSON.stringify(payload)
   };
   
   try {
-    const response = UrlFetchApp.fetch(url, options);
-    console.log("Admin Slip Notification Status: " + response.getContentText());
+    const response = fetchWithRetry(url, options);
+    const code = response.getResponseCode();
+    if (code !== 200) {
+      throw new Error("LINE Admin Push API failed with response code " + code + ": " + response.getContentText());
+    }
   } catch(e) {
     console.error("Failed to notify admin LINE: " + e.toString());
   }
 }
 
-// ฟังก์ชัน GET สำหรับทดสอบ Web App
+// GET Gateway for Testing
 function doGet(e) {
   return ContentService.createTextOutput("Notification & Backup Web App is active.")
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
-// ฟังก์ชันดึงสิทธิ์เพื่อทดสอบระบบและปลดล็อก
+// ตัวดึงสิทธิ์เพื่อทดสอบระบบเมลและปฏิทิน
 function testEmail() {
   const calendar = CalendarApp.getDefaultCalendar();
   console.log("ชื่อปฏิทินของคุณคือ: " + calendar.getName());

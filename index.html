@@ -343,7 +343,7 @@
 
           <div class="form-group" style="text-align: left; margin-bottom: 0.5rem;">
             <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.4rem;">แนบหลักฐานการโอนเงิน (Payment Slip) *</label>
-            <input type="file" id="slipUpload" class="form-control" accept="image/*" style="padding: 0.4rem; font-size: 0.9rem;">
+            <input type="file" id="slipUpload" class="form-control" accept="image/jpeg, image/png, image/jpg" style="padding: 0.4rem; font-size: 0.9rem;">
             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
               * กรุณาแนบสลิปเพื่อยืนยันการทำรายการ
             </div>
@@ -671,6 +671,10 @@
               <label for="gasUrlInput" class="form-label">Google Apps Script Web App URL</label>
               <input type="url" id="gasUrlInput" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
             </div>
+            <div class="form-group">
+              <label for="webhookSecretInput" class="form-label">Google Webhook Secret Key</label>
+              <input type="password" id="webhookSecretInput" class="form-control" placeholder="ป้อนรหัสความปลอดภัยของ Webhook...">
+            </div>
             <div class="form-group" style="margin-bottom: 0; display: flex; gap: 0.5rem;">
               <button id="btnBackupData" class="btn-primary" style="width: auto; padding: 0.75rem 1.25rem;">
                 <i class="fa-solid fa-file-csv"></i> สำรองข้อมูล (Backup)
@@ -774,7 +778,7 @@
 
             <div class="form-group">
               <label for="txSlipFile" class="form-label">แนบหลักฐานการจ่ายเงิน (ถ้ามี)</label>
-              <input type="file" id="txSlipFile" class="form-control" accept="image/*,application/pdf" style="padding: 0.5rem;">
+              <input type="file" id="txSlipFile" class="form-control" accept="image/jpeg, image/png, image/jpg" style="padding: 0.5rem;">
             </div>
 
             <button id="btnSaveTx" class="btn-primary">
