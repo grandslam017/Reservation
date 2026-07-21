@@ -854,6 +854,7 @@ function removeBookingFromSheet(dateStr, slotStr, courtStr) {
 
 // 6. จัดการการอัปเดตข้อมูลลูกค้าและโน้ตแอดมิน
 function handleUpdateNotes(data) {
+  const id = data.id || "";
   const name = data.name;
   const phone = data.phone;
   const email = data.email || "";
@@ -881,8 +882,13 @@ function handleUpdateNotes(data) {
     const bookingSheet = spreadsheet.getSheetByName("Bookings");
     if (bookingSheet) {
       const indexMap = getBookingsIndexMap(bookingSheet);
-      const key = getNormalizedBookingKey(dateStr, court, slotStr);
-      const row = indexMap.dateSlotMap[key];
+      let row = null;
+      if (id && indexMap.uuidRowMap[id]) {
+        row = indexMap.uuidRowMap[id];
+      } else {
+        const key = getNormalizedBookingKey(dateStr, court, slotStr);
+        row = indexMap.dateSlotMap[key];
+      }
       
       if (row) {
         bookingSheet.getRange(row, 4).setValue(name);

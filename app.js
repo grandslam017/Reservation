@@ -116,8 +116,8 @@ const translations = {
     confirmDeleteTxPrompt: "คุณต้องการลบธุรกรรมนี้ใช่หรือไม่?",
     searchTab: "ตรวจสอบการจอง",
     searchViewTitle: "ค้นหาและสรุปรายการจองสนาม",
-    searchViewDesc: "ใส่ชื่อของคุณที่ใช้จองสนามเพื่อสรุปวันเวลาและรายละเอียดการจองทั้งหมดของคุณ",
-    searchPlaceholderName: "ระบุชื่อ-นามสกุลลูกค้าที่ใช้จอง (เช่น หนูดี)",
+    searchViewDesc: "ใส่ชื่อ หรือเบอร์โทรศัพท์ของคุณที่ใช้จองสนามเพื่อสรุปวันเวลาและรายละเอียดการจองทั้งหมดของคุณ",
+    searchPlaceholderName: "ระบุชื่อ-นามสกุล หรือเบอร์โทรศัพท์ (เช่น 0812345678)",
     btnSearch: "ค้นหา",
     thInvoiceNumber: "โน้ตเพิ่มเติม",
     thReceiptNumber: "หมายเลขใบเสร็จ"
@@ -236,8 +236,8 @@ const translations = {
     confirmDeleteTxPrompt: "Are you sure you want to delete this transaction?",
     searchTab: "My Bookings",
     searchViewTitle: "Search & Summarize Bookings",
-    searchViewDesc: "Enter the customer name used for booking to see your reserved times and summary.",
-    searchPlaceholderName: "Enter the customer name (e.g. John Doe)",
+    searchViewDesc: "Enter the customer name or phone number used for booking to see your reserved times and summary.",
+    searchPlaceholderName: "Enter customer name or phone number (e.g. 0812345678)",
     btnSearch: "Search",
     thInvoiceNumber: "Admin Notes",
     thReceiptNumber: "Receipt No."
@@ -3113,6 +3113,7 @@ async function handleEditBookingSave() {
     try {
       await sendGasRequest({
         action: "updateNotes",
+        id: bookingId,
         name: newName,
         phone: newPhone,
         email: newEmail || '',
@@ -3222,6 +3223,7 @@ async function updateBookingNoteInSupabase(bookingId, noteText) {
     if (state.config.gasUrl) {
       sendGasRequest({
         action: "updateNotes",
+        id: bookingId,
         name: booking.name,
         phone: booking.phone,
         date: booking.date,
@@ -3338,8 +3340,13 @@ function performBookingSearch(query, isSilent = false) {
     return;
   }
 
-  // Filter bookings matching name
-  const results = state.bookings.filter(b => b.name.toLowerCase().includes(query));
+  // Filter bookings matching name OR phone number
+  const results = state.bookings.filter(b => {
+    const nameMatch = b.name.toLowerCase().includes(query);
+    const cleanQueryPhone = query.replace(/[^0-9]/g, '');
+    const phoneMatch = b.phone && b.phone.replace(/[^0-9]/g, '').includes(cleanQueryPhone);
+    return nameMatch || (cleanQueryPhone !== '' && phoneMatch);
+  });
 
   resultArea.style.display = 'block';
   tbody.innerHTML = '';
