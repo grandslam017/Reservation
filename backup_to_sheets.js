@@ -153,7 +153,7 @@ function checkRateLimit(data) {
   
   if (countStr) {
     const count = parseInt(countStr, 10);
-    if (count >= 5) {
+    if (count >= 30) {
       return "Rate limit exceeded. Please wait 1 minute.";
     }
     cache.put(cacheKey, String(count + 1), 60);
@@ -185,9 +185,9 @@ function isValidTimeSlot(slotStr) {
   const endHour = parseInt(match[3], 10);
   const endMin = parseInt(match[4], 10);
   
-  // ตรวจสอบชั่วโมงสนามเปิดให้บริการ (08:00 - 22:00)
+  // ตรวจสอบชั่วโมงสนามเปิดให้บริการ (08:00 - 23:00)
   if (startHour < 8 || startHour > 22) return false;
-  if (endHour < 8 || endHour > 22) return false;
+  if (endHour < 9 || endHour > 23) return false;
   if (startMin !== 0 && startMin !== 30) return false;
   if (endMin !== 0 && endMin !== 30) return false;
   
@@ -966,11 +966,15 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
       
       let coachEventId = "";
       if (coachCalendar) {
-        const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
-        const cEvent = coachCalendar.createEvent(coachTitle, startTime, endTime, {
-          description: description
-        });
-        coachEventId = cEvent.getId();
+        try {
+          const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
+          const cEvent = coachCalendar.createEvent(coachTitle, startTime, endTime, {
+            description: description
+          });
+          coachEventId = cEvent.getId();
+        } catch (coachErr) {
+          console.warn("Failed to create coach calendar event: " + coachErr.toString());
+        }
       }
       
       // เก็บข้อมูล Event IDs เป็นโครงสร้าง JSON

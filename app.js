@@ -359,9 +359,20 @@ async function sendGasRequest(payload) {
   }
 }
 
+// Helper: Get Gregorian Year (Avoids Thai/Buddhist calendar issue in iOS/Safari)
+function getGregorianYear(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', { year: 'numeric' });
+    return parseInt(formatter.format(date), 10);
+  } catch (e) {
+    const y = date.getFullYear();
+    return y > 2400 ? y - 543 : y;
+  }
+}
+
 // Helper: Get Year-Month String (e.g., "2026-05")
 function getYearMonthString(date) {
-  const y = date.getFullYear();
+  const y = getGregorianYear(date);
   const m = String(date.getMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
 }
@@ -395,7 +406,7 @@ function isMonthLocked(date) {
     return targetDate > maxDate;
   }
 
-  const monthsDiff = (targetDate.getFullYear() - today.getFullYear()) * 12 + (targetDate.getMonth() - today.getMonth());
+  const monthsDiff = (getGregorianYear(targetDate) - getGregorianYear(today)) * 12 + (targetDate.getMonth() - today.getMonth());
   
   const maxAdvance = state.config.advanceBookingMonths !== undefined 
     ? (state.config.advanceBookingMonths === "99" ? 999 : parseInt(state.config.advanceBookingMonths)) 
@@ -413,7 +424,7 @@ function isMonthLocked(date) {
 function getRunningNumber(type) {
   // ใช้วันที่ที่ลูกค้าเลือกจอง (Booking Date) เป็นตัวกำหนดเดือน
   const targetDate = state.selectedDate || new Date();
-  const yyyy = targetDate.getFullYear();
+  const yyyy = getGregorianYear(targetDate);
   const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
   const prefix = `${yyyy}${mm}`;
   
@@ -994,7 +1005,7 @@ function renderCalendar() {
 
   grid.innerHTML = '';
 
-  const year = state.currentDate.getFullYear();
+  const year = getGregorianYear(state.currentDate);
   const month = state.currentDate.getMonth();
 
   const monthName = state.currentDate.toLocaleString(state.language === 'th' ? 'th-TH' : 'en-US', { month: 'long' });
@@ -1033,7 +1044,7 @@ function renderCalendar() {
     
     const isPast = cellDate < today;
     
-    const selectedDateString = `${state.selectedDate.getFullYear()}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
+    const selectedDateString = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
     if (dateString === selectedDateString) {
       dayCell.classList.add('selected');
     }
@@ -1094,7 +1105,7 @@ function renderTimeSlotsUI() {
 
   slotsGrid.innerHTML = '';
 
-  const dateStr = `${state.selectedDate.getFullYear()}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
+  const dateStr = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
   
   const opt = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
   const displayDate = state.selectedDate.toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', opt);
@@ -1420,7 +1431,7 @@ function initBookingWizard() {
 
       // === Double-check กับ Google Sheets ก่อนจอง ===
       // Fetch ข้อมูลล่าสุดเพื่อป้องกันการจอง slot ที่คนอื่นเพิ่งจองไป
-      const dateStr = `${state.selectedDate.getFullYear()}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
+      const dateStr = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
       
       if (state.config.supabaseUrl && state.config.supabaseKey) {
         showToast(state.language === 'th' ? 'กำลังตรวจสอบสถานะเวลาว่าง...' : 'Checking availability...', 'info');
@@ -1829,7 +1840,7 @@ function populateYearFilter() {
   });
 
   // Always include current year
-  years.add(new Date().getFullYear().toString());
+  years.add(getGregorianYear(new Date()).toString());
 
   // Sort years descending
   const sortedYears = Array.from(years).sort((a, b) => b - a);
@@ -1897,7 +1908,7 @@ function renderAdminDashboard() {
       return tx.date.startsWith(yearFilter);
     }
     if (monthFilter) {
-      const yr = yearFilter || new Date().getFullYear().toString();
+      const yr = yearFilter || getGregorianYear(new Date()).toString();
       return tx.date.startsWith(yr);
     }
     return true;
@@ -1922,7 +1933,7 @@ function renderAdminDashboard() {
   let occupancyRate = 0;
   if (monthFilter) {
     // Calculate for the specific month
-    const yr = yearFilter ? Number(yearFilter) : new Date().getFullYear();
+    const yr = yearFilter ? Number(yearFilter) : getGregorianYear(new Date());
     const month = Number(monthFilter);
     const daysInMonth = new Date(yr, month, 0).getDate();
     const totalSlotsInMonth = daysInMonth * 15; // 15 slots/day (08:00 to 23:00)
@@ -2024,7 +2035,7 @@ function renderAdminDashboard() {
           await supabaseClient
             .from('bookings')
             .upsert([{
-              id: 'cfg_advance_months',
+              id: '00000000-0000-0000-0000-000000000001',
               booking_date: '1970-01-01',
               time_slot: 'config',
               customer_name: String(val),
@@ -2266,7 +2277,7 @@ function initAdminForms() {
             await supabaseClient
               .from('bookings')
               .upsert([{
-                id: 'cfg_admin_notepad',
+                id: '00000000-0000-0000-0000-000000000002',
                 booking_date: '1970-01-01',
                 time_slot: 'notepad',
                 customer_name: textVal,
@@ -2636,7 +2647,7 @@ function renderRescheduleCalendar(bookingId) {
 
   grid.innerHTML = '';
 
-  const year = rescheduleCalendarDate.getFullYear();
+  const year = getGregorianYear(rescheduleCalendarDate);
   const month = rescheduleCalendarDate.getMonth();
 
   const thaiMonths = [
@@ -3360,7 +3371,7 @@ async function init() {
   const txDateInput = document.getElementById('txDate');
   if (txDateInput) {
     const today = new Date();
-    const y = today.getFullYear();
+    const y = getGregorianYear(today);
     const m = String(today.getMonth() + 1).padStart(2, '0');
     const d = String(today.getDate()).padStart(2, '0');
     txDateInput.value = `${y}-${m}-${d}`;
