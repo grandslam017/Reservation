@@ -34,6 +34,70 @@ const MAIN_CALENDAR_ID = scriptProperties.getProperty("MAIN_CALENDAR_ID");
 const OFF_PEAK_PRICE = parseFloat(scriptProperties.getProperty("OFF_PEAK_PRICE") || "250");
 const PEAK_PRICE = parseFloat(scriptProperties.getProperty("PEAK_PRICE") || "350");
 
+// รายชื่อสนามที่ได้รับอนุญาต (Whitelisted Courts)
+const VALID_COURTS = ["Main Court"];
+
+// ฟังก์ชันสร้างคีย์จองและตรวจเช็คชนกันแบบมาตรฐาน (Normalized Booking Key)
+function getNormalizedBookingKey(dateStr, courtStr, slotStr) {
+  return [
+    String(dateStr || "").trim(),
+    String(courtStr || "").trim().toUpperCase(),
+    String(slotStr || "").trim()
+  ].join("_");
+}
+
+// ฟังก์ชันบันทึกและตรวจสอบ Nonce ผ่านชีต Nonces เพื่อป้องกัน Replay Attack อย่างถาวร
+function checkAndSaveNonce(nonce) {
+  if (!nonce) return false;
+  const cleanNonce = nonce.replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!cleanNonce) return false;
+  
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let nonceSheet = spreadsheet.getSheetByName("Nonces");
+  if (!nonceSheet) {
+    nonceSheet = spreadsheet.insertSheet("Nonces");
+    nonceSheet.getRange(1, 1, 1, 2).setValues([["Nonce", "Timestamp"]]);
+  }
+  
+  const lastRow = nonceSheet.getLastRow();
+  const now = Date.now();
+  
+  // ล้าง Nonce เก่า (ที่มีอายุเกิน 10 นาที) เพื่อไม่ให้ชีตขยายขนาดมากเกินไป
+  if (lastRow > 1) {
+    const values = nonceSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    const rowsToKeep = [];
+    let hasOldNonces = false;
+    for (let i = 0; i < values.length; i++) {
+      const nonceTime = new Date(values[i][1]).getTime();
+      if (now - nonceTime <= 10 * 60 * 1000) {
+        rowsToKeep.push(values[i]);
+      } else {
+        hasOldNonces = true;
+      }
+    }
+    
+    if (hasOldNonces) {
+      nonceSheet.deleteRows(2, lastRow - 1);
+      if (rowsToKeep.length > 0) {
+        nonceSheet.getRange(2, 1, rowsToKeep.length, 2).setValues(rowsToKeep);
+      }
+    }
+  }
+  
+  // ตรวจสอบเช็คว่ามี nonce นี้อยู่แล้วหรือไม่
+  const freshLastRow = nonceSheet.getLastRow();
+  if (freshLastRow > 1) {
+    const nonces = nonceSheet.getRange(2, 1, freshLastRow - 1, 1).getValues().map(function(r) { return String(r[0]); });
+    if (nonces.indexOf(cleanNonce) !== -1) {
+      return false; // พบการ replay!
+    }
+  }
+  
+  // บันทึก nonce ใหม่ลงชีต
+  nonceSheet.appendRow([cleanNonce, new Date()]);
+  return true;
+}
+
 // ==========================================
 // CORE WEB APP GATEWAY (รับ Request จากระบบจอง)
 // ==========================================
@@ -52,10 +116,29 @@ function doPost(e) {
     // 2. ตรวจสอบความปลอดภัย Webhook (HMAC Signature & Timestamp Verification)
     const clientSignature = data.signature;
     const clientTimestamp = data.timestamp;
+    const clientNonce = data.nonce;
     
-    if (!clientSignature || !clientTimestamp) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Missing signature or timestamp." }))
+    if (!clientSignature || !clientTimestamp || !clientNonce) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Missing signature, timestamp, or nonce." }))
         .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // ตรวจสอบ Replay Attack (ตรวจเช็ค nonce ซ้ำซ้อนอย่างปลอดภัยโดยใช้ Lock ร่วมกับ Nonce Sheet)
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(5000);
+      const nonceValid = checkAndSaveNonce(clientNonce);
+      if (!nonceValid) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Replay attack detected (duplicate nonce)." }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } catch(lockErr) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server busy. Failed to verify nonce." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } finally {
+      try {
+        lock.releaseLock();
+      } catch(e) {}
     }
     
     // ตรวจสอบ Replay Attack (ต้องส่งคำขอในเวลาไม่เกิน 5 นาที)
@@ -138,23 +221,34 @@ function verifyHMACSignature(message, clientSignature, secret) {
   }
 }
 
-// 5. ป้องกันสแปมด้วยระบบจำกัดคำสั่งจอง (Rate Limiting) ผ่าน CacheService
+// 5. ป้องกันสแปมด้วยระบบจำกัดคำสั่งจอง (Rate Limiting) แยกตามประเภท Action ผ่าน CacheService
 function checkRateLimit(data) {
-  const cache = CacheService.getScriptCache();
-  // ข้อมูลลูกค้าทั้งหมดได้รับการลงลายเซ็น HMAC ป้องกันการปลอมแปลงค่า
-  const identifier = data.lineUserId || data.phone || data.email || data.clientFingerprint || "anonymous";
-  
   if (data.action === "backup") {
     return null;
   }
   
-  const cacheKey = "rate_" + identifier.replace(/[^a-zA-Z0-9_]/g, "");
+  const cache = CacheService.getScriptCache();
+  // ข้อมูลลูกค้าทั้งหมดได้รับการลงลายเซ็น HMAC ป้องกันการปลอมแปลงค่า
+  const identifier = data.lineUserId || data.phone || data.email || data.clientFingerprint || "anonymous";
+  
+  let limit = 5; // ค่าเริ่มต้นสำหรับการจอง (sendConfirmation)
+  if (data.action === "cancelBooking") {
+    limit = 10;
+  } else if (data.action === "updateNotes" || data.action === "uploadLedgerSlip") {
+    limit = 20;
+  } else {
+    limit = 10; // ค่าเริ่มต้นทั่วไป
+  }
+  
+  const cleanAction = String(data.action || "default").replace(/[^a-zA-Z0-9_]/g, "");
+  const cleanId = identifier.replace(/[^a-zA-Z0-9_]/g, "");
+  const cacheKey = "rate_" + cleanAction + "_" + cleanId;
   const countStr = cache.get(cacheKey);
   
   if (countStr) {
     const count = parseInt(countStr, 10);
-    if (count >= 30) {
-      return "Rate limit exceeded. Please wait 1 minute.";
+    if (count >= limit) {
+      return "Rate limit exceeded for " + data.action + ". Please wait 1 minute.";
     }
     cache.put(cacheKey, String(count + 1), 60);
   } else {
@@ -212,6 +306,9 @@ function validateInput(data) {
     if (!data.phone || !/^[0-9\-\+\s]{9,15}$/.test(data.phone)) return "Invalid phone number format.";
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return "Invalid email format.";
     if (!data.slots || !Array.isArray(data.slots) || data.slots.length === 0) return "At least one time slot is required.";
+    if (data.court && VALID_COURTS.indexOf(data.court) === -1) {
+      return "Invalid court selection: " + data.court;
+    }
     
     // ตรวจสอบความถูกต้องของสล็อตเวลาอย่างระมัดระวัง
     for (let i = 0; i < data.slots.length; i++) {
@@ -221,17 +318,20 @@ function validateInput(data) {
     }
     
     // ตรวจสอบรูปแบบ invoiceNo และ receiptNo
-    if (data.invoiceNo && !/^INV\.\d+$/.test(data.invoiceNo)) {
-      return "Invalid invoice format. Expected 'INV.YYYYMMNNN'.";
+    if (data.invoiceNo && !/^INV\.\d{9}$/.test(data.invoiceNo)) {
+      return "Invalid invoice format. Expected 'INV.YYYYMMNNN' (9 digits).";
     }
-    if (data.receiptNo && !/^R\.\d+$/.test(data.receiptNo)) {
-      return "Invalid receipt format. Expected 'R.YYYYMMNNN'.";
+    if (data.receiptNo && !/^R\.\d{9}$/.test(data.receiptNo)) {
+      return "Invalid receipt format. Expected 'R.YYYYMMNNN' (9 digits).";
     }
   }
   
   if (data.action === "cancelBooking" || data.action === "updateNotes") {
     if (!data.slot || !isValidTimeSlot(data.slot)) {
       return "Invalid time slot format or bounds: " + data.slot;
+    }
+    if (data.court && VALID_COURTS.indexOf(data.court) === -1) {
+      return "Invalid court selection: " + data.court;
     }
   }
   
@@ -268,7 +368,12 @@ function logError(type, functionName, errorDescription, severity) {
       logSheet.deleteRows(2, 200); 
     }
     
-    const executionId = Utilities.getUuid();
+    let executionId = "";
+    try {
+      executionId = ScriptApp.getExecutionInfo().getExecutionId();
+    } catch(err) {
+      executionId = Utilities.getUuid();
+    }
     const timestamp = new Date();
     
     logSheet.getRange(logSheet.getLastRow() + 1, 1, 1, 5).setValues([[
@@ -295,6 +400,11 @@ function getBookingsIndexMap(sheet) {
   
   for (let i = 0; i < values.length; i++) {
     const rowNum = i + 2;
+    const statusVal = String(values[i][16] || "").trim();
+    if (statusVal === "CANCELLED") {
+      continue; // ข้ามรายการจองที่ถูกยกเลิกแล้ว (Soft Deleted)
+    }
+    
     const uuid = String(values[i][0] || "").trim();
     const dateVal = values[i][1];
     const slot = String(values[i][2] || "").trim();
@@ -307,11 +417,14 @@ function getBookingsIndexMap(sheet) {
       dateStr = String(dateVal);
     }
     
-    // คีย์ผสมเพื่อเช็คซ้ำหลายสนามพร้อมกัน: date_court_slot
-    const key = dateStr + "_" + court + "_" + slot;
+    // แปลงคีย์สนามและเวลาให้เป็นตัวใหญ่ตัดเศษขอบเขตเดียวกัน (Normalized Key)
+    const key = getNormalizedBookingKey(dateStr, court, slot);
     dateSlotMap[key] = rowNum;
     
     if (uuid) {
+      if (uuidRowMap[uuid]) {
+        throw new Error("Duplicate UUID detected in Bookings sheet: '" + uuid + "' at rows " + uuidRowMap[uuid] + " and " + rowNum);
+      }
       uuidRowMap[uuid] = rowNum;
     }
   }
@@ -368,6 +481,11 @@ function handleUploadLedgerSlip(data) {
   }
   
   const file = folder.createFile(sanitizedBlob);
+  try {
+    file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  } catch (err) {
+    console.warn("Failed to set file sharing to PRIVATE: " + err.toString());
+  }
   
   return ContentService.createTextOutput(JSON.stringify({ 
     status: "success", 
@@ -375,17 +493,36 @@ function handleUploadLedgerSlip(data) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ฟังก์ชันคัดกรองไบนารี Magic Numbers รองรับ variants ต่างๆ รวมถึง JPEG2000
 function validateMagicNumbers(byteArray, declaredMime) {
-  if (!byteArray || byteArray.length < 4) {
+  if (!byteArray || byteArray.length < 8) {
     return "Security Error: File payload is too small.";
   }
   
-  const isPNG = (byteArray[0] === -119 && byteArray[1] === 80 && byteArray[2] === 78 && byteArray[3] === 71);
-  const isJPEGStandard = (byteArray[0] === -1 && byteArray[1] === -40 && byteArray[2] === -1);
-  const isJPEG2000 = (byteArray[0] === 0 && byteArray[1] === 0 && byteArray[2] === 0 && byteArray[3] === 12 && byteArray[4] === 106 && byteArray[5] === 80);
+  const byte0 = byteArray[0] & 0xFF;
+  const byte1 = byteArray[1] & 0xFF;
+  const byte2 = byteArray[2] & 0xFF;
+  const byte3 = byteArray[3] & 0xFF;
+  const byte4 = byteArray[4] & 0xFF;
+  const byte5 = byteArray[5] & 0xFF;
+  const byte6 = byteArray[6] & 0xFF;
+  const byte7 = byteArray[7] & 0xFF;
   
-  const isJPEG = isJPEGStandard || (byteArray.length >= 6 && isJPEG2000);
+  // ตรวจสอบเช็ค 8 ไบต์ตามมาตรฐานสากลของ PNG
+  const isPNG = (byte0 === 137 && byte1 === 80 && byte2 === 78 && byte3 === 71 &&
+                 byte4 === 13 && byte5 === 10 && byte6 === 26 && byte7 === 10);
+                 
+  // ตรวจสอบเช็คหัวไฟล์ (FF D8 FF) และท้ายไฟล์ (FF D9) ของ JPEG Standard
+  const isJPEGStandardStart = (byte0 === 255 && byte1 === 216 && byte2 === 255);
+  const lastIndex = byteArray.length - 1;
+  const isJPEGStandardEnd = ((byteArray[lastIndex - 1] & 0xFF) === 255 && (byteArray[lastIndex] & 0xFF) === 217);
+  const isJPEGStandard = isJPEGStandardStart && isJPEGStandardEnd;
+  
+  let isJPEG2000 = false;
+  if (byte0 === 0 && byte1 === 0 && byte2 === 0 && byte3 === 12 && byte4 === 106 && byte5 === 80) {
+    isJPEG2000 = true;
+  }
+  
+  const isJPEG = isJPEGStandard || isJPEG2000;
   const mimeLower = declaredMime.toLowerCase();
   
   if (isPNG) {
@@ -446,6 +583,7 @@ function handleSendConfirmation(data) {
   
   // A. ขอบเขตการล็อคขนาดเล็ก (Micro-Lock Scope) เฉพาะตรวจสอบสล็อตว่างและจองแถว
   const lock = LockService.getScriptLock();
+  let lockReleased = false;
   try {
     lock.waitLock(10000); 
   } catch (err) {
@@ -482,11 +620,7 @@ function handleSendConfirmation(data) {
       }
       
       if (allExist) {
-        lock.releaseLock();
-        return ContentService.createTextOutput(JSON.stringify({ 
-          status: "success", 
-          message: "Idempotent request already processed." 
-        })).setMimeType(ContentService.MimeType.JSON);
+        throw new Error("IDEMPOTENT_SUCCESS");
       }
     }
     
@@ -499,10 +633,7 @@ function handleSendConfirmation(data) {
     });
     
     if (duplicates.length > 0) {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        status: "error", 
-        message: "Time slots already booked: " + duplicates.join(", ") 
-      })).setMimeType(ContentService.MimeType.JSON);
+      throw new Error("DUPLICATE_BOOKINGS:" + duplicates.join(", "));
     }
     
     // เขียนข้อมูลการจองลงชีต (Batch Write)
@@ -536,11 +667,32 @@ function handleSendConfirmation(data) {
     lastRow = bookingSheet.getLastRow();
     bookingSheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
   } catch (e) {
+    if (e.message === "IDEMPOTENT_SUCCESS") {
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: "success", 
+        message: "Idempotent request already processed." 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (e.message.indexOf("DUPLICATE_BOOKINGS:") === 0) {
+      const dups = e.message.substring("DUPLICATE_BOOKINGS:".length);
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: "error", 
+        message: "Time slots already booked: " + dups 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     logError("Sheet Batch Write Error", "handleSendConfirmation", e.toString(), "CRITICAL");
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Failed to save booking to Sheets: " + e.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
-    lock.releaseLock(); 
+    if (!lockReleased) {
+      try {
+        lock.releaseLock();
+      } catch (err) {
+        console.warn("Finally block lock release warning: " + err.toString());
+      }
+      lockReleased = true;
+    }
   }
   
   // B. บันทึกกิจกรรมปฏิทิน Google Calendar อัตโนมัติ (พร้อมกลไกโยน Exception และ Rollback แถว Sheets อัตโนมัติหากสร้างไม่ครบทุกสล็อต)
@@ -554,13 +706,14 @@ function handleSendConfirmation(data) {
   } catch (e) {
     logError("Calendar Creation Failure - Initiating ROLLBACK", "handleSendConfirmation", e.toString(), "CRITICAL");
     
-    // Rollback 1: ลบแถวข้อมูลที่เพิ่งเขียนลง Sheets คืนค่าเดิม
+    // Rollback 1: ปรับแก้ข้อมูลแถวจองใน Sheets ให้เป็น "CANCELLED" แทนการเรียกลบแถวป้องกัน Row Shifting
     try {
       if (bookingSheet && lastRow > 0) {
-        bookingSheet.deleteRows(lastRow + 1, uniqueSlots.length);
+        const cancelledValues = uniqueSlots.map(function() { return ["CANCELLED"]; });
+        bookingSheet.getRange(lastRow + 1, 17, cancelledValues.length, 1).setValues(cancelledValues);
       }
     } catch(sheetErr) {
-      logError("Rollback Sheets Delete Failure", "handleSendConfirmation", sheetErr.toString(), "CRITICAL");
+      logError("Rollback Sheets Status Failure", "handleSendConfirmation", sheetErr.toString(), "CRITICAL");
     }
     
     // Rollback 2: ลบปฏิทินที่สร้างเสร็จบางส่วน
@@ -627,7 +780,7 @@ function handleSendConfirmation(data) {
 
 // ตรวจสอบเช็คว่ามีแถวบันทึกจองนี้อยู่แล้วในชีตหรือไม่โดยใช้ตำแหน่งสนามและวัน-เวลา
 function isBookingDuplicate(indexMap, dateStr, courtStr, slotStr) {
-  const key = dateStr + "_" + courtStr + "_" + slotStr;
+  const key = getNormalizedBookingKey(dateStr, courtStr, slotStr);
   return !!indexMap.dateSlotMap[key];
 }
 
@@ -649,6 +802,7 @@ function handleCancelBooking(data) {
 function removeBookingFromSheet(dateStr, slotStr, courtStr) {
   const activeCourt = courtStr || "Main Court";
   const lock = LockService.getScriptLock();
+  let lockReleased = false;
   try {
     lock.waitLock(10000);
   } catch (e) {
@@ -661,30 +815,40 @@ function removeBookingFromSheet(dateStr, slotStr, courtStr) {
     const bookingSheet = spreadsheet.getSheetByName("Bookings");
     if (!bookingSheet) return;
     
-    // โหลด map เพื่อลบใน O(1)
+    // โหลด map เพื่อค้นหาตำแหน่งใน O(1)
     const indexMap = getBookingsIndexMap(bookingSheet);
     
-    // ดึงสนามเพื่อค้นหาคีย์ date_court_slot
-    const key = dateStr + "_" + activeCourt + "_" + slotStr;
+    // ดึงคีย์สนามมาตรฐาน
+    const key = getNormalizedBookingKey(dateStr, activeCourt, slotStr);
     const row = indexMap.dateSlotMap[key];
     
     if (row) {
       const eventId = bookingSheet.getRange(row, 17).getValue();
       
-      // ลบแถวชีต
-      bookingSheet.deleteRow(row);
+      // ปรับปรุงเป็น Soft Delete: เปลี่ยนสถานะแถวจองในชีตเป็น CANCELLED แทนการลบแถว
+      bookingSheet.getRange(row, 17).setValue("CANCELLED");
       
       // ปลดล็อคชีตทันทีก่อนยิงลบ Google Calendar
-      lock.releaseLock();
+      if (!lockReleased) {
+        lock.releaseLock();
+        lockReleased = true;
+      }
       
       deleteGoogleCalendarEvent("", dateStr, slotStr, eventId);
-      console.log("Deleted row " + row + " and synced Calendar event.");
+      console.log("Cancelled row " + row + " (Soft Delete) and synced Calendar event.");
     }
   } catch (e) {
     logError("Delete Booking Error", "removeBookingFromSheet", e.toString(), "CRITICAL");
     throw e;
   } finally {
-    if (lock.hasLock()) lock.releaseLock();
+    if (!lockReleased) {
+      try {
+        lock.releaseLock();
+      } catch (err) {
+        console.warn("Finally lock release warning: " + err.toString());
+      }
+      lockReleased = true;
+    }
   }
 }
 
@@ -704,6 +868,7 @@ function handleUpdateNotes(data) {
   let eventId = "";
   
   const lock = LockService.getScriptLock();
+  let lockReleased = false;
   try {
     lock.waitLock(10000);
   } catch (e) {
@@ -716,7 +881,7 @@ function handleUpdateNotes(data) {
     const bookingSheet = spreadsheet.getSheetByName("Bookings");
     if (bookingSheet) {
       const indexMap = getBookingsIndexMap(bookingSheet);
-      const key = dateStr + "_" + court + "_" + slotStr;
+      const key = getNormalizedBookingKey(dateStr, court, slotStr);
       const row = indexMap.dateSlotMap[key];
       
       if (row) {
@@ -733,7 +898,14 @@ function handleUpdateNotes(data) {
     logError("Update Note Sheets Error", "handleUpdateNotes", e.toString(), "CRITICAL");
     throw e;
   } finally {
-    lock.releaseLock(); 
+    if (!lockReleased) {
+      try {
+        lock.releaseLock();
+      } catch (err) {
+        console.warn("Finally lock release warning: " + err.toString());
+      }
+      lockReleased = true;
+    }
   }
   
   updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventId);
@@ -818,9 +990,29 @@ function sendEmailConfirmation(recipientEmail, name, dateStr, slots, invoiceNo, 
     </div>
   `;
   
-  GmailApp.sendEmail(recipientEmail, subject, "", {
-    htmlBody: htmlBody
-  });
+  sendEmailWithRetry(recipientEmail, subject, htmlBody);
+}
+
+// ฟังก์ชันส่งอีเมลด้วย GmailApp พร้อมกลไกส่งซ้ำหากผิดพลาด (Retry with Exponential Backoff and Jitter)
+function sendEmailWithRetry(recipientEmail, subject, htmlBody) {
+  let attempt = 0;
+  const retries = 3;
+  while (attempt < retries) {
+    try {
+      GmailApp.sendEmail(recipientEmail, subject, "", {
+        htmlBody: htmlBody
+      });
+      return;
+    } catch (e) {
+      attempt++;
+      console.warn("GmailApp.sendEmail failed (attempt " + attempt + "): " + e.toString());
+      if (attempt < retries) {
+        Utilities.sleep(Math.random() * 1000 + Math.pow(2, attempt) * 1000);
+      } else {
+        throw e;
+      }
+    }
+  }
 }
 
 // 14. ฟังก์ชันส่งคำสั่งเชื่อมต่อ HTTP ลองใหม่อัตโนมัติ (Retry with Exponential Backoff - กรองเฉพาะ 5xx และ 429 เท่านั้น)
@@ -852,7 +1044,7 @@ function fetchWithRetry(url, options, retries = 3) {
     }
     attempt++;
     if (attempt < retries) {
-      Utilities.sleep(Math.pow(2, attempt) * 1000); 
+      Utilities.sleep(Math.random() * 1000 + Math.pow(2, attempt) * 1000); 
     }
   }
   
@@ -926,11 +1118,17 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
   }
   
   let coachCalendar = null;
-  if (requireCoach && typeof COACH_CALENDAR_ID !== "undefined" && COACH_CALENDAR_ID) {
+  if (requireCoach) {
+    if (typeof COACH_CALENDAR_ID === "undefined" || !COACH_CALENDAR_ID) {
+      throw new Error("COACH_CALENDAR_ID is missing but requireCoach is true.");
+    }
     try {
       coachCalendar = CalendarApp.getCalendarById(COACH_CALENDAR_ID);
     } catch(err) {
-      console.error("Failed to access coach calendar: " + err.toString());
+      throw new Error("Failed to access coach calendar: " + err.toString());
+    }
+    if (!coachCalendar) {
+      throw new Error("Failed to access coach calendar (returned null for ID: " + COACH_CALENDAR_ID + ")");
     }
   }
   
@@ -941,7 +1139,9 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
     const slotStr = slots[i];
     try {
       const timeParts = slotStr.split(' - ');
-      if (timeParts.length !== 2) continue;
+      if (timeParts.length !== 2) {
+        throw new Error("Invalid time slot format: " + slotStr);
+      }
       
       const startStr = timeParts[0];
       const endStr = timeParts[1];
@@ -966,15 +1166,11 @@ function createGoogleCalendarEvents(name, phone, dateStr, slots, receiptNo, requ
       
       let coachEventId = "";
       if (coachCalendar) {
-        try {
-          const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
-          const cEvent = coachCalendar.createEvent(coachTitle, startTime, endTime, {
-            description: description
-          });
-          coachEventId = cEvent.getId();
-        } catch (coachErr) {
-          console.warn("Failed to create coach calendar event: " + coachErr.toString());
-        }
+        const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
+        const cEvent = coachCalendar.createEvent(coachTitle, startTime, endTime, {
+          description: description
+        });
+        coachEventId = cEvent.getId();
       }
       
       // เก็บข้อมูล Event IDs เป็นโครงสร้าง JSON

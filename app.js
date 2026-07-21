@@ -256,7 +256,8 @@ const state = {
     webhookSecret: "grandslam_secret_key_2026", // คีย์รหัสความปลอดภัยสำหรับ Webhook
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
-    advanceBookingMonths: 0    // Default 0 (เฉพาะเดือนปัจจุบัน)
+    advanceBookingMonths: 0,    // Default 0 (เฉพาะเดือนปัจจุบัน)
+    bookingNotice: ""
   },
   currentDate: new Date(),          // For calendar view navigations
   selectedDate: new Date(),         // Selected booking date
@@ -333,7 +334,9 @@ async function sendGasRequest(payload) {
   }
   try {
     const timestamp = Date.now().toString();
+    const nonce = generateUUID();
     payload.timestamp = timestamp;
+    payload.nonce = nonce;
     payload.clientFingerprint = getClientFingerprint();
     
     // Sort properties to ensure deterministic JSON representation
@@ -532,6 +535,7 @@ function loadStateFromStorage() {
       if (!parsedConfig.liffId) parsedConfig.liffId = state.config.liffId;
       if (!parsedConfig.gasUrl) parsedConfig.gasUrl = state.config.gasUrl;
       if (!parsedConfig.webhookSecret) parsedConfig.webhookSecret = state.config.webhookSecret;
+      if (parsedConfig.bookingNotice !== undefined) state.config.bookingNotice = parsedConfig.bookingNotice;
       state.config = { ...state.config, ...parsedConfig };
     }
   } catch (err) {
@@ -820,8 +824,18 @@ async function fetchBookingsFromSupabase(silent = false) {
         }
       }
       
+      // ดึงข้อความประกาศเงื่อนไขของลูกค้าจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
+      const noticeRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'booking_notice');
+      if (noticeRow) {
+        state.config.bookingNotice = noticeRow.name || "";
+        const noticeText = document.getElementById('customerNoticeText');
+        if (noticeText && !noticeText.matches(':focus')) {
+          noticeText.value = state.config.bookingNotice;
+        }
+      }
+      
       // กรองแถวตั้งค่าเหล่านี้ออกจากรายการจองจริง เพื่อไม่แสดงผลบนตาราง
-      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && (b.slot === 'config' || b.slot === 'notepad')));
+      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && (b.slot === 'config' || b.slot === 'notepad' || b.slot === 'booking_notice')));
       saveStateToStorage();
     }
   } catch (error) {
@@ -981,6 +995,8 @@ function setupTabNavigation() {
         showView(tabId);
         if (tabId === 'admin') {
           renderAdminDashboard();
+        } else if (tabId === 'availability') {
+          renderAvailabilityGrid();
         }
       }
     });
@@ -1226,6 +1242,25 @@ function showSummaryPanel() {
   }
 
   document.getElementById('summaryTotalFee').textContent = `${total.toLocaleString()} ฿`;
+
+  // Render the customer notice card dynamically
+  const noticeCard = document.getElementById('customerNoticeCard');
+  const noticeContent = document.getElementById('customerNoticeContent');
+  if (noticeCard && noticeContent) {
+    if (state.config.bookingNotice && state.config.bookingNotice.trim() !== "") {
+      const escapedNotice = state.config.bookingNotice
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
+        .replace(/\n/g, "<br>");
+      noticeContent.innerHTML = escapedNotice;
+      noticeCard.style.display = 'flex';
+    } else {
+      noticeCard.style.display = 'none';
+    }
+  }
 
   // Disable button if no slot is selected
   const bookBtn = document.getElementById('btnBookNow');
@@ -2013,6 +2048,11 @@ function renderAdminDashboard() {
     notepadText.value = state.config.adminNotepad || '';
   }
 
+  const noticeText = document.getElementById('customerNoticeText');
+  if (noticeText && !noticeText.matches(':focus')) {
+    noticeText.value = state.config.bookingNotice || '';
+  }
+
   // Setup Admin search input handler
   const searchInput = document.getElementById('bookingSearchInput');
   if (searchInput) {
@@ -2293,6 +2333,43 @@ function initAdminForms() {
           }
         }
         showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
+      }
+    });
+  }
+
+  const btnSaveCustomerNotice = document.getElementById('btnSaveCustomerNotice');
+  if (btnSaveCustomerNotice) {
+    btnSaveCustomerNotice.addEventListener('click', async () => {
+      const noticeText = document.getElementById('customerNoticeText');
+      if (noticeText) {
+        const textVal = noticeText.value.trim();
+        state.config.bookingNotice = textVal;
+        saveStateToStorage();
+        
+        // บันทึกประกาศแจ้งเตือนลง Supabase เพื่อซิงก์ข้ามเครื่องและเบราว์เซอร์
+        if (supabaseClient) {
+          try {
+            await supabaseClient
+              .from('bookings')
+              .upsert([{
+                id: '00000000-0000-0000-0000-000000000003',
+                booking_date: '1970-01-01',
+                time_slot: 'booking_notice',
+                customer_name: textVal,
+                phone: '000-000-0000',
+                email: 'config@system.local',
+                court: 'System',
+                require_coach: false,
+                fee: 0,
+                status: 'confirmed'
+              }], { onConflict: 'id' });
+          } catch (err) {
+            console.error("Failed to save booking notice to Supabase:", err);
+          }
+        }
+        showToast(state.language === 'th' ? "บันทึกประกาศเรียบร้อยแล้ว" : "Customer notice saved successfully.", 'success');
+        // อัปเดตการแสดงผลในหน้าลูกค้าด้วย
+        showSummaryPanel();
       }
     });
   }
@@ -3504,6 +3581,11 @@ async function init() {
         renderTimeSlotsUI();
       }
       
+      // If user is viewing the availability grid, re-render it smoothly
+      if (document.getElementById('availability').classList.contains('active')) {
+        renderAvailabilityGrid();
+      }
+      
       // If admin is viewing the admin dashboard, re-render dashboard
       if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
         renderAdminDashboard();
@@ -3511,7 +3593,162 @@ async function init() {
     }
   }, 10000);
 
+  // Initialize Weekly Availability Start Date (Monday of current week)
+  state.availabilityStartOfWeek = getMonday(new Date());
+
+  const prevWeekBtn = document.getElementById('prevWeekBtn');
+  const nextWeekBtn = document.getElementById('nextWeekBtn');
+  if (prevWeekBtn && nextWeekBtn) {
+    prevWeekBtn.addEventListener('click', () => {
+      state.availabilityStartOfWeek.setDate(state.availabilityStartOfWeek.getDate() - 7);
+      renderAvailabilityGrid();
+    });
+    nextWeekBtn.addEventListener('click', () => {
+      state.availabilityStartOfWeek.setDate(state.availabilityStartOfWeek.getDate() + 7);
+      renderAvailabilityGrid();
+    });
+  }
+
   showView('booking');
+}
+
+// ----------------------------------------------------
+// Weekly Availability Grid Helper Functions
+// ----------------------------------------------------
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(date.setDate(diff));
+}
+
+function renderAvailabilityGrid() {
+  const container = document.getElementById('availabilityGridContainer');
+  const weekRangeLabel = document.getElementById('currentWeekRange');
+  if (!container || !weekRangeLabel) return;
+
+  container.innerHTML = '';
+
+  // Get date range array (7 days: Monday to Sunday)
+  const days = [];
+  const start = new Date(state.availabilityStartOfWeek);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push(d);
+  }
+
+  // Set Date Range label: "Mon 20-07-26 → Sun 26-07-26"
+  const formatDateForRange = (date) => {
+    const dayName = date.toLocaleString('en-US', { weekday: 'short' });
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(getGregorianYear(date)).slice(-2);
+    return `${dayName} ${day}-${month}-${year}`;
+  };
+  weekRangeLabel.textContent = `${formatDateForRange(days[0])} → ${formatDateForRange(days[6])}`;
+
+  // Time slots matching the system slots
+  const timeSlots = [
+    "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+    "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+    "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
+    "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"
+  ];
+
+  // 1. Render Time Column
+  const timeCol = document.createElement('div');
+  timeCol.className = 'availability-column time-column';
+  
+  const timeColHeader = document.createElement('div');
+  timeColHeader.className = 'column-header';
+  timeColHeader.textContent = state.language === 'th' ? 'เวลา' : 'Time';
+  // Align spacing
+  timeColHeader.style.paddingBottom = '1.25rem'; 
+  timeCol.appendChild(timeColHeader);
+
+  timeSlots.forEach(slot => {
+    const cell = document.createElement('div');
+    cell.className = 'grid-cell time-cell';
+    cell.textContent = slot.replace(/:/g, '.');
+    timeCol.appendChild(cell);
+  });
+  container.appendChild(timeCol);
+
+  // 2. Render Day Columns
+  days.forEach(dayDate => {
+    const col = document.createElement('div');
+    col.className = 'availability-column';
+    
+    const dayNum = dayDate.getDay();
+    const isWeekend = (dayNum === 0 || dayNum === 6);
+    if (isWeekend) {
+      col.classList.add('weekend-column');
+    }
+
+    const dateStr = formatDateString(dayDate);
+    const selectedDateStr = formatDateString(state.selectedDate);
+    if (dateStr === selectedDateStr) {
+      col.classList.add('highlight-column');
+    }
+
+    const dayName = dayDate.toLocaleString(state.language === 'th' ? 'th-TH' : 'en-US', { weekday: 'short' });
+    const dateFormatted = `${String(dayDate.getDate()).padStart(2, '0')}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(getGregorianYear(dayDate)).slice(-2)}`;
+
+    const header = document.createElement('div');
+    header.className = 'column-header';
+    header.innerHTML = `${dayName}<br><span class="date-sub">${dateFormatted}</span>`;
+    col.appendChild(header);
+
+    timeSlots.forEach(slot => {
+      // Check if this time slot is in the past for this day
+      const isPast = checkIfSlotIsPast(dayDate, slot);
+      
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+
+      if (isPast) {
+        // Render as empty/blank slot if in the past
+        cell.classList.add('empty-cell');
+      } else {
+        const isBooked = state.bookings.some(b => b.date === dateStr && b.slot === slot);
+        if (isBooked) {
+          cell.classList.add('booked-cell');
+          cell.innerHTML = `
+            <i class="fa-solid fa-lock"></i>
+            <span>BOOKED</span>
+          `;
+        } else {
+          cell.classList.add('available-cell');
+          cell.innerHTML = `
+            <span>AVAILABLE</span>
+          `;
+        }
+      }
+      col.appendChild(cell);
+    });
+
+    container.appendChild(col);
+  });
+}
+
+// Helper: Check if slot is in the past
+function checkIfSlotIsPast(dayDate, slot) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  
+  const checkDate = new Date(dayDate);
+  checkDate.setHours(0,0,0,0);
+  
+  if (checkDate < today) return true;
+  if (checkDate > today) return false;
+  
+  // If today, compare the slot start time with current hour
+  const startHourStr = slot.split(' - ')[0]; // "08:00"
+  const startHour = parseInt(startHourStr.split(':')[0], 10);
+  
+  const currentHour = new Date().getHours();
+  return startHour <= currentHour;
 }
 
 window.addEventListener('DOMContentLoaded', init);

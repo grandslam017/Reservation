@@ -1292,3 +1292,147 @@ header {
   }
 }
 
+/* Styles for Customer Booking Notice Card */
+.booking-notice-card {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 12px;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  transition: all 0.3s ease;
+}
+
+.notice-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.notice-content {
+  font-weight: 400;
+  color: #cbd5e1;
+}
+
+.notice-content strong {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* Availability Flex Grid Layout (Modern Column Cards) */
+.availability-flex-grid {
+  display: flex;
+  gap: 12px;
+  min-width: 950px;
+  padding: 8px 4px;
+}
+
+.availability-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 10px;
+  transition: all 0.3s ease;
+  min-width: 110px;
+}
+
+.availability-column.time-column {
+  background: transparent;
+  border-color: transparent;
+  flex: 0 0 120px;
+  min-width: 120px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Highlight Selected Column */
+.availability-column.highlight-column {
+  border-color: rgba(163, 230, 53, 0.3) !important;
+  background: rgba(30, 41, 59, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.availability-column.weekend-column {
+  background: rgba(250, 204, 21, 0.02);
+}
+
+.column-header {
+  padding: 0.5rem 0.25rem 0.75rem 0.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.column-header .date-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
+.availability-column.weekend-column .column-header {
+  color: #facc15;
+}
+
+.grid-cell {
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-sizing: border-box;
+  text-align: center;
+  transition: all 0.25s ease;
+}
+
+.grid-cell.time-cell {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--panel-border);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.grid-cell.empty-cell {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.grid-cell.available-cell {
+  background: rgba(163, 230, 53, 0.04);
+  color: #a3e635;
+  border: 1px solid rgba(163, 230, 53, 0.18);
+  cursor: default;
+}
+
+.grid-cell.booked-cell {
+  background: rgba(239, 68, 68, 0.04);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  cursor: default;
+}
+
+.grid-cell.booked-cell i {
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+  opacity: 0.85;
+}
+
