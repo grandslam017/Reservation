@@ -380,6 +380,14 @@ function getYearMonthString(date) {
   return `${y}-${m}`;
 }
 
+// Helper: Format Date to YYYY-MM-DD
+function formatDateString(d) {
+  const y = getGregorianYear(d);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // Helper: Check if month or date is locked for booking
 function isMonthLocked(date) {
   const today = new Date();
@@ -3663,8 +3671,6 @@ function renderAvailabilityGrid() {
   const timeColHeader = document.createElement('div');
   timeColHeader.className = 'column-header';
   timeColHeader.textContent = state.language === 'th' ? 'เวลา' : 'Time';
-  // Align spacing
-  timeColHeader.style.paddingBottom = '1.25rem'; 
   timeCol.appendChild(timeColHeader);
 
   timeSlots.forEach(slot => {
