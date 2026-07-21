@@ -485,9 +485,9 @@ header {
 
 /* Slot Status Styles (Green vs Red) */
 .slot-item.available {
-  background: var(--available-bg) !important;
-  border-color: var(--available-border) !important;
-  color: var(--available-color) !important;
+  background: var(--accent-color) !important;
+  border-color: var(--accent-color) !important;
+  color: #0b0f19 !important;
 }
 
 .slot-item.booked {
@@ -499,15 +499,16 @@ header {
 }
 
 .slot-item.selected {
-  background: var(--selected-bg) !important;
+  background: #ffffff !important;
   border-color: var(--accent-color) !important;
-  color: var(--selected-text) !important;
-  box-shadow: 0 4px 12px var(--accent-glow);
-  font-weight: 600;
+  color: #0b0f19 !important;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  transform: scale(1.04) translateY(-2px);
+  font-weight: 700;
   text-decoration: none !important;
 }
 .slot-item.selected .slot-status {
-  color: var(--selected-text) !important;
+  color: #0b0f19 !important;
 }
 
 /* Month Locked Warning screen design */
