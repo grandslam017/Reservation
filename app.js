@@ -2876,7 +2876,11 @@ function renderRescheduleCalendar(bookingId) {
 function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
   const gridContainer = document.getElementById('rescheduleAvailabilityGrid');
   const selectSlot = document.getElementById('rescheduleNewSlot');
+  const inputDate = document.getElementById('rescheduleNewDate');
   if (!gridContainer || !selectSlot) return;
+
+  if (inputDate) inputDate.value = dateStr;
+  if (selectSlot && selectedSlot) selectSlot.value = selectedSlot;
 
   gridContainer.innerHTML = '';
 
@@ -2915,6 +2919,7 @@ function renderRescheduleAvailability(dateStr, currentBookingId, selectedSlot) {
       btn.style.background = 'var(--accent-color)';
       btn.style.color = '#000';
       btn.style.boxShadow = '0 0 8px var(--accent-color)';
+      selectSlot.value = slot;
     } else {
       btn.style.background = 'rgba(255,255,255,0.05)';
       btn.style.color = 'var(--text-secondary)';
@@ -2969,8 +2974,10 @@ function openRescheduleModal(booking) {
 
 async function handleRescheduleSave() {
   const bookingId = document.getElementById('rescheduleBookingId')?.value;
-  const newDate = document.getElementById('rescheduleNewDate')?.value;
-  const newSlot = document.getElementById('rescheduleNewSlot')?.value;
+  let newDate = document.getElementById('rescheduleNewDate')?.value;
+  let newSlot = document.getElementById('rescheduleNewSlot')?.value;
+
+  if (!newDate) newDate = rescheduleSelectedDateStr;
 
   if (!bookingId || !newDate || !newSlot) {
     showToast(state.language === 'th' ? "กรุณากรอกข้อมูลให้ครบถ้วน" : "Please fill in all required fields", 'error');
