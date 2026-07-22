@@ -879,6 +879,59 @@ async function fetchBookingsFromSupabase(silent = false) {
   }
 }
 
+// Helper: Securely save system configuration rows (config, notepad, booking_notice) to Supabase
+async function saveSystemConfigToSupabase(id, slot, value) {
+  if (!supabaseClient) return false;
+  
+  const payload = {
+    id: id,
+    booking_date: '1970-01-01',
+    time_slot: slot,
+    customer_name: String(value),
+    phone: '0000000000',
+    email: 'config@system.local',
+    court: 'Main Court',
+    require_coach: false,
+    fee: 0,
+    status: 'confirmed'
+  };
+
+  try {
+    // 1. Attempt update first
+    const { data: updatedData, error: updateError } = await supabaseClient
+      .from('bookings')
+      .update({ customer_name: String(value) })
+      .eq('id', id)
+      .select();
+
+    if (!updateError && updatedData && updatedData.length > 0) {
+      return true;
+    }
+
+    // 2. If row does not exist yet, attempt insert
+    const { error: insertError } = await supabaseClient
+      .from('bookings')
+      .insert([payload]);
+
+    if (!insertError) return true;
+
+    // 3. Fallback to upsert
+    const { error: upsertError } = await supabaseClient
+      .from('bookings')
+      .upsert([payload], { onConflict: 'id' });
+
+    if (upsertError) {
+      console.error(`Supabase system config upsert error (${slot}):`, upsertError);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`Failed to save system config (${slot}) to Supabase:`, err);
+    return false;
+  }
+}
+
 async function addTransactionToSupabase(tx) {
   if (!supabaseClient) {
     state.transactions.push({
@@ -2104,26 +2157,10 @@ function renderAdminDashboard() {
       
       // บันทึกการตั้งค่าลง Supabase เพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้แบบเรียลไทม์
       if (supabaseClient) {
-        try {
-          const { error } = await supabaseClient
-            .from('bookings')
-            .upsert([{
-              id: '00000000-0000-0000-0000-000000000001',
-              booking_date: '1970-01-01',
-              time_slot: 'config',
-              customer_name: String(val),
-              phone: '000-000-0000',
-              email: 'config@system.local',
-              court: 'System',
-              require_coach: false,
-              fee: 0,
-              status: 'confirmed'
-            }], { onConflict: 'id' });
-
-          if (error) throw error;
+        const ok = await saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000001', 'config', val);
+        if (ok) {
           showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองลง Supabase เรียบร้อยแล้ว" : "Advance booking setting saved to Supabase.", 'success');
-        } catch (err) {
-          console.error("Failed to save advance booking config to Supabase:", err);
+        } else {
           showToast(state.language === 'th' ? "บันทึกเงื่อนไขลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save setting to server", 'error');
         }
       } else {
@@ -2349,26 +2386,10 @@ function initAdminForms() {
         
         // บันทึกโน้ตแอดมินลง Supabase เป็น Source of Truth โดยตรง
         if (supabaseClient) {
-          try {
-            const { error } = await supabaseClient
-              .from('bookings')
-              .upsert([{
-                id: '00000000-0000-0000-0000-000000000002',
-                booking_date: '1970-01-01',
-                time_slot: 'notepad',
-                customer_name: textVal,
-                phone: '000-000-0000',
-                email: 'config@system.local',
-                court: 'System',
-                require_coach: false,
-                fee: 0,
-                status: 'confirmed'
-              }], { onConflict: 'id' });
-
-            if (error) throw error;
+          const ok = await saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000002', 'notepad', textVal);
+          if (ok) {
             showToast(state.language === 'th' ? "บันทึกสมุดโน้ตแอดมินลง Supabase เรียบร้อยแล้ว" : "Admin notepad saved to Supabase server successfully.", 'success');
-          } catch (err) {
-            console.error("Failed to save admin notepad to Supabase:", err);
+          } else {
             showToast(state.language === 'th' ? "บันทึกโน้ตลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save notepad to server", 'error');
           }
         } else {
@@ -2379,9 +2400,10 @@ function initAdminForms() {
     });
   }
 
-  const btnSaveCustomerNotice = document.getElementById('btnSaveCustomerNotice');
-  if (btnSaveCustomerNotice) {
-    btnSaveCustomerNotice.addEventListener('click', async () => {
+  const btnSaveCustomerNotice = document.getElementById('customerNoticeText');
+  const btnSaveCustomerNoticeBtn = document.getElementById('btnSaveCustomerNotice');
+  if (btnSaveCustomerNoticeBtn) {
+    btnSaveCustomerNoticeBtn.addEventListener('click', async () => {
       const noticeText = document.getElementById('customerNoticeText');
       if (noticeText) {
         const textVal = noticeText.value.trim();
@@ -2389,26 +2411,10 @@ function initAdminForms() {
         
         // บันทึกประกาศแจ้งเตือนลง Supabase เป็น Source of Truth โดยตรง
         if (supabaseClient) {
-          try {
-            const { error } = await supabaseClient
-              .from('bookings')
-              .upsert([{
-                id: '00000000-0000-0000-0000-000000000003',
-                booking_date: '1970-01-01',
-                time_slot: 'booking_notice',
-                customer_name: textVal,
-                phone: '000-000-0000',
-                email: 'config@system.local',
-                court: 'System',
-                require_coach: false,
-                fee: 0,
-                status: 'confirmed'
-              }], { onConflict: 'id' });
-
-            if (error) throw error;
+          const ok = await saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000003', 'booking_notice', textVal);
+          if (ok) {
             showToast(state.language === 'th' ? "บันทึกประกาศลง Supabase เรียบร้อยแล้ว" : "Customer notice saved to Supabase server successfully.", 'success');
-          } catch (err) {
-            console.error("Failed to save booking notice to Supabase:", err);
+          } else {
             showToast(state.language === 'th' ? "บันทึกประกาศลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save notice to server", 'error');
           }
         } else {
