@@ -176,6 +176,10 @@ function doPost(e) {
       response = handleUpdateNotes(data);
     } else if (data.action === "uploadLedgerSlip") {
       response = handleUploadLedgerSlip(data);
+    } else if (data.action === "saveConfig") {
+      response = handleSaveConfig(data);
+    } else if (data.action === "getConfig") {
+      response = handleGetConfig(data);
     } else if (data.action === "backup") {
       response = handleBackup(data);
     } else {
@@ -914,6 +918,36 @@ function handleUpdateNotes(data) {
     status: "success", 
     message: "Notes update processed" 
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// 6.1 บันทึกและดึงการตั้งค่าระบบผ่าน PropertiesService
+function handleSaveConfig(data) {
+  const key = data.key;
+  const value = data.value;
+  if (!key) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Missing key" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("CONFIG_" + key, String(value));
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", key: key, value: value }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleGetConfig(data) {
+  const props = PropertiesService.getScriptProperties();
+  const allProps = props.getProperties();
+  const config = {};
+  for (let k in allProps) {
+    if (k.indexOf("CONFIG_") === 0) {
+      const realKey = k.replace("CONFIG_", "");
+      config[realKey] = allProps[k];
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", config: config }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ฟังก์ชันจัดรูปแบบวันที่ (เช่น 2026-08-02 -> 02 AUG 2026)
