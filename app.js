@@ -256,7 +256,7 @@ const state = {
     webhookSecret: "grandslam_secret_key_2026", // คีย์รหัสความปลอดภัยสำหรับ Webhook
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
-    advanceBookingMonths: 0,    // Default 0 (เฉพาะเดือนปัจจุบัน)
+    advanceBookingMonths: 1,    // Default 1 (อนุญาตจองล่วงหน้า 1 เดือน)
     bookingNotice: ""
   },
   currentDate: new Date(),          // For calendar view navigations
@@ -419,9 +419,17 @@ function isMonthLocked(date) {
 
   const monthsDiff = (getGregorianYear(targetDate) - getGregorianYear(today)) * 12 + (targetDate.getMonth() - today.getMonth());
   
-  const maxAdvance = state.config.advanceBookingMonths !== undefined 
-    ? (state.config.advanceBookingMonths === "99" ? 999 : parseInt(state.config.advanceBookingMonths)) 
-    : 1;
+  let maxAdvance = 0; // Default fallback if no setting configured
+  if (state.config.advanceBookingMonths !== undefined && state.config.advanceBookingMonths !== null) {
+    if (state.config.advanceBookingMonths === "99" || state.config.advanceBookingMonths === 99) {
+      maxAdvance = 999;
+    } else {
+      const parsed = parseInt(state.config.advanceBookingMonths, 10);
+      if (!isNaN(parsed)) {
+        maxAdvance = parsed;
+      }
+    }
+  }
   
   // Current month and past months are always unlocked
   if (monthsDiff <= 0) {
@@ -544,6 +552,7 @@ function loadStateFromStorage() {
       if (!parsedConfig.gasUrl) parsedConfig.gasUrl = state.config.gasUrl;
       if (!parsedConfig.webhookSecret) parsedConfig.webhookSecret = state.config.webhookSecret;
       if (parsedConfig.bookingNotice !== undefined) state.config.bookingNotice = parsedConfig.bookingNotice;
+      if (parsedConfig.adminNotepad !== undefined) state.config.adminNotepad = parsedConfig.adminNotepad;
       state.config = { ...state.config, ...parsedConfig };
     }
   } catch (err) {
@@ -593,7 +602,15 @@ function saveStateToStorage() {
     } else {
       localStorage.removeItem('tennis_transactions'); // Clean up transactions cache if Supabase is active
     }
-    localStorage.setItem('tennis_config', JSON.stringify(state.config));
+    
+    // If Supabase is active, Supabase is the single source of truth for adminNotepad & bookingNotice
+    const configToSave = { ...state.config };
+    if (supabaseClient) {
+      delete configToSave.adminNotepad;
+      delete configToSave.bookingNotice;
+    }
+    
+    localStorage.setItem('tennis_config', JSON.stringify(configToSave));
     localStorage.setItem('tennis_lang', state.language);
   } catch (error) {
     console.warn("Storage warning: Could not save to localStorage (Quota exceeded?). Data might not persist across reloads.", error);
@@ -811,8 +828,8 @@ async function fetchBookingsFromSupabase(silent = false) {
       }));
       
       // ดึงการตั้งค่าล็อกเดือนจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
-      const configRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'config');
-      if (configRow) {
+      const configRow = dbBookings.find(b => b.id === '00000000-0000-0000-0000-000000000001' || b.slot === 'config');
+      if (configRow && configRow.name) {
         const val = configRow.name;
         state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
         // อัปเดตตัวเลือกในดรอปดาวน์ของแอดมินด้วยหากแสดงผลอยู่
@@ -823,8 +840,8 @@ async function fetchBookingsFromSupabase(silent = false) {
       }
       
       // ดึงข้อความโน้ตแอดมินจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
-      const notepadRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'notepad');
-      if (notepadRow) {
+      const notepadRow = dbBookings.find(b => b.id === '00000000-0000-0000-0000-000000000002' || b.slot === 'notepad');
+      if (notepadRow && notepadRow.name !== undefined) {
         state.config.adminNotepad = notepadRow.name || "";
         const notepadText = document.getElementById('adminNotepadText');
         if (notepadText && !notepadText.matches(':focus')) {
@@ -833,8 +850,8 @@ async function fetchBookingsFromSupabase(silent = false) {
       }
       
       // ดึงข้อความประกาศเงื่อนไขของลูกค้าจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
-      const noticeRow = dbBookings.find(b => b.date === '1970-01-01' && b.slot === 'booking_notice');
-      if (noticeRow) {
+      const noticeRow = dbBookings.find(b => b.id === '00000000-0000-0000-0000-000000000003' || b.slot === 'booking_notice');
+      if (noticeRow && noticeRow.name !== undefined) {
         state.config.bookingNotice = noticeRow.name || "";
         const noticeText = document.getElementById('customerNoticeText');
         if (noticeText && !noticeText.matches(':focus')) {
@@ -843,7 +860,13 @@ async function fetchBookingsFromSupabase(silent = false) {
       }
       
       // กรองแถวตั้งค่าเหล่านี้ออกจากรายการจองจริง เพื่อไม่แสดงผลบนตาราง
-      state.bookings = dbBookings.filter(b => !(b.date === '1970-01-01' && (b.slot === 'config' || b.slot === 'notepad' || b.slot === 'booking_notice')));
+      state.bookings = dbBookings.filter(b => !(
+        b.id === '00000000-0000-0000-0000-000000000001' ||
+        b.id === '00000000-0000-0000-0000-000000000002' ||
+        b.id === '00000000-0000-0000-0000-000000000003' ||
+        b.slot === 'config' || b.slot === 'notepad' || b.slot === 'booking_notice' ||
+        (b.date && String(b.date).startsWith('1970-01-01'))
+      ));
       saveStateToStorage();
     }
   } catch (error) {
@@ -1067,6 +1090,7 @@ function renderCalendar() {
     dayCell.className = 'calendar-day';
     
     const isPast = cellDate < today;
+    const isLocked = isMonthLocked(cellDate);
     
     const selectedDateString = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
     if (dateString === selectedDateString) {
@@ -1077,13 +1101,13 @@ function renderCalendar() {
       dayCell.classList.add('today');
     }
     
-    if (isPast) {
+    if (isPast || isLocked) {
       dayCell.classList.add('disabled');
     }
 
     dayCell.innerHTML = `<span class="calendar-day-num">${d}</span>`;
 
-    if (!isPast) {
+    if (!isPast && !isLocked) {
       dayCell.addEventListener('click', () => {
         state.selectedDate = cellDate;
         state.selectedSlots = []; // Clear selections on date change
@@ -2070,17 +2094,18 @@ function renderAdminDashboard() {
   // Setup Admin Advance Booking Dropdown
   const advanceSelect = document.getElementById('advanceBookingMonths');
   if (advanceSelect) {
-    advanceSelect.value = state.config.advanceBookingMonths !== undefined ? state.config.advanceBookingMonths : 1;
+    if (state.config.advanceBookingMonths !== undefined && state.config.advanceBookingMonths !== null) {
+      advanceSelect.value = String(state.config.advanceBookingMonths);
+    }
     advanceSelect.onchange = async (e) => {
       const val = e.target.value;
-      // Do not parse int if it's the Sunday 14 days option string
-      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
+      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val, 10);
       saveStateToStorage();
       
-      // บันทึกการตั้งค่าลง Supabase เพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้
+      // บันทึกการตั้งค่าลง Supabase เพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้แบบเรียลไทม์
       if (supabaseClient) {
         try {
-          await supabaseClient
+          const { error } = await supabaseClient
             .from('bookings')
             .upsert([{
               id: '00000000-0000-0000-0000-000000000001',
@@ -2094,14 +2119,18 @@ function renderAdminDashboard() {
               fee: 0,
               status: 'confirmed'
             }], { onConflict: 'id' });
+
+          if (error) throw error;
+          showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองลง Supabase เรียบร้อยแล้ว" : "Advance booking setting saved to Supabase.", 'success');
         } catch (err) {
           console.error("Failed to save advance booking config to Supabase:", err);
+          showToast(state.language === 'th' ? "บันทึกเงื่อนไขลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save setting to server", 'error');
         }
+      } else {
+        showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
       }
-      
       renderCalendar();
       renderTimeSlots();
-      showToast(state.language === 'th' ? 'บันทึกการตั้งค่าล่วงหน้าเรียบร้อยแล้ว' : 'Advance booking settings saved', 'success');
     };
   }
 
@@ -2317,12 +2346,11 @@ function initAdminForms() {
       if (notepadText) {
         const textVal = notepadText.value;
         state.config.adminNotepad = textVal;
-        saveStateToStorage();
         
-        // บันทึกโน้ตแอดมินลง Supabase เพื่อซิงก์ข้ามเครื่องและเบราว์เซอร์
+        // บันทึกโน้ตแอดมินลง Supabase เป็น Source of Truth โดยตรง
         if (supabaseClient) {
           try {
-            await supabaseClient
+            const { error } = await supabaseClient
               .from('bookings')
               .upsert([{
                 id: '00000000-0000-0000-0000-000000000002',
@@ -2336,11 +2364,17 @@ function initAdminForms() {
                 fee: 0,
                 status: 'confirmed'
               }], { onConflict: 'id' });
+
+            if (error) throw error;
+            showToast(state.language === 'th' ? "บันทึกสมุดโน้ตแอดมินลง Supabase เรียบร้อยแล้ว" : "Admin notepad saved to Supabase server successfully.", 'success');
           } catch (err) {
             console.error("Failed to save admin notepad to Supabase:", err);
+            showToast(state.language === 'th' ? "บันทึกโน้ตลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save notepad to server", 'error');
           }
+        } else {
+          saveStateToStorage();
+          showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
         }
-        showToast(state.language === 'th' ? "บันทึกโน้ตแอดมินเรียบร้อยแล้ว" : "Admin notepad saved successfully.", 'success');
       }
     });
   }
@@ -2352,12 +2386,11 @@ function initAdminForms() {
       if (noticeText) {
         const textVal = noticeText.value.trim();
         state.config.bookingNotice = textVal;
-        saveStateToStorage();
         
-        // บันทึกประกาศแจ้งเตือนลง Supabase เพื่อซิงก์ข้ามเครื่องและเบราว์เซอร์
+        // บันทึกประกาศแจ้งเตือนลง Supabase เป็น Source of Truth โดยตรง
         if (supabaseClient) {
           try {
-            await supabaseClient
+            const { error } = await supabaseClient
               .from('bookings')
               .upsert([{
                 id: '00000000-0000-0000-0000-000000000003',
@@ -2371,12 +2404,17 @@ function initAdminForms() {
                 fee: 0,
                 status: 'confirmed'
               }], { onConflict: 'id' });
+
+            if (error) throw error;
+            showToast(state.language === 'th' ? "บันทึกประกาศลง Supabase เรียบร้อยแล้ว" : "Customer notice saved to Supabase server successfully.", 'success');
           } catch (err) {
             console.error("Failed to save booking notice to Supabase:", err);
+            showToast(state.language === 'th' ? "บันทึกประกาศลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save notice to server", 'error');
           }
+        } else {
+          saveStateToStorage();
+          showToast(state.language === 'th' ? "บันทึกประกาศเรียบร้อยแล้ว" : "Customer notice saved successfully.", 'success');
         }
-        showToast(state.language === 'th' ? "บันทึกประกาศเรียบร้อยแล้ว" : "Customer notice saved successfully.", 'success');
-        // อัปเดตการแสดงผลในหน้าลูกค้าด้วย
         showSummaryPanel();
       }
     });
@@ -3078,6 +3116,8 @@ async function handleEditBookingSave() {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (!booking) return;
 
+  const effectiveLineUserId = newLineUserId ? newLineUserId : (booking.lineUserId || "");
+
   showToast(state.language === 'th' ? "กำลังบันทึกข้อมูล..." : "Saving customer info...", 'info');
 
   // 1. Update details in Supabase
@@ -3089,7 +3129,7 @@ async function handleEditBookingSave() {
           customer_name: newName, 
           phone: newPhone,
           email: newEmail || null,
-          line_user_id: newLineUserId || null
+          line_user_id: effectiveLineUserId || null
         })
         .eq('id', bookingId);
 
@@ -3105,7 +3145,7 @@ async function handleEditBookingSave() {
   booking.name = newName;
   booking.phone = newPhone;
   booking.email = newEmail;
-  booking.lineUserId = newLineUserId;
+  booking.lineUserId = effectiveLineUserId;
   saveStateToStorage();
 
   // 2. Notify Google Apps Script to update sheet and calendar event
@@ -3117,7 +3157,7 @@ async function handleEditBookingSave() {
         name: newName,
         phone: newPhone,
         email: newEmail || '',
-        lineUserId: newLineUserId || '',
+        lineUserId: effectiveLineUserId || '',
         date: booking.date,
         slot: booking.slot,
         receiptNo: booking.receiptNo,
@@ -3432,6 +3472,12 @@ async function init() {
   if (prevBtn && nextBtn) {
     prevBtn.addEventListener('click', () => {
       state.currentDate.setMonth(state.currentDate.getMonth() - 1);
+      const today = new Date();
+      if (state.currentDate.getFullYear() === today.getFullYear() && state.currentDate.getMonth() === today.getMonth()) {
+        state.selectedDate = new Date();
+      } else {
+        state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), 1);
+      }
       state.selectedSlots = [];
       hideSummaryPanel();
       renderCalendar();
@@ -3439,6 +3485,12 @@ async function init() {
     });
     nextBtn.addEventListener('click', () => {
       state.currentDate.setMonth(state.currentDate.getMonth() + 1);
+      const today = new Date();
+      if (state.currentDate.getFullYear() === today.getFullYear() && state.currentDate.getMonth() === today.getMonth()) {
+        state.selectedDate = new Date();
+      } else {
+        state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), 1);
+      }
       state.selectedSlots = [];
       hideSummaryPanel();
       renderCalendar();

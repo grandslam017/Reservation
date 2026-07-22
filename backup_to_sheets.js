@@ -296,39 +296,29 @@ function validateInput(data) {
   if (!data.action) return "Missing action.";
   
   if (data.action === "sendConfirmation" || data.action === "cancelBooking" || data.action === "updateNotes") {
-    if (!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+    if (!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.date).trim())) {
       return "Invalid date format (expected YYYY-MM-DD).";
     }
   }
   
   if (data.action === "sendConfirmation") {
-    if (!data.name || data.name.trim().length === 0) return "Name is required.";
-    if (!data.phone || !/^[0-9\-\+\s]{9,15}$/.test(data.phone)) return "Invalid phone number format.";
-    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return "Invalid email format.";
+    if (!data.name || String(data.name).trim().length === 0) return "Name is required.";
+    if (!data.phone || String(data.phone).trim().length === 0) return "Phone number is required.";
     if (!data.slots || !Array.isArray(data.slots) || data.slots.length === 0) return "At least one time slot is required.";
     if (data.court && VALID_COURTS.indexOf(data.court) === -1) {
       return "Invalid court selection: " + data.court;
     }
     
-    // ตรวจสอบความถูกต้องของสล็อตเวลาอย่างระมัดระวัง
     for (let i = 0; i < data.slots.length; i++) {
       if (!isValidTimeSlot(data.slots[i])) {
-        return "Invalid time slot values or chronologically incorrect: " + data.slots[i];
+        return "Invalid time slot values: " + data.slots[i];
       }
-    }
-    
-    // ตรวจสอบรูปแบบ invoiceNo และ receiptNo
-    if (data.invoiceNo && !/^INV\.\d{9}$/.test(data.invoiceNo)) {
-      return "Invalid invoice format. Expected 'INV.YYYYMMNNN' (9 digits).";
-    }
-    if (data.receiptNo && !/^R\.\d{9}$/.test(data.receiptNo)) {
-      return "Invalid receipt format. Expected 'R.YYYYMMNNN' (9 digits).";
     }
   }
   
-  if (data.action === "cancelBooking" || data.action === "updateNotes") {
+  if (data.action === "cancelBooking") {
     if (!data.slot || !isValidTimeSlot(data.slot)) {
-      return "Invalid time slot format or bounds: " + data.slot;
+      return "Invalid time slot format: " + data.slot;
     }
     if (data.court && VALID_COURTS.indexOf(data.court) === -1) {
       return "Invalid court selection: " + data.court;
@@ -895,8 +885,12 @@ function handleUpdateNotes(data) {
         bookingSheet.getRange(row, 5).setValue(phone);
         bookingSheet.getRange(row, 6).setValue(email);
         bookingSheet.getRange(row, 8).setValue(requireCoach ? "Yes" : "No");
-        bookingSheet.getRange(row, 13).setValue(lineUserId);
-        bookingSheet.getRange(row, 16).setValue(adminNotes || "");
+        if (lineUserId && String(lineUserId).trim().length > 0) {
+          bookingSheet.getRange(row, 13).setValue(String(lineUserId).trim());
+        }
+        if (adminNotes !== undefined) {
+          bookingSheet.getRange(row, 16).setValue(adminNotes || "");
+        }
         eventId = bookingSheet.getRange(row, 17).getValue();
       }
     }
@@ -1640,7 +1634,7 @@ function checkAndSendReminders() {
   const lastRow = bookingSheet.getLastRow();
   if (lastRow <= 1) return;
   
-  const range = bookingSheet.getRange(2, 1, lastRow - 1, 15);
+  const range = bookingSheet.getRange(2, 1, lastRow - 1, 17);
   const values = range.getValues();
   
   const now = new Date();
@@ -1648,10 +1642,20 @@ function checkAndSendReminders() {
   
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const lineUserId = row[12];
-    const reminderSent = row[14];
+    let lineUserId = String(row[12] || "").trim();
+    const lineIdInput = String(row[13] || "").trim();
+    const reminderSent = String(row[14] || "").trim();
+    const statusVal = String(row[16] || "").trim();
     
-    if (reminderSent === "Yes" || !lineUserId) continue;
+    // ข้ามแถวที่ส่งเตือนไปแล้ว หรือเป็นรายการยกเลิก (CANCELLED)
+    if (reminderSent === "Yes" || statusVal === "CANCELLED") continue;
+    
+    // หากช่อง LINE User ID ว่าง แต่ช่อง Line ID Input กรอกเป็นรหัส LINE User ID (ขึ้นต้นด้วย U)
+    if (!lineUserId && lineIdInput.indexOf("U") === 0 && lineIdInput.length >= 30) {
+      lineUserId = lineIdInput;
+    }
+    
+    if (!lineUserId) continue;
     
     const bookingTime = parseBookingDateTime(row[1], row[2]);
     if (!bookingTime) continue;
@@ -1659,8 +1663,8 @@ function checkAndSendReminders() {
     const diffMs = bookingTime.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     
-    // ส่งเตือนล่วงหน้าหากช่วงจองจวนจะถึงใน 24 ชั่วโมงข้างหน้า และไม่เลยกำหนดไปแล้ว ( diffHours <= 24.0 && diffHours > 0 )
-    if (diffHours > 0 && diffHours <= 24.0) {
+    // ส่งเตือนล่วงหน้าช่วง 0 - 36 ชั่วโมงก่อนถึงเวลาใช้งาน (ครอบคลุมทั้งวันรุ่งขึ้น)
+    if (diffHours > 0 && diffHours <= 36.0) {
       const success = sendLineReminder(lineUserId, row[3], row[1], row[2], token);
       if (success) {
         bookingSheet.getRange(i + 2, 15).setValue("Yes");
