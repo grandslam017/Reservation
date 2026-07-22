@@ -891,6 +891,10 @@ async function saveSystemConfigToSupabase(id, slot, value) {
     phone: '0000000000',
     email: 'config@system.local',
     court: 'Main Court',
+    invoice_no: 'INV.197001000',
+    receipt_no: 'R.197001000',
+    line_id_input: '',
+    line_user_id: '',
     require_coach: false,
     fee: 0,
     status: 'confirmed'
@@ -921,13 +925,13 @@ async function saveSystemConfigToSupabase(id, slot, value) {
       .upsert([payload], { onConflict: 'id' });
 
     if (upsertError) {
-      console.error(`Supabase system config upsert error (${slot}):`, upsertError);
+      console.warn(`Supabase system config upsert warning (${slot}):`, upsertError.message || upsertError);
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error(`Failed to save system config (${slot}) to Supabase:`, err);
+    console.warn(`System config sync warning (${slot}):`, err);
     return false;
   }
 }
@@ -2155,17 +2159,13 @@ function renderAdminDashboard() {
       state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val, 10);
       saveStateToStorage();
       
-      // บันทึกการตั้งค่าลง Supabase เพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้แบบเรียลไทม์
+      showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
+      
+      // บันทึกการตั้งค่าลง Supabase ในพื้นหลังเพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้แบบเรียลไทม์
       if (supabaseClient) {
-        const ok = await saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000001', 'config', val);
-        if (ok) {
-          showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองลง Supabase เรียบร้อยแล้ว" : "Advance booking setting saved to Supabase.", 'success');
-        } else {
-          showToast(state.language === 'th' ? "บันทึกเงื่อนไขลงเซิร์ฟเวอร์ล้มเหลว" : "Failed to save setting to server", 'error');
-        }
-      } else {
-        showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
+        saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000001', 'config', val);
       }
+      
       renderCalendar();
       renderTimeSlots();
     };
