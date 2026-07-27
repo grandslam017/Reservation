@@ -1859,6 +1859,60 @@ function initBookingWizard() {
   }
 }
 
+// ฟังก์ชันบันทึกประวัติการดำเนินการของแอดมินไปยัง Google Sheets
+async function logAdminActionToGas(actionType, name, phone, details) {
+  if (!state.config.gasUrl) return;
+  try {
+    const payload = {
+      action: "logAdminAction",
+      actionType: actionType,
+      name: name,
+      phone: phone,
+      details: details
+    };
+    await sendGasRequest(payload);
+    // รีเฟรชตารางประวัติทันทีหลังบันทึกสำเร็จ
+    fetchAdminLogsFromGas();
+  } catch (err) {
+    console.error("Failed to log admin action:", err);
+  }
+}
+
+// ฟังก์ชันดึงข้อมูลประวัติการดำเนินการของแอดมินมาแสดงผล
+async function fetchAdminLogsFromGas() {
+  const container = document.getElementById('adminLogsTableBody');
+  if (!container) return;
+  if (!state.config.gasUrl) {
+    container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">ไม่ได้กำหนด Google Apps Script Web App URL</td></tr>`;
+    return;
+  }
+  
+  try {
+    const response = await sendGasRequest({ action: "getAdminLogs" });
+    if (response && response.status === "success" && response.logs) {
+      if (response.logs.length === 0) {
+        container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">ไม่มีประวัติการดำเนินการในระบบ</td></tr>`;
+        return;
+      }
+      
+      container.innerHTML = response.logs.map(log => `
+        <tr>
+          <td style="font-family: monospace; white-space: nowrap;">${log.timestamp}</td>
+          <td><span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: rgba(163, 230, 53, 0.1); color: var(--accent-color); border: 1px solid rgba(163, 230, 53, 0.2);">${log.actionType}</span></td>
+          <td style="font-weight: 500;">${log.name}</td>
+          <td style="font-family: monospace;">${log.phone}</td>
+          <td style="color: var(--text-secondary); font-size: 0.9rem;">${log.details}</td>
+        </tr>
+      `).join('');
+    } else {
+      container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 2rem;">โหลดประวัติการทำงานล้มเหลว: ${response ? response.message : 'Unknown response'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error("Failed to fetch admin logs:", err);
+    container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 2rem;">เกิดข้อผิดพลาดในการโหลดประวัติ</td></tr>`;
+  }
+}
+
 // ----------------------------------------------------
 // Admin Gate Authentication
 // ----------------------------------------------------
@@ -2485,6 +2539,16 @@ function initAdminForms() {
       }
     });
   }
+  
+  const btnRefreshAdminLogs = document.getElementById('btnRefreshAdminLogs');
+  if (btnRefreshAdminLogs) {
+    btnRefreshAdminLogs.addEventListener('click', () => {
+      fetchAdminLogsFromGas();
+    });
+  }
+
+  // โหลดประวัติแอดมินมาแสดงผลด้วย
+  fetchAdminLogsFromGas();
 }
 
 function renderBookingsTable() {
@@ -2759,6 +2823,14 @@ async function cancelBooking(bookingId) {
     saveStateToStorage();
     showToast(translations[state.language].toastBookingCancelled, 'success');
   }
+
+  // บันทึกประวัติการยกเลิกจองลง Log
+  logAdminActionToGas(
+    "ยกเลิกการจอง (Cancel)", 
+    booking.name, 
+    booking.phone || "-", 
+    `ยกเลิกการจองวันที่ ${booking.date} (${booking.slot})`
+  );
 
   renderCalendar();
   renderTimeSlots();
@@ -3080,6 +3152,15 @@ async function handleRescheduleSave() {
   }
 
   saveStateToStorage();
+  
+  // บันทึกประวัติการเปลี่ยนเวลาลงระบบ Log
+  logAdminActionToGas(
+    "เลื่อนเวลา (Reschedule)", 
+    booking.name, 
+    booking.phone || "-", 
+    `เลื่อนจาก ${oldDate} (${oldSlot}) เป็น ${newDate} (${newSlot})`
+  );
+
   document.getElementById('rescheduleModal').style.display = 'none';
   showToast(state.language === 'th' ? "เลื่อนวันและเวลาเรียบร้อยแล้ว!" : "Rescheduled successfully!", 'success');
 
@@ -3173,6 +3254,7 @@ async function handleEditBookingSave() {
         lineUserId: effectiveLineUserId || '',
         date: booking.date,
         slot: booking.slot,
+        court: booking.court || 'Main Court',
         receiptNo: booking.receiptNo,
         requireCoach: booking.requireCoach,
         adminNotes: booking.adminNotes || ''
@@ -3181,6 +3263,14 @@ async function handleEditBookingSave() {
       console.error("Failed to sync customer info update with GAS:", err);
     }
   }
+
+  // บันทึกประวัติการแก้ไขข้อมูลลงระบบ Log
+  logAdminActionToGas(
+    "แก้ไขข้อมูลลูกค้า (Edit Info)", 
+    newName, 
+    newPhone, 
+    `แก้ไขข้อมูล ของรายการวันที่ ${booking.date} (${booking.slot})`
+  );
 
   document.getElementById('editBookingModal').style.display = 'none';
   showToast(state.language === 'th' ? "แก้ไขข้อมูลลูกค้าเรียบร้อยแล้ว!" : "Customer info updated successfully!", 'success');
@@ -3227,6 +3317,7 @@ async function toggleCoachStatus(bookingId) {
       phone: booking.phone,
       date: booking.date,
       slot: booking.slot,
+      court: booking.court || 'Main Court',
       receiptNo: booking.receiptNo,
       requireCoach: newRequireCoach,
       adminNotes: booking.adminNotes || ''

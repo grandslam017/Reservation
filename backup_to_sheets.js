@@ -1,38 +1,27 @@
 // ==========================================
 // CONFIGURATION (ตั้งค่าการเชื่อมต่อ)
 // ==========================================
-const scriptProperties = PropertiesService.getScriptProperties();
-
-// โหลดรหัส LINE Channel Access Token - Throw error if missing
-const LINE_CHANNEL_ACCESS_TOKEN = scriptProperties.getProperty("LINE_CHANNEL_ACCESS_TOKEN");
-if (!LINE_CHANNEL_ACCESS_TOKEN) {
-  throw new Error("CRITICAL: LINE_CHANNEL_ACCESS_TOKEN is missing in Script Properties.");
+function getCleanScriptProperty(key) {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(key) || "";
+    return String(raw).trim().replace(/^['"]+|['"]+$/g, "").trim();
+  } catch(e) {
+    return "";
+  }
 }
 
-// ไอดี LINE ส่วนตัวของแอดมินสำหรับส่งรูปสลิป - Throw error if missing
-const ADMIN_LINE_USER_ID = scriptProperties.getProperty("ADMIN_LINE_USER_ID");
-if (!ADMIN_LINE_USER_ID) {
-  throw new Error("CRITICAL: ADMIN_LINE_USER_ID is missing in Script Properties.");
-}
-
-// อีเมลปฏิทินของโค้ช - Throw error if missing
-const COACH_CALENDAR_ID = scriptProperties.getProperty("COACH_CALENDAR_ID");
-if (!COACH_CALENDAR_ID) {
-  throw new Error("CRITICAL: COACH_CALENDAR_ID is missing in Script Properties.");
-}
-
-// คีย์รหัสสำหรับตรวจสอบความปลอดภัยของ Webhook (HMAC Secret) - Throw error if missing
-const WEBHOOK_SECRET = scriptProperties.getProperty("WEBHOOK_SECRET");
-if (!WEBHOOK_SECRET) {
-  throw new Error("CRITICAL: WEBHOOK_SECRET is missing in Script Properties.");
-}
+// โหลดรหัสผ่าน Script Properties สำหรับ LINE และ Calendar (ล้างเศษเครื่องหมายคำพูดส่วนเกินให้อัตโนมัติ)
+const LINE_CHANNEL_ACCESS_TOKEN = getCleanScriptProperty("LINE_CHANNEL_ACCESS_TOKEN");
+const ADMIN_LINE_USER_ID = getCleanScriptProperty("ADMIN_LINE_USER_ID");
+const COACH_CALENDAR_ID = getCleanScriptProperty("COACH_CALENDAR_ID");
+const WEBHOOK_SECRET = getCleanScriptProperty("WEBHOOK_SECRET");
 
 // อีเมลปฏิทินหลัก (MAIN_CALENDAR_ID) - เลือกกรอกได้ หากว่างจะใช้ปฏิทินเริ่มต้น (Default Calendar)
-const MAIN_CALENDAR_ID = scriptProperties.getProperty("MAIN_CALENDAR_ID");
+const MAIN_CALENDAR_ID = getCleanScriptProperty("MAIN_CALENDAR_ID");
 
 // การตั้งค่าราคาเช่าสนามผ่าน Script Properties
-const OFF_PEAK_PRICE = parseFloat(scriptProperties.getProperty("OFF_PEAK_PRICE") || "250");
-const PEAK_PRICE = parseFloat(scriptProperties.getProperty("PEAK_PRICE") || "350");
+const OFF_PEAK_PRICE = parseFloat(getCleanScriptProperty("OFF_PEAK_PRICE") || "250");
+const PEAK_PRICE = parseFloat(getCleanScriptProperty("PEAK_PRICE") || "350");
 
 // รายชื่อสนามที่ได้รับอนุญาต (Whitelisted Courts)
 const VALID_COURTS = ["Main Court"];
@@ -182,6 +171,10 @@ function doPost(e) {
       response = handleGetConfig(data);
     } else if (data.action === "backup") {
       response = handleBackup(data);
+    } else if (data.action === "logAdminAction") {
+      response = handleLogAdminAction(data);
+    } else if (data.action === "getAdminLogs") {
+      response = handleGetAdminLogs(data);
     } else {
       response = handleBackup(data);
     }
@@ -392,6 +385,7 @@ function getBookingsIndexMap(sheet) {
   const dateSlotMap = {};
   const uuidRowMap = {};
   
+  const tz = sheet.getParent().getSpreadsheetTimeZone();
   for (let i = 0; i < values.length; i++) {
     const rowNum = i + 2;
     const statusVal = String(values[i][16] || "").trim();
@@ -406,7 +400,7 @@ function getBookingsIndexMap(sheet) {
     
     let dateStr = "";
     if (dateVal instanceof Date) {
-      dateStr = Utilities.formatDate(dateVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      dateStr = Utilities.formatDate(dateVal, tz, "yyyy-MM-dd");
     } else {
       dateStr = String(dateVal);
     }
@@ -739,10 +733,15 @@ function handleSendConfirmation(data) {
     }
   }
   
+  let targetLineUserId = lineUserId;
+  if (!targetLineUserId && data.lineIdInput && data.lineIdInput.indexOf("U") === 0 && data.lineIdInput.length >= 30) {
+    targetLineUserId = data.lineIdInput;
+  }
+
   let lineSent = false;
-  if (lineUserId && LINE_CHANNEL_ACCESS_TOKEN) {
+  if (targetLineUserId && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
-      sendLineMessageConfirmation(lineUserId, name, formattedDate, uniqueSlots, receiptNo, requireCoach);
+      sendLineMessageConfirmation(targetLineUserId, name, formattedDate, uniqueSlots, receiptNo, requireCoach);
       lineSent = true;
     } catch (e) {
       logError("LINE User Notification Error", "sendLineMessageConfirmation", e.toString(), "WARNING");
@@ -751,7 +750,7 @@ function handleSendConfirmation(data) {
   }
   
   let adminLineSent = false;
-  if (ADMIN_LINE_USER_ID && ADMIN_LINE_USER_ID !== "ใส่_LINE_USER_ID_ส่วนตัวของแอดมิน_ที่นี่" && LINE_CHANNEL_ACCESS_TOKEN) {
+  if (ADMIN_LINE_USER_ID && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
       const slipUrl = data.slipUrl || "";
       sendAdminSlipNotification(name, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach);
@@ -912,7 +911,7 @@ function handleUpdateNotes(data) {
     }
   }
   
-  updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventId);
+  updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventId, court);
   
   return ContentService.createTextOutput(JSON.stringify({ 
     status: "success", 
@@ -1088,6 +1087,15 @@ function fetchWithRetry(url, options, retries = 3) {
 
 // ส่งข้อความ LINE Push Message แจ้งเตือนจองสำเร็จ
 function sendLineMessageConfirmation(lineUserId, name, dateStr, slots, receiptNo, requireCoach) {
+  if (!LINE_CHANNEL_ACCESS_TOKEN) {
+    console.warn("Skipping LINE push: LINE_CHANNEL_ACCESS_TOKEN is missing.");
+    return;
+  }
+  if (!lineUserId || lineUserId.indexOf("U") !== 0 || lineUserId.length < 25) {
+    console.warn("Skipping LINE push: invalid or empty lineUserId (" + lineUserId + ").");
+    return;
+  }
+
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
   const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
@@ -1313,7 +1321,7 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr, eventIdStr) {
     
     calendar.getEvents(searchStart, searchEnd).forEach(function(event) {
       const title = event.getTitle();
-      if (title.indexOf(name) !== -1 && (title.indexOf("จองสนาม") !== -1)) {
+      if (title.indexOf(name) !== -1 && (title.indexOf("จอง") !== -1)) {
         event.deleteEvent();
       }
     });
@@ -1324,7 +1332,7 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr, eventIdStr) {
         if (coachCalendar) {
           coachCalendar.getEvents(searchStart, searchEnd).forEach(function(event) {
             const title = event.getTitle();
-            if (title.indexOf(name) !== -1 && (title.indexOf("สอนเทนนิส") !== -1)) {
+            if (title.indexOf(name) !== -1 && (title.indexOf("สอน") !== -1)) {
               event.deleteEvent();
             }
           });
@@ -1339,7 +1347,8 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr, eventIdStr) {
 }
 
 // อัปเดตกิจกรรมปฏิทิน Google Calendar ด้วย Event ID (รองรับโครงสร้างแบบ JSON)
-function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventIdStr) {
+function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo, requireCoach, adminNotes, eventIdStr, court) {
+  const activeCourt = court || "Main Court";
   let calendar = null;
   if (typeof MAIN_CALENDAR_ID !== "undefined" && MAIN_CALENDAR_ID) {
     try {
@@ -1381,7 +1390,7 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
         const ev = calendar.getEventById(mainId);
         if (ev) {
           const icon = requireCoach ? "🧸" : "🎾";
-          ev.setTitle(icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")");
+          ev.setTitle(icon + " [" + activeCourt + "] จอง: คุณ " + name + " (" + slotStr + ")");
           ev.setDescription(description);
         }
       } catch (err) {
@@ -1396,7 +1405,7 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
             const ev = coachCalendar.getEventById(coachId);
             if (ev) {
               if (requireCoach) {
-                ev.setTitle("🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")");
+                ev.setTitle("🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")");
                 ev.setDescription(description);
               } else {
                 ev.deleteEvent();
@@ -1407,7 +1416,7 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
             const tp = slotStr.split(' - ');
             const st = new Date(parseInt(dp[0],10), parseInt(dp[1],10)-1, parseInt(dp[2],10), parseInt(tp[0].split(':')[0],10), parseInt(tp[0].split(':')[1],10), 0);
             const et = new Date(parseInt(dp[0],10), parseInt(dp[1],10)-1, parseInt(dp[2],10), parseInt(tp[1].split(':')[0],10), parseInt(tp[1].split(':')[1],10), 0);
-            coachCalendar.createEvent("🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")", st, et, { description: description });
+            coachCalendar.createEvent("🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")", st, et, { description: description });
           }
         }
       } catch (err) {
@@ -1442,9 +1451,9 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
       const desc = event.getDescription() || "";
       const isMatch = (receiptNo && desc.indexOf(receiptNo) !== -1) || (name && title.indexOf(name) !== -1);
       
-      if (isMatch && (title.indexOf("จองสนาม") !== -1)) {
+      if (isMatch && (title.indexOf("จอง") !== -1)) {
         const icon = requireCoach ? "🧸" : "🎾";
-        event.setTitle(icon + " จองสนาม: คุณ " + name + " (" + slotStr + ")");
+        event.setTitle(icon + " [" + activeCourt + "] จอง: คุณ " + name + " (" + slotStr + ")");
         event.setDescription(description);
       }
     });
@@ -1461,19 +1470,18 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
             const desc = event.getDescription() || "";
             const isMatch = (receiptNo && desc.indexOf(receiptNo) !== -1) || (name && title.indexOf(name) !== -1);
             
-            if (isMatch && title.indexOf("สอนเทนนิส") !== -1) {
+            if (isMatch && title.indexOf("สอน") !== -1) {
               coachEvent = event;
             }
           });
           
           if (requireCoach) {
+            const coachTitle = "🧸 [" + activeCourt + "] สอน: คุณ " + name + " (" + slotStr + ")";
             if (!coachEvent) {
-              const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
               coachCalendar.createEvent(coachTitle, startTime, endTime, {
                 description: description
               });
             } else {
-              const coachTitle = "🧸 สอนเทนนิส: คุณ " + name + " (" + slotStr + ")";
               coachEvent.setTitle(coachTitle);
               coachEvent.setDescription(description);
             }
@@ -1712,10 +1720,8 @@ function parseBookingDateTime(dateVal, slotStr) {
   try {
     let dateStr = "";
     if (dateVal instanceof Date) {
-      const y = dateVal.getFullYear();
-      const m = String(dateVal.getMonth() + 1).padStart(2, '0');
-      const d = String(dateVal.getDate()).padStart(2, '0');
-      dateStr = `${y}-${m}-${d}`;
+      const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+      dateStr = Utilities.formatDate(dateVal, tz, "yyyy-MM-dd");
     } else {
       dateStr = String(dateVal);
     }
@@ -1792,57 +1798,76 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
   }
 }
 
-// ส่งแจ้งสลิปและข้อมูลการจองไปยังแอดมินทาง LINE
-function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, requireCoach) {
+// ส่งแจ้งสลิปและข้อมูลการจองไปยังแอดมินทาง LINE Messaging API Push Message
+function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, requireCoach, lineIdInput) {
+  if (!LINE_CHANNEL_ACCESS_TOKEN || !ADMIN_LINE_USER_ID) {
+    console.warn("Skipping Admin LINE notification: missing LINE_CHANNEL_ACCESS_TOKEN or ADMIN_LINE_USER_ID.");
+    return;
+  }
+
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
   const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
+  const contactText = lineIdInput || "-";
   
-  const textMessage = `🔔 มีรูปภาพสลิปแจ้งชำระเงินเข้ามาใหม่!
+  const textMessage = `🔔 มีรายการจองใหม่และสลิปแจ้งชำระเงินเข้ามา!
  
 👤 ลูกค้า: คุณ ${name}
+📞 LINE ID / ติดต่อ: ${contactText}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
 🧸 โค้ช: ${coachText}
-🧾 เลขที่ใบเสร็จ: ${receiptNo || "-"}`;
+🧾 เลขที่ใบเสร็จ: ${receiptNo || "-"}
+🖼️ ลิงก์สลิป: ${slipUrl || "ไม่มีสลิปแนบ"}`;
 
-  const messages = [
-    {
-      type: "text",
-      text: textMessage
-    }
-  ];
-  
-  if (slipUrl) {
-    messages.push({
-      type: "image",
-      originalContentUrl: slipUrl,
-      previewImageUrl: slipUrl
-    });
-  }
-  
-  const payload = {
-    to: ADMIN_LINE_USER_ID,
-    messages: messages
+  const baseHeaders = {
+    "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
   };
-  
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    headers: {
-      "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
-    },
-    payload: JSON.stringify(payload)
-  };
-  
+
+  // 1. ส่งข้อความตัวอักษรหาแอดมินก่อนเสมอผ่าน LINE Messaging API
   try {
-    const response = fetchWithRetry(url, options);
-    const code = response.getResponseCode();
-    if (code !== 200) {
-      throw new Error("LINE Admin Push API failed with response code " + code + ": " + response.getContentText());
+    const textPayload = {
+      to: ADMIN_LINE_USER_ID,
+      messages: [{ type: "text", text: textMessage }]
+    };
+    const resp = fetchWithRetry(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: baseHeaders,
+      payload: JSON.stringify(textPayload)
+    });
+    if (resp) {
+      const code = resp.getResponseCode();
+      if (code !== 200) {
+        logError("LINE Admin Push Error (HTTP " + code + ")", "sendAdminSlipNotification", resp.getContentText(), "CRITICAL");
+      } else {
+        console.log("Admin LINE Push Notification sent successfully (HTTP 200).");
+      }
     }
   } catch(e) {
-    console.error("Failed to notify admin LINE: " + e.toString());
+    console.error("Failed to send admin LINE text notification: " + e.toString());
+  }
+
+  // 2. หากมี slipUrl ที่เป็น https:// ให้ลองส่งเป็นรูปภาพพรีวิวแยกต่างหาก
+  if (slipUrl && String(slipUrl).indexOf("https://") === 0) {
+    try {
+      const imgPayload = {
+        to: ADMIN_LINE_USER_ID,
+        messages: [{
+          type: "image",
+          originalContentUrl: slipUrl,
+          previewImageUrl: slipUrl
+        }]
+      };
+      fetchWithRetry(url, {
+        method: "post",
+        contentType: "application/json",
+        headers: baseHeaders,
+        payload: JSON.stringify(imgPayload)
+      });
+    } catch(imgErr) {
+      console.warn("Failed to send admin LINE image preview: " + imgErr.toString());
+    }
   }
 }
 
@@ -1858,4 +1883,161 @@ function testEmail() {
   console.log("ชื่อปฏิทินของคุณคือ: " + calendar.getName());
   
   GmailApp.sendEmail("grandslamcourt@gmail.com", "🎾 ทดสอบระบบอีเมลและปฏิทิน", "ยินดีด้วย! สิทธิ์การเข้าถึงปฏิทิน Google Calendar และอีเมล ได้รับการปลดล็อกแล้ว");
+}
+
+// ฟังก์ชันทดสอบยิงแจ้งเตือนเข้า LINE แอดมินโดยตรง เพื่อตรวจสอบความถูกต้องของ Token และ Admin LINE User ID
+function testLineNotification() {
+  const token = LINE_CHANNEL_ACCESS_TOKEN;
+  const adminId = ADMIN_LINE_USER_ID;
+  
+  console.log("-----------------------------------------");
+  console.log("เริ่มต้นทดสอบการส่ง LINE Notification...");
+  console.log("ความยาว Token: " + (token ? token.length : 0));
+  console.log("Admin LINE User ID: " + adminId);
+  
+  if (!token) {
+    console.error("❌ ล้มเหลว: ไม่พบ LINE_CHANNEL_ACCESS_TOKEN ใน Script Properties");
+    return "❌ ไม่พบ LINE_CHANNEL_ACCESS_TOKEN";
+  }
+  if (!adminId) {
+    console.error("❌ ล้มเหลว: ไม่พบ ADMIN_LINE_USER_ID ใน Script Properties");
+    return "❌ ไม่พบ ADMIN_LINE_USER_ID";
+  }
+  
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: adminId,
+    messages: [
+      {
+        type: "text",
+        text: "🎾 [ทดสอบ] ยืนยันการเชื่อมต่อระบบแจ้งเตือน LINE - The Grand Slam Tennis Court\n\nยินดีด้วยครับ! หากคุณเห็นข้อความนี้ แสดงว่าระบบแจ้งเตือน LINE ทำงานถูกต้อง 100% เรียบร้อยแล้ว 🎉"
+      }
+    ]
+  };
+  
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      "Authorization": "Bearer " + token
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  
+  const response = UrlFetchApp.fetch(url, options);
+  const code = response.getResponseCode();
+  const body = response.getContentText();
+  
+  console.log("HTTP Response Code: " + code);
+  console.log("HTTP Response Body: " + body);
+  console.log("-----------------------------------------");
+  
+  if (code === 200) {
+    console.log("✅ ส่งข้อความเข้า LINE แอดมินสำเร็จ 100%");
+    return "✅ ส่งข้อความเข้า LINE แอดมินสำเร็จ 100%";
+  } else {
+    console.error("❌ เกิดข้อผิดพลาดจาก LINE API (HTTP " + code + "): " + body);
+    return "❌ ล้มเหลว (HTTP " + code + "): " + body;
+  }
+}
+
+// ฟังก์ชันบันทึกประวัติการแก้ไขตารางโดยผู้ดูแลระบบลง Google Sheet (Admin Logs)
+function handleLogAdminAction(data) {
+  const actionType = data.actionType || "Unknown";
+  const name = data.name || "-";
+  const phone = data.phone || "-";
+  const details = data.details || "-";
+  
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch(e) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server busy. Failed to write log." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = spreadsheet.getSheetByName("AdminLogs");
+    if (!logSheet) {
+      logSheet = spreadsheet.insertSheet("AdminLogs");
+      const headers = ["Timestamp", "Action Type", "Customer Name", "Phone", "Details"];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+    
+    // จำกัดแถวล็อกไม่เกิน 2,000 แถวเพื่อไม่ให้ไฟล์บวมและโหลดช้า
+    const lastRow = logSheet.getLastRow();
+    if (lastRow >= 2000) {
+      logSheet.deleteRows(2, 200);
+    }
+    
+    const timestamp = new Date();
+    logSheet.appendRow([timestamp, actionType, name, phone, details]);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(e) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: e.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lock.hasLock()) {
+      try { lock.releaseLock(); } catch(err) {}
+    }
+  }
+}
+
+// ฟังก์ชันดึงประวัติการแก้ไขล่าสุด 100 รายการ เพื่อแสดงบนหน้าแผงควบคุมแอดมิน
+function handleGetAdminLogs(data) {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const logSheet = spreadsheet.getSheetByName("AdminLogs");
+    if (!logSheet) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", logs: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    const lastRow = logSheet.getLastRow();
+    if (lastRow <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", logs: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // ดึงย้อนหลังสูงสุด 100 รายการ
+    const startRow = Math.max(2, lastRow - 99);
+    const numRows = lastRow - startRow + 1;
+    const values = logSheet.getRange(startRow, 1, numRows, 5).getValues();
+    
+    const logs = [];
+    // วนลูปย้อนกลับจากแถวล่าสุด (ถอยหลัง) เพื่อให้เรียงลำดับใหม่สุดอยู่บน
+    for (let i = values.length - 1; i >= 0; i--) {
+      let tsVal = values[i][0];
+      let formattedTs = "";
+      if (tsVal instanceof Date) {
+        const y = tsVal.getFullYear();
+        const m = String(tsVal.getMonth() + 1).padStart(2, '0');
+        const d = String(tsVal.getDate()).padStart(2, '0');
+        const hh = String(tsVal.getHours()).padStart(2, '0');
+        const mm = String(tsVal.getMinutes()).padStart(2, '0');
+        const ss = String(tsVal.getSeconds()).padStart(2, '0');
+        formattedTs = `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+      } else {
+        formattedTs = String(tsVal);
+      }
+      
+      logs.push({
+        timestamp: formattedTs,
+        actionType: String(values[i][1] || ""),
+        name: String(values[i][2] || ""),
+        phone: String(values[i][3] || ""),
+        details: String(values[i][4] || "")
+      });
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", logs: logs }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(e) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: e.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
