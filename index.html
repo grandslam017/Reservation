@@ -288,6 +288,8 @@
                 <tr>
                   <th data-translate="thBookDate">วันที่จอง</th>
                   <th data-translate="thBookTime">เวลา</th>
+                  <th data-translate="thBookCust">ชื่อลูกค้า</th>
+                  <th data-translate="thBookPhone">เบอร์โทร</th>
                   <th data-translate="thBookCoach">โค้ช</th>
                   <th data-translate="thBookFee">ค่าบริการ</th>
                   <th data-translate="thInvoiceNumber">โน้ตเพิ่มเติม</th>
@@ -954,6 +956,37 @@
               </thead>
               <tbody id="bookingsTableBody">
                 <!-- Loaded dynamically in app.js?v=24 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Admin Action Logs card -->
+        <div class="glass-panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-clock-rotate-left text-accent"></i>
+              <span>ประวัติการแก้ไขและเลื่อนเวลาโดยแอดมิน (Admin Logs)</span>
+            </div>
+            <button id="btnRefreshAdminLogs" class="btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: var(--text-primary); cursor: pointer;">
+              <i class="fa-solid fa-arrows-rotate"></i> รีเฟรชประวัติ
+            </button>
+          </div>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th style="width: 180px;">วันเวลาทำรายการ</th>
+                  <th style="width: 180px;">การดำเนินการ</th>
+                  <th style="width: 150px;">ชื่อลูกค้า</th>
+                  <th style="width: 120px;">เบอร์โทร</th>
+                  <th>รายละเอียดการแก้ไข</th>
+                </tr>
+              </thead>
+              <tbody id="adminLogsTableBody">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">กำลังโหลดประวัติการดำเนินการ...</td>
+                </tr>
               </tbody>
             </table>
           </div>

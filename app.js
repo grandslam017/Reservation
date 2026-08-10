@@ -3540,7 +3540,7 @@ function performBookingSearch(query, isSilent = false) {
   if (results.length === 0) {
     summaryTitle.textContent = state.language === 'th' ? `ไม่พบรายการจองสำหรับ "${query}"` : `No bookings found for "${query}"`;
     summarySubtitle.textContent = state.language === 'th' ? 'กรุณาตรวจสอบชื่อ-นามสกุลแล้วลองอีกครั้ง' : 'Please check the name and try again.';
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบข้อมูลการจอง' : 'No booking data found'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบข้อมูลการจอง' : 'No booking data found'}</td></tr>`;
     return;
   }
 
@@ -3571,6 +3571,8 @@ function performBookingSearch(query, isSilent = false) {
     row.innerHTML = `
       <td style="font-weight: 500;">${formattedDate}</td>
       <td class="text-accent" style="font-weight: 600;">${booking.slot}</td>
+      <td style="font-weight: 600;">${booking.name}</td>
+      <td style="font-family: monospace; font-size: 0.9rem;">${booking.phone || '-'}</td>
       <td><span class="${coachBadgeClass}">${coachBadgeText}</span></td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td style="font-size: 0.85rem; color: var(--text-secondary);">${booking.adminNotes || '-'}</td>
