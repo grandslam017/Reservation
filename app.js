@@ -824,7 +824,8 @@ async function fetchBookingsFromSupabase(silent = false) {
         court: b.court,
         requireCoach: b.require_coach,
         fee: parseFloat(b.fee) || 0,
-        adminNotes: b.admin_notes || ""
+        adminNotes: b.admin_notes || "",
+        calendarEventId: b.calendar_event_id || ""
       }));
       
       // ดึงการตั้งค่าล็อกเดือนจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
@@ -1836,9 +1837,30 @@ function initBookingWizard() {
             ...info
           };
           sendGasRequest(payload)
-            .then(res => {
+            .then(async res => {
               if (res && res.status === "warning" && res.warnings) {
                 console.warn("GAS notification warnings:", res.warnings);
+              }
+              if (res && (res.status === "success" || res.status === "warning") && res.calendarEventIds && res.uuids && supabaseClient) {
+                for (let i = 0; i < res.uuids.length; i++) {
+                  const bId = res.uuids[i];
+                  const cId = res.calendarEventIds[i];
+                  if (bId && cId) {
+                    const { error } = await supabaseClient
+                      .from('bookings')
+                      .update({ calendar_event_id: cId })
+                      .eq('id', bId);
+                    if (error) {
+                      console.error("Failed to update calendar_event_id in Supabase for booking", bId, error);
+                    } else {
+                      const localB = state.bookings.find(b => b.id === bId);
+                      if (localB) {
+                        localB.calendarEventId = cId;
+                      }
+                    }
+                  }
+                }
+                saveStateToStorage();
               }
             })
             .catch(err => console.error("GAS notification trigger failed:", err));
@@ -2580,9 +2602,12 @@ function renderBookingsTable() {
   // Get Admin Search query
   const query = document.getElementById('bookingSearchInput')?.value.toLowerCase().trim() || '';
   
-  // Filter bookings by customer name
+  // Filter bookings by customer name or admin notes
   if (query !== '') {
-    filteredBookings = filteredBookings.filter(b => b.name.toLowerCase().includes(query));
+    filteredBookings = filteredBookings.filter(b => 
+      b.name.toLowerCase().includes(query) || 
+      (b.adminNotes && b.adminNotes.toLowerCase().includes(query))
+    );
   }
 
   if (filteredBookings.length === 0) {
@@ -3130,7 +3155,7 @@ async function handleRescheduleSave() {
       });
 
       // Step B: Send new confirmation for the rescheduled booking details
-      await sendGasRequest({
+      const res = await sendGasRequest({
         action: "sendConfirmation",
         bookingKey: "reschedule_" + bookingId + "_" + Date.now(),
         name: booking.name,
@@ -3146,6 +3171,22 @@ async function handleRescheduleSave() {
         lineIdInput: booking.lineIdInput || "",
         court: booking.court || "Main Court"
       });
+
+      if (res && (res.status === "success" || res.status === "warning") && res.calendarEventIds && res.calendarEventIds.length > 0) {
+        const newEventId = res.calendarEventIds[0];
+        booking.calendarEventId = newEventId;
+        if (supabaseClient) {
+          try {
+            const { error } = await supabaseClient
+              .from('bookings')
+              .update({ calendar_event_id: newEventId })
+              .eq('id', bookingId);
+            if (error) throw error;
+          } catch (e) {
+            console.error("Failed to update rescheduled calendar_event_id in Supabase:", e);
+          }
+        }
+      }
     } catch (err) {
       console.error("Failed to sync reschedule with Google Apps Script:", err);
     }
@@ -3484,12 +3525,13 @@ function performBookingSearch(query, isSilent = false) {
     return;
   }
 
-  // Filter bookings matching name OR phone number
+  // Filter bookings matching name OR phone number OR admin notes
   const results = state.bookings.filter(b => {
     const nameMatch = b.name.toLowerCase().includes(query);
     const cleanQueryPhone = query.replace(/[^0-9]/g, '');
     const phoneMatch = b.phone && b.phone.replace(/[^0-9]/g, '').includes(cleanQueryPhone);
-    return nameMatch || (cleanQueryPhone !== '' && phoneMatch);
+    const notesMatch = b.adminNotes && b.adminNotes.toLowerCase().includes(query);
+    return nameMatch || (cleanQueryPhone !== '' && phoneMatch) || notesMatch;
   });
 
   resultArea.style.display = 'block';
