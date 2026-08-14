@@ -2055,33 +2055,23 @@ function populateYearFilter() {
 
   const currentValue = yearFilterSelect.value;
   const years = new Set();
-  const currentYearNum = getGregorianYear(new Date());
-  
-  // Extract valid years (>= 2000) from transactions
+
   state.transactions.forEach(tx => {
     if (tx.date) {
-      const y = parseInt(tx.date.substring(0, 4), 10);
-      if (y >= 2000 && y <= currentYearNum + 10) years.add(y.toString());
+      years.add(tx.date.substring(0, 4));
     }
   });
 
-  // Extract valid years (>= 2000) from bookings
   state.bookings.forEach(b => {
     if (b.date) {
-      const y = parseInt(b.date.substring(0, 4), 10);
-      if (y >= 2000 && y <= currentYearNum + 10) years.add(y.toString());
+      years.add(b.date.substring(0, 4));
     }
   });
 
-  // Always include a practical range around current year (-2 to +2 years)
-  for (let offset = -2; offset <= 2; offset++) {
-    years.add((currentYearNum + offset).toString());
-  }
+  years.add(getGregorianYear(new Date()).toString());
 
-  // Sort years descending
   const sortedYears = Array.from(years).sort((a, b) => b - a);
 
-  // Build options HTML
   let html = `<option value="" style="background: #1e293b;">${state.language === 'th' ? 'ทุกปี' : 'All Years'}</option>`;
   sortedYears.forEach(y => {
     const displayYear = state.language === 'th' ? parseInt(y) + 543 : y;
@@ -2089,15 +2079,13 @@ function populateYearFilter() {
   });
 
   yearFilterSelect.innerHTML = html;
-  
-  // Restore previous selection if it is still valid
+
   if (sortedYears.includes(currentValue)) {
     yearFilterSelect.value = currentValue;
   } else {
     yearFilterSelect.value = '';
   }
 
-  // Populate bookingYearFilter
   const bookingYearSelect = document.getElementById('bookingYearFilter');
   if (bookingYearSelect) {
     const prevVal = bookingYearSelect.value;
@@ -2109,7 +2097,6 @@ function populateYearFilter() {
     }
   }
 
-  // Populate slotStatYearFilter
   const slotYearSelect = document.getElementById('slotStatYearFilter');
   if (slotYearSelect) {
     const prevVal = slotYearSelect.value;
@@ -2122,7 +2109,7 @@ function populateYearFilter() {
     if (sortedYears.includes(prevVal)) {
       slotYearSelect.value = prevVal;
     } else {
-      slotYearSelect.value = currentYearNum.toString();
+      slotYearSelect.value = getGregorianYear(new Date()).toString();
     }
     slotYearSelect.onchange = () => renderTimeSlotStats();
   }
