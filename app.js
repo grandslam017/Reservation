@@ -2055,25 +2055,28 @@ function populateYearFilter() {
 
   const currentValue = yearFilterSelect.value;
   const years = new Set();
+  const currentYearNum = getGregorianYear(new Date());
   
-  // Extract years from transactions
+  // Extract valid years (>= 2000) from transactions
   state.transactions.forEach(tx => {
     if (tx.date) {
-      const y = tx.date.substring(0, 4);
-      if (y && /^\d{4}$/.test(y)) years.add(y);
+      const y = parseInt(tx.date.substring(0, 4), 10);
+      if (y >= 2000 && y <= currentYearNum + 10) years.add(y.toString());
     }
   });
 
-  // Extract years from bookings
+  // Extract valid years (>= 2000) from bookings
   state.bookings.forEach(b => {
     if (b.date) {
-      const y = b.date.substring(0, 4);
-      if (y && /^\d{4}$/.test(y)) years.add(y);
+      const y = parseInt(b.date.substring(0, 4), 10);
+      if (y >= 2000 && y <= currentYearNum + 10) years.add(y.toString());
     }
   });
 
-  // Always include current year
-  years.add(getGregorianYear(new Date()).toString());
+  // Always include a practical range around current year (-2 to +2 years)
+  for (let offset = -2; offset <= 2; offset++) {
+    years.add((currentYearNum + offset).toString());
+  }
 
   // Sort years descending
   const sortedYears = Array.from(years).sort((a, b) => b - a);
@@ -2119,7 +2122,7 @@ function populateYearFilter() {
     if (sortedYears.includes(prevVal)) {
       slotYearSelect.value = prevVal;
     } else {
-      slotYearSelect.value = getGregorianYear(new Date()).toString();
+      slotYearSelect.value = currentYearNum.toString();
     }
     slotYearSelect.onchange = () => renderTimeSlotStats();
   }
@@ -2153,7 +2156,6 @@ function renderAdminDashboard() {
   });
 
   // 2. Filter Transactions for Trend Chart (Income vs Expense Monthly Trend)
-  // Shows all months in the selected year, or selected month's year, or all time
   const filteredTxsForTrend = state.transactions.filter(tx => {
     if (yearFilter) {
       return tx.date.startsWith(yearFilter);
@@ -2183,11 +2185,10 @@ function renderAdminDashboard() {
   // Calculate Occupancy Rate
   let occupancyRate = 0;
   if (monthFilter) {
-    // Calculate for the specific month
     const yr = yearFilter ? Number(yearFilter) : getGregorianYear(new Date());
     const month = Number(monthFilter);
     const daysInMonth = new Date(yr, month, 0).getDate();
-    const totalSlotsInMonth = daysInMonth * 15; // 15 slots/day (08:00 to 23:00)
+    const totalSlotsInMonth = daysInMonth * 15;
     
     const bookingsInMonth = state.bookings.filter(b => {
       if (yearFilter) {
@@ -2199,7 +2200,6 @@ function renderAdminDashboard() {
     });
     occupancyRate = Math.min(100, Math.round((bookingsInMonth.length / totalSlotsInMonth) * 100));
   } else if (yearFilter) {
-    // Calculate for the specific year
     const yr = Number(yearFilter);
     const isLeap = (yr % 4 === 0 && yr % 100 !== 0) || (yr % 400 === 0);
     const daysInYear = isLeap ? 366 : 365;
@@ -2208,7 +2208,6 @@ function renderAdminDashboard() {
     const bookingsInYear = state.bookings.filter(b => b.date.startsWith(yearFilter));
     occupancyRate = Math.min(100, Math.round((bookingsInYear.length / totalSlotsInYear) * 100));
   } else {
-    // Fallback to last 30 days
     const today = new Date();
     const past30Days = new Date();
     past30Days.setDate(today.getDate() - 30);
@@ -2238,20 +2237,137 @@ function renderAdminDashboard() {
     updateDashboardCharts(filteredTxsForTrend, filteredTxsForMetrics, state.language);
   }
 
-  const supabaseUrlInput = document.getElementById('supabaseUrlInput');
-  const supabaseKeyInput = document.getElementById('supabaseKeyInput');
-  const liffInput = document.getElementById('liffIdInput');
-  if (supabaseUrlInput) {
-    supabaseUrlInput.value = state.config.supabaseUrl || '';
+  renderBookingsTable();
+  renderLedgerTable(filteredTxsForMetrics);
+  renderTimeSlotStats();
+}
+
+function renderTimeSlotStats() {
+  const dayHoursEl = document.getElementById('txtDayHours');
+  const nightHoursEl = document.getElementById('txtNightHours');
+  const rainoutHoursEl = document.getElementById('txtRainoutHours');
+  const dayPercentEl = document.getElementById('txtDayPercent');
+  const nightPercentEl = document.getElementById('txtNightPercent');
+  const rainoutPercentEl = document.getElementById('txtRainoutPercent');
+  const dayBarEl = document.getElementById('barDayProgress');
+  const nightBarEl = document.getElementById('barNightProgress');
+  const rainoutBarEl = document.getElementById('barRainoutProgress');
+  const tbody = document.getElementById('slotMonthlyComparisonTbody');
+  const slotYearSelect = document.getElementById('slotStatYearFilter');
+
+  if (!dayHoursEl || !tbody) return;
+
+  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
+  const mainYearFilter = document.getElementById('adminYearFilter')?.value || '';
+  const activeYear = slotYearSelect?.value || mainYearFilter || getGregorianYear(new Date()).toString();
+
+  const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+  const targetMonthStr = monthFilter || currentMonthStr;
+
+  const activeBookings = state.bookings.filter(b => b.status !== 'cancelled');
+
+  let totalDayHours = 0;
+  let totalNightHours = 0;
+  let totalRainoutHours = 0;
+
+  activeBookings.forEach(b => {
+    if (b.date && b.date.startsWith(`${activeYear}-${targetMonthStr}`)) {
+      const isRain = b.isRainout || (b.adminNotes && b.adminNotes.includes('[ฝนตก]'));
+      if (isRain) {
+        totalRainoutHours += 1;
+      } else {
+        const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+        if (startHour >= 8 && startHour < 16) {
+          totalDayHours += 1;
+        } else if (startHour >= 16 && startHour <= 23) {
+          totalNightHours += 1;
+        }
+      }
+    }
+  });
+
+  const totalBookedHours = totalDayHours + totalNightHours + totalRainoutHours;
+  const dayPct = totalBookedHours > 0 ? Math.round((totalDayHours / totalBookedHours) * 100) : 0;
+  const nightPct = totalBookedHours > 0 ? Math.round((totalNightHours / totalBookedHours) * 100) : 0;
+  const rainoutPct = totalBookedHours > 0 ? Math.round((totalRainoutHours / totalBookedHours) * 100) : 0;
+
+  dayHoursEl.textContent = totalDayHours.toLocaleString();
+  nightHoursEl.textContent = totalNightHours.toLocaleString();
+  if (rainoutHoursEl) rainoutHoursEl.textContent = totalRainoutHours.toLocaleString();
+
+  if (dayPercentEl) dayPercentEl.textContent = `${dayPct}%`;
+  if (nightPercentEl) nightPercentEl.textContent = `${nightPct}%`;
+  if (rainoutPercentEl) rainoutPercentEl.textContent = `${rainoutPct}%`;
+
+  if (dayBarEl) dayBarEl.style.width = `${dayPct}%`;
+  if (nightBarEl) nightBarEl.style.width = `${nightPct}%`;
+  if (rainoutBarEl) rainoutBarEl.style.width = `${rainoutPct}%`;
+
+  const monthNamesTh = [
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
+    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
+    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+  ];
+  const monthNamesEn = [
+    "Jan", "Feb", "Mar", "Apr",
+    "May", "Jun", "Jul", "Aug",
+    "Sep", "Oct", "Nov", "Dec"
+  ];
+
+  tbody.innerHTML = '';
+
+  for (let m = 1; m <= 12; m++) {
+    const monthStr = String(m).padStart(2, '0');
+    let mDayHours = 0;
+    let mNightHours = 0;
+    let mRainoutHours = 0;
+
+    activeBookings.forEach(b => {
+      if (b.date && b.date.startsWith(`${activeYear}-${monthStr}`)) {
+        const isRain = b.isRainout || (b.adminNotes && b.adminNotes.includes('[ฝนตก]'));
+        if (isRain) {
+          mRainoutHours += 1;
+        } else {
+          const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+          if (startHour >= 8 && startHour < 16) {
+            mDayHours += 1;
+          } else if (startHour >= 16 && startHour <= 23) {
+            mNightHours += 1;
+          }
+        }
+      }
+    });
+
+    const mNetTotal = mDayHours + mNightHours;
+    const isSelectedMonth = targetMonthStr === monthStr;
+
+    const row = document.createElement('tr');
+    if (isSelectedMonth) {
+      row.style.background = 'rgba(217, 249, 157, 0.08)';
+    }
+
+    const monthLabel = state.language === 'th' ? monthNamesTh[m - 1] : monthNamesEn[m - 1];
+    const displayYear = state.language === 'th' ? parseInt(activeYear) + 543 : activeYear;
+
+    row.innerHTML = `
+      <td style="padding: 0.4rem 0.6rem;">
+        <span style="font-weight: 600; color: ${isSelectedMonth ? 'var(--accent-color)' : 'var(--text-primary)'};">
+          ${monthLabel} ${displayYear}
+        </span>
+      </td>
+      <td style="color: #facc15; font-weight: 600; padding: 0.4rem 0.6rem;">${mDayHours.toLocaleString()} ชม.</td>
+      <td style="color: #60a5fa; font-weight: 600; padding: 0.4rem 0.6rem;">${mNightHours.toLocaleString()} ชม.</td>
+      <td style="color: #f87171; font-weight: 600; padding: 0.4rem 0.6rem;">${mRainoutHours.toLocaleString()} ชม.</td>
+      <td style="font-weight: 700; padding: 0.4rem 0.6rem;">${mNetTotal.toLocaleString()} ชม.</td>
+    `;
+
+    tbody.appendChild(row);
   }
-  if (supabaseKeyInput) {
-    supabaseKeyInput.value = state.config.supabaseKey || '';
+
+  if (tbody.children.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 1rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
   }
-  if (liffInput) {
-    liffInput.value = state.config.liffId || '';
-  }
-  const gasUrlInput = document.getElementById('gasUrlInput');
-  if (gasUrlInput) {
+}
     gasUrlInput.value = state.config.gasUrl || '';
   }
   const webhookSecretInput = document.getElementById('webhookSecretInput');
