@@ -4372,5 +4372,10 @@ function checkIfSlotIsPast(dayDate, slot) {
   return startHour <= currentHour;
 }
 
-window.addEventListener('DOMContentLoaded', init);
+// Start application safely whether DOM is loading or already ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
