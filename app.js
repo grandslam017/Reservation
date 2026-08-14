@@ -2222,6 +2222,54 @@ function renderAdminDashboard() {
     updateDashboardCharts(filteredTxsForTrend, filteredTxsForMetrics, state.language);
   }
 
+  // Populate Admin Inputs
+  const gasUrlInput = document.getElementById('gasUrlInput');
+  if (gasUrlInput) {
+    gasUrlInput.value = state.config.gasUrl || '';
+  }
+  const webhookSecretInput = document.getElementById('webhookSecretInput');
+  if (webhookSecretInput) {
+    webhookSecretInput.value = state.config.webhookSecret || '';
+  }
+
+  const notepadText = document.getElementById('adminNotepadText');
+  if (notepadText && !notepadText.matches(':focus')) {
+    notepadText.value = state.config.adminNotepad || '';
+  }
+
+  const noticeText = document.getElementById('customerNoticeText');
+  if (noticeText && !noticeText.matches(':focus')) {
+    noticeText.value = state.config.bookingNotice || '';
+  }
+
+  // Setup Admin search input handler
+  const searchInput = document.getElementById('bookingSearchInput');
+  if (searchInput) {
+    searchInput.oninput = () => renderBookingsTable();
+  }
+
+  // Setup Admin Advance Booking Dropdown
+  const advanceSelect = document.getElementById('advanceBookingMonths');
+  if (advanceSelect) {
+    if (state.config.advanceBookingMonths !== undefined && state.config.advanceBookingMonths !== null) {
+      advanceSelect.value = String(state.config.advanceBookingMonths);
+    }
+    advanceSelect.onchange = async (e) => {
+      const val = e.target.value;
+      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val, 10);
+      saveStateToStorage();
+      
+      showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
+      
+      if (supabaseClient) {
+        saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000001', 'config', val);
+      }
+      
+      renderCalendar();
+      renderTimeSlots();
+    };
+  }
+
   renderBookingsTable();
   renderLedgerTable(filteredTxsForMetrics);
   renderTimeSlotStats();
@@ -2324,168 +2372,6 @@ function renderTimeSlotStats() {
       <td style="color: #facc15; font-weight: 600; padding: 0.4rem 0.6rem;">${mDayHours.toLocaleString()} ชม.</td>
       <td style="color: #60a5fa; font-weight: 600; padding: 0.4rem 0.6rem;">${mNightHours.toLocaleString()} ชม.</td>
       <td style="font-weight: 700; padding: 0.4rem 0.6rem;">${mTotal.toLocaleString()} ชม.</td>
-    `;
-
-    tbody.appendChild(row);
-  }
-
-  if (tbody.children.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
-  }
-}
-    gasUrlInput.value = state.config.gasUrl || '';
-  }
-  const webhookSecretInput = document.getElementById('webhookSecretInput');
-  if (webhookSecretInput) {
-    webhookSecretInput.value = state.config.webhookSecret || '';
-  }
-
-  const notepadText = document.getElementById('adminNotepadText');
-  if (notepadText && !notepadText.matches(':focus')) {
-    notepadText.value = state.config.adminNotepad || '';
-  }
-
-  const noticeText = document.getElementById('customerNoticeText');
-  if (noticeText && !noticeText.matches(':focus')) {
-    noticeText.value = state.config.bookingNotice || '';
-  }
-
-  // Setup Admin search input handler
-  const searchInput = document.getElementById('bookingSearchInput');
-  if (searchInput) {
-    searchInput.oninput = () => renderBookingsTable();
-  }
-
-  // Setup Admin Advance Booking Dropdown
-  const advanceSelect = document.getElementById('advanceBookingMonths');
-  if (advanceSelect) {
-    if (state.config.advanceBookingMonths !== undefined && state.config.advanceBookingMonths !== null) {
-      advanceSelect.value = String(state.config.advanceBookingMonths);
-    }
-    advanceSelect.onchange = async (e) => {
-      const val = e.target.value;
-      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val, 10);
-      saveStateToStorage();
-      
-      showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
-      
-      // บันทึกการตั้งค่าลง Supabase ในพื้นหลังเพื่อซิงก์ให้เครื่องลูกค้าทุกคนใช้ค่านี้แบบเรียลไทม์
-      if (supabaseClient) {
-        saveSystemConfigToSupabase('00000000-0000-0000-0000-000000000001', 'config', val);
-      }
-      
-      renderCalendar();
-      renderTimeSlots();
-    };
-  }
-
-
-
-  renderBookingsTable();
-  renderLedgerTable(filteredTxsForMetrics);
-  renderTimeSlotStats();
-}
-
-function renderTimeSlotStats() {
-  const dayHoursEl = document.getElementById('txtDayHours');
-  const nightHoursEl = document.getElementById('txtNightHours');
-  const dayPercentEl = document.getElementById('txtDayPercent');
-  const nightPercentEl = document.getElementById('txtNightPercent');
-  const dayBarEl = document.getElementById('barDayProgress');
-  const nightBarEl = document.getElementById('barNightProgress');
-  const tbody = document.getElementById('slotMonthlyComparisonTbody');
-  const slotYearSelect = document.getElementById('slotStatYearFilter');
-
-  if (!dayHoursEl || !tbody) return;
-
-  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
-  const mainYearFilter = document.getElementById('adminYearFilter')?.value || '';
-  const activeYear = slotYearSelect?.value || mainYearFilter || getGregorianYear(new Date()).toString();
-
-  // Determine target month: if monthFilter is set, use it; otherwise default to current month
-  const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
-  const targetMonthStr = monthFilter || currentMonthStr;
-
-  // Filter out cancelled bookings
-  const activeBookings = state.bookings.filter(b => b.status !== 'cancelled');
-
-  // 1. Calculate stats for the TARGET MONTH ONLY (not whole year)
-  let totalDayHours = 0;
-  let totalNightHours = 0;
-
-  activeBookings.forEach(b => {
-    if (b.date && b.date.startsWith(`${activeYear}-${targetMonthStr}`)) {
-      const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
-      if (startHour >= 8 && startHour < 16) {
-        totalDayHours += 1;
-      } else if (startHour >= 16 && startHour <= 23) {
-        totalNightHours += 1;
-      }
-    }
-  });
-
-  const grandTotalHours = totalDayHours + totalNightHours;
-  const dayPct = grandTotalHours > 0 ? Math.round((totalDayHours / grandTotalHours) * 100) : 0;
-  const nightPct = grandTotalHours > 0 ? Math.round((totalNightHours / grandTotalHours) * 100) : 0;
-
-  dayHoursEl.textContent = totalDayHours.toLocaleString();
-  nightHoursEl.textContent = totalNightHours.toLocaleString();
-  dayPercentEl.textContent = `${dayPct}%`;
-  nightPercentEl.textContent = `${nightPct}%`;
-
-  if (dayBarEl) dayBarEl.style.width = `${dayPct}%`;
-  if (nightBarEl) nightBarEl.style.width = `${nightPct}%`;
-
-  // 2. Build Month-by-Month comparison table for the active year
-  const monthNamesTh = [
-    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
-    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
-    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-  ];
-  const monthNamesEn = [
-    "Jan", "Feb", "Mar", "Apr",
-    "May", "Jun", "Jul", "Aug",
-    "Sep", "Oct", "Nov", "Dec"
-  ];
-
-  tbody.innerHTML = '';
-
-  for (let m = 1; m <= 12; m++) {
-    const monthStr = String(m).padStart(2, '0');
-    let mDayHours = 0;
-    let mNightHours = 0;
-
-    activeBookings.forEach(b => {
-      if (b.date && b.date.startsWith(`${activeYear}-${monthStr}`)) {
-        const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
-        if (startHour >= 8 && startHour < 16) {
-          mDayHours += 1;
-        } else if (startHour >= 16 && startHour <= 23) {
-          mNightHours += 1;
-        }
-      }
-    });
-
-    const mTotal = mDayHours + mNightHours;
-    const isSelectedMonth = targetMonthStr === monthStr;
-
-    const row = document.createElement('tr');
-    if (isSelectedMonth) {
-      row.style.background = 'rgba(217, 249, 157, 0.08)';
-    }
-
-    const monthLabel = state.language === 'th' ? monthNamesTh[m - 1] : monthNamesEn[m - 1];
-    const displayYear = state.language === 'th' ? parseInt(activeYear) + 543 : activeYear;
-
-    row.innerHTML = `
-      <td style="padding: 0.4rem 0.75rem;">
-        <span style="font-weight: 600; color: ${isSelectedMonth ? 'var(--accent-color)' : 'var(--text-primary)'};">
-          ${monthLabel} ${displayYear}
-        </span>
-      </td>
-      <td style="color: #facc15; font-weight: 600; padding: 0.4rem 0.75rem;">${mDayHours.toLocaleString()} ชม.</td>
-      <td style="color: #60a5fa; font-weight: 600; padding: 0.4rem 0.75rem;">${mNightHours.toLocaleString()} ชม.</td>
-      <td style="font-weight: 700; padding: 0.4rem 0.75rem;">${mTotal.toLocaleString()} ชม.</td>
     `;
 
     tbody.appendChild(row);
