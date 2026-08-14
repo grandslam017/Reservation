@@ -2105,6 +2105,24 @@ function populateYearFilter() {
       bookingYearSelect.value = '';
     }
   }
+
+  // Populate slotStatYearFilter
+  const slotYearSelect = document.getElementById('slotStatYearFilter');
+  if (slotYearSelect) {
+    const prevVal = slotYearSelect.value;
+    let slotYearHtml = '';
+    sortedYears.forEach(y => {
+      const displayYear = state.language === 'th' ? parseInt(y) + 543 : y;
+      slotYearHtml += `<option value="${y}" style="background: #1e293b;">${displayYear}</option>`;
+    });
+    slotYearSelect.innerHTML = slotYearHtml;
+    if (sortedYears.includes(prevVal)) {
+      slotYearSelect.value = prevVal;
+    } else {
+      slotYearSelect.value = getGregorianYear(new Date()).toString();
+    }
+    slotYearSelect.onchange = () => renderTimeSlotStats();
+  }
 }
 
 // ----------------------------------------------------
@@ -2295,30 +2313,27 @@ function renderTimeSlotStats() {
   const dayBarEl = document.getElementById('barDayProgress');
   const nightBarEl = document.getElementById('barNightProgress');
   const tbody = document.getElementById('slotMonthlyComparisonTbody');
+  const slotYearSelect = document.getElementById('slotStatYearFilter');
 
   if (!dayHoursEl || !tbody) return;
 
   const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
-  const yearFilter = document.getElementById('adminYearFilter')?.value || getGregorianYear(new Date()).toString();
+  const mainYearFilter = document.getElementById('adminYearFilter')?.value || '';
+  const activeYear = slotYearSelect?.value || mainYearFilter || getGregorianYear(new Date()).toString();
+
+  // Determine target month: if monthFilter is set, use it; otherwise default to current month
+  const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+  const targetMonthStr = monthFilter || currentMonthStr;
 
   // Filter out cancelled bookings
   const activeBookings = state.bookings.filter(b => b.status !== 'cancelled');
 
-  // 1. Calculate stats for the selected Month / Year filter
+  // 1. Calculate stats for the TARGET MONTH ONLY (not whole year)
   let totalDayHours = 0;
   let totalNightHours = 0;
 
   activeBookings.forEach(b => {
-    let matchesMonth = true;
-    let matchesYear = true;
-
-    if (yearFilter && !b.date.startsWith(yearFilter)) matchesYear = false;
-    if (monthFilter) {
-      const parts = b.date.split('-');
-      if (parts.length < 2 || parts[1] !== monthFilter) matchesMonth = false;
-    }
-
-    if (matchesMonth && matchesYear) {
+    if (b.date && b.date.startsWith(`${activeYear}-${targetMonthStr}`)) {
       const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
       if (startHour >= 8 && startHour < 16) {
         totalDayHours += 1;
@@ -2340,16 +2355,16 @@ function renderTimeSlotStats() {
   if (dayBarEl) dayBarEl.style.width = `${dayPct}%`;
   if (nightBarEl) nightBarEl.style.width = `${nightPct}%`;
 
-  // 2. Build Month-by-Month comparison for the active year
+  // 2. Build Month-by-Month comparison table for the active year
   const monthNamesTh = [
-    "มกราคม (Jan)", "กุมภาพันธ์ (Feb)", "มีนาคม (Mar)", "เมษายน (Apr)",
-    "พฤษภาคม (May)", "มิถุนายน (Jun)", "กรกฎาคม (Jul)", "สิงหาคม (Aug)",
-    "กันยายน (Sep)", "ตุลาคม (Oct)", "พฤศจิกายน (Nov)", "ธันวาคม (Dec)"
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
+    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
+    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
   ];
   const monthNamesEn = [
-    "January", "February", "March", "April",
-    "May", "June", "July", "August",
-    "September", "October", "November", "December"
+    "Jan", "Feb", "Mar", "Apr",
+    "May", "Jun", "Jul", "Aug",
+    "Sep", "Oct", "Nov", "Dec"
   ];
 
   tbody.innerHTML = '';
@@ -2360,7 +2375,7 @@ function renderTimeSlotStats() {
     let mNightHours = 0;
 
     activeBookings.forEach(b => {
-      if (b.date.startsWith(`${yearFilter}-${monthStr}`)) {
+      if (b.date && b.date.startsWith(`${activeYear}-${monthStr}`)) {
         const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
         if (startHour >= 8 && startHour < 16) {
           mDayHours += 1;
@@ -2371,34 +2386,32 @@ function renderTimeSlotStats() {
     });
 
     const mTotal = mDayHours + mNightHours;
-    if (mTotal === 0 && monthFilter && monthFilter !== monthStr) {
-      continue;
-    }
+    const isSelectedMonth = targetMonthStr === monthStr;
 
     const row = document.createElement('tr');
-    const isSelectedMonth = monthFilter === monthStr;
     if (isSelectedMonth) {
       row.style.background = 'rgba(217, 249, 157, 0.08)';
     }
 
     const monthLabel = state.language === 'th' ? monthNamesTh[m - 1] : monthNamesEn[m - 1];
+    const displayYear = state.language === 'th' ? parseInt(activeYear) + 543 : activeYear;
 
     row.innerHTML = `
-      <td>
+      <td style="padding: 0.4rem 0.75rem;">
         <span style="font-weight: 600; color: ${isSelectedMonth ? 'var(--accent-color)' : 'var(--text-primary)'};">
-          ${monthLabel} ${yearFilter ? `(${yearFilter})` : ''}
+          ${monthLabel} ${displayYear}
         </span>
       </td>
-      <td style="color: #facc15; font-weight: 600;">${mDayHours.toLocaleString()} ชม.</td>
-      <td style="color: #60a5fa; font-weight: 600;">${mNightHours.toLocaleString()} ชม.</td>
-      <td style="font-weight: 700;">${mTotal.toLocaleString()} ชม.</td>
+      <td style="color: #facc15; font-weight: 600; padding: 0.4rem 0.75rem;">${mDayHours.toLocaleString()} ชม.</td>
+      <td style="color: #60a5fa; font-weight: 600; padding: 0.4rem 0.75rem;">${mNightHours.toLocaleString()} ชม.</td>
+      <td style="font-weight: 700; padding: 0.4rem 0.75rem;">${mTotal.toLocaleString()} ชม.</td>
     `;
 
     tbody.appendChild(row);
   }
 
   if (tbody.children.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
   }
 }
 
