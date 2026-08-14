@@ -383,15 +383,13 @@ async function sendGasRequest(payload) {
   }
 }
 
-// Helper: Get Gregorian Year (Avoids Thai/Buddhist calendar issue in iOS/Safari)
+// Helper: Get Gregorian Year (Avoids Thai/Buddhist calendar issue in iOS/Safari/Intl)
 function getGregorianYear(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', { year: 'numeric' });
-    return parseInt(formatter.format(date), 10);
-  } catch (e) {
-    const y = date.getFullYear();
-    return y > 2400 ? y - 543 : y;
-  }
+  if (!date) return new Date().getFullYear();
+  const d = (date instanceof Date && !isNaN(date)) ? date : new Date(date);
+  if (isNaN(d)) return new Date().getFullYear();
+  let y = d.getFullYear();
+  return y > 2400 ? y - 543 : y;
 }
 
 // Helper: Get Year-Month String (e.g., "2026-05")
@@ -3990,10 +3988,32 @@ async function checkAdminSession() {
 async function init() {
   loadStateFromStorage();
 
+  // Guarantee valid Date objects for calendar rendering
+  if (!state.currentDate || isNaN(new Date(state.currentDate).getTime())) {
+    state.currentDate = new Date();
+  } else if (!(state.currentDate instanceof Date)) {
+    state.currentDate = new Date(state.currentDate);
+  }
+
+  if (!state.selectedDate || isNaN(new Date(state.selectedDate).getTime())) {
+    state.selectedDate = new Date();
+  } else if (!(state.selectedDate instanceof Date)) {
+    state.selectedDate = new Date(state.selectedDate);
+  }
+
   setupTabNavigation();
 
-  await fetchBookingsFromSupabase();
-  await checkAdminSession();
+  // Render Calendar and Time Slots IMMEDIATELY on load (0ms latency)
+  renderCalendar();
+  renderTimeSlots();
+
+  // Fetch remote bookings asynchronously in background
+  try {
+    await fetchBookingsFromSupabase();
+    await checkAdminSession();
+  } catch (err) {
+    console.warn("Background fetch error on init:", err);
+  }
   
   // Re-render calendar after fetching remote data
   renderCalendar();
