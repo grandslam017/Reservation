@@ -2754,12 +2754,17 @@ function renderBookingsTable() {
   // Get Admin Search query
   const query = document.getElementById('bookingSearchInput')?.value.toLowerCase().trim() || '';
   
-  // Filter bookings by customer name or admin notes
+  // Filter bookings by customer name, phone number, or admin notes
   if (query !== '') {
-    filteredBookings = filteredBookings.filter(b => 
-      b.name.toLowerCase().includes(query) || 
-      (b.adminNotes && b.adminNotes.toLowerCase().includes(query))
-    );
+    const cleanQueryPhone = query.replace(/[^0-9]/g, '');
+    filteredBookings = filteredBookings.filter(b => {
+      const nameMatch = (b.name || '').toLowerCase().includes(query);
+      const cleanPhone = (b.phone || '').toString().replace(/[^0-9]/g, '');
+      const phoneMatch = cleanQueryPhone !== '' && cleanPhone.includes(cleanQueryPhone);
+      const rawPhoneMatch = (b.phone || '').toString().toLowerCase().includes(query);
+      const notesMatch = (b.adminNotes || '').toLowerCase().includes(query);
+      return nameMatch || phoneMatch || rawPhoneMatch || notesMatch;
+    });
   }
 
   if (filteredBookings.length === 0) {
