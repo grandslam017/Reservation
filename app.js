@@ -420,17 +420,19 @@ function isMonthLocked(date) {
     return false;
   }
 
-  // Check Sunday 14 days advance booking option
-  if (state.config.advanceBookingMonths === "14_days_sunday") {
+  // Check Sunday advance booking options (21_days_sunday or legacy 14_days_sunday)
+  if (state.config.advanceBookingMonths === "14_days_sunday" || state.config.advanceBookingMonths === "21_days_sunday") {
     // Find the most recent Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
     const currentDay = today.getDay(); 
     const recentSunday = new Date(today);
     recentSunday.setDate(today.getDate() - currentDay);
     recentSunday.setHours(0, 0, 0, 0);
 
-    // Max bookable date is 14 days from that Sunday
+    const advanceDays = (state.config.advanceBookingMonths === "14_days_sunday") ? 14 : 21;
+
+    // Max bookable date is advanceDays from that Sunday
     const maxDate = new Date(recentSunday);
-    maxDate.setDate(recentSunday.getDate() + 14);
+    maxDate.setDate(recentSunday.getDate() + advanceDays);
     maxDate.setHours(23, 59, 59, 999);
 
     return targetDate > maxDate;
@@ -855,7 +857,7 @@ async function fetchBookingsFromSupabase(silent = false) {
       const configRow = dbBookings.find(b => b.id === '00000000-0000-0000-0000-000000000001' || b.slot === 'config');
       if (configRow && configRow.name) {
         const val = configRow.name;
-        state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val);
+        state.config.advanceBookingMonths = (val === '14_days_sunday' || val === '21_days_sunday') ? val : parseInt(val);
         // อัปเดตตัวเลือกในดรอปดาวน์ของแอดมินด้วยหากแสดงผลอยู่
         const advanceSelect = document.getElementById('advanceBookingMonths');
         if (advanceSelect) {
@@ -2256,7 +2258,7 @@ function renderAdminDashboard() {
     }
     advanceSelect.onchange = async (e) => {
       const val = e.target.value;
-      state.config.advanceBookingMonths = (val === '14_days_sunday') ? val : parseInt(val, 10);
+      state.config.advanceBookingMonths = (val === '14_days_sunday' || val === '21_days_sunday') ? val : parseInt(val, 10);
       saveStateToStorage();
       
       showToast(state.language === 'th' ? "บันทึกเงื่อนไขการจองเรียบร้อยแล้ว" : "Advance booking setting updated.", 'success');
