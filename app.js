@@ -383,13 +383,15 @@ async function sendGasRequest(payload) {
   }
 }
 
-// Helper: Get Gregorian Year (Avoids Thai/Buddhist calendar issue in iOS/Safari/Intl)
+// Helper: Get Gregorian Year (Avoids Thai/Buddhist calendar issue in iOS/Safari)
 function getGregorianYear(date) {
-  if (!date) return new Date().getFullYear();
-  const d = (date instanceof Date && !isNaN(date)) ? date : new Date(date);
-  if (isNaN(d)) return new Date().getFullYear();
-  let y = d.getFullYear();
-  return y > 2400 ? y - 543 : y;
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', { year: 'numeric' });
+    return parseInt(formatter.format(date), 10);
+  } catch (e) {
+    const y = date.getFullYear();
+    return y > 2400 ? y - 543 : y;
+  }
 }
 
 // Helper: Get Year-Month String (e.g., "2026-05")
@@ -4020,19 +4022,6 @@ async function checkAdminSession() {
 // Start app
 async function init() {
   loadStateFromStorage();
-
-  // Guarantee valid Date objects for calendar rendering
-  if (!state.currentDate || isNaN(new Date(state.currentDate).getTime())) {
-    state.currentDate = new Date();
-  } else if (!(state.currentDate instanceof Date)) {
-    state.currentDate = new Date(state.currentDate);
-  }
-
-  if (!state.selectedDate || isNaN(new Date(state.selectedDate).getTime())) {
-    state.selectedDate = new Date();
-  } else if (!(state.selectedDate instanceof Date)) {
-    state.selectedDate = new Date(state.selectedDate);
-  }
 
   setupTabNavigation();
 
