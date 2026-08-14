@@ -2284,6 +2284,122 @@ function renderAdminDashboard() {
 
   renderBookingsTable();
   renderLedgerTable(filteredTxsForMetrics);
+  renderTimeSlotStats();
+}
+
+function renderTimeSlotStats() {
+  const dayHoursEl = document.getElementById('txtDayHours');
+  const nightHoursEl = document.getElementById('txtNightHours');
+  const dayPercentEl = document.getElementById('txtDayPercent');
+  const nightPercentEl = document.getElementById('txtNightPercent');
+  const dayBarEl = document.getElementById('barDayProgress');
+  const nightBarEl = document.getElementById('barNightProgress');
+  const tbody = document.getElementById('slotMonthlyComparisonTbody');
+
+  if (!dayHoursEl || !tbody) return;
+
+  const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
+  const yearFilter = document.getElementById('adminYearFilter')?.value || getGregorianYear(new Date()).toString();
+
+  // Filter out cancelled bookings
+  const activeBookings = state.bookings.filter(b => b.status !== 'cancelled');
+
+  // 1. Calculate stats for the selected Month / Year filter
+  let totalDayHours = 0;
+  let totalNightHours = 0;
+
+  activeBookings.forEach(b => {
+    let matchesMonth = true;
+    let matchesYear = true;
+
+    if (yearFilter && !b.date.startsWith(yearFilter)) matchesYear = false;
+    if (monthFilter) {
+      const parts = b.date.split('-');
+      if (parts.length < 2 || parts[1] !== monthFilter) matchesMonth = false;
+    }
+
+    if (matchesMonth && matchesYear) {
+      const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+      if (startHour >= 8 && startHour < 16) {
+        totalDayHours += 1;
+      } else if (startHour >= 16 && startHour <= 23) {
+        totalNightHours += 1;
+      }
+    }
+  });
+
+  const grandTotalHours = totalDayHours + totalNightHours;
+  const dayPct = grandTotalHours > 0 ? Math.round((totalDayHours / grandTotalHours) * 100) : 0;
+  const nightPct = grandTotalHours > 0 ? Math.round((totalNightHours / grandTotalHours) * 100) : 0;
+
+  dayHoursEl.textContent = totalDayHours.toLocaleString();
+  nightHoursEl.textContent = totalNightHours.toLocaleString();
+  dayPercentEl.textContent = `${dayPct}%`;
+  nightPercentEl.textContent = `${nightPct}%`;
+
+  if (dayBarEl) dayBarEl.style.width = `${dayPct}%`;
+  if (nightBarEl) nightBarEl.style.width = `${nightPct}%`;
+
+  // 2. Build Month-by-Month comparison for the active year
+  const monthNamesTh = [
+    "มกราคม (Jan)", "กุมภาพันธ์ (Feb)", "มีนาคม (Mar)", "เมษายน (Apr)",
+    "พฤษภาคม (May)", "มิถุนายน (Jun)", "กรกฎาคม (Jul)", "สิงหาคม (Aug)",
+    "กันยายน (Sep)", "ตุลาคม (Oct)", "พฤศจิกายน (Nov)", "ธันวาคม (Dec)"
+  ];
+  const monthNamesEn = [
+    "January", "February", "March", "April",
+    "May", "June", "July", "August",
+    "September", "October", "November", "December"
+  ];
+
+  tbody.innerHTML = '';
+
+  for (let m = 1; m <= 12; m++) {
+    const monthStr = String(m).padStart(2, '0');
+    let mDayHours = 0;
+    let mNightHours = 0;
+
+    activeBookings.forEach(b => {
+      if (b.date.startsWith(`${yearFilter}-${monthStr}`)) {
+        const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+        if (startHour >= 8 && startHour < 16) {
+          mDayHours += 1;
+        } else if (startHour >= 16 && startHour <= 23) {
+          mNightHours += 1;
+        }
+      }
+    });
+
+    const mTotal = mDayHours + mNightHours;
+    if (mTotal === 0 && monthFilter && monthFilter !== monthStr) {
+      continue;
+    }
+
+    const row = document.createElement('tr');
+    const isSelectedMonth = monthFilter === monthStr;
+    if (isSelectedMonth) {
+      row.style.background = 'rgba(217, 249, 157, 0.08)';
+    }
+
+    const monthLabel = state.language === 'th' ? monthNamesTh[m - 1] : monthNamesEn[m - 1];
+
+    row.innerHTML = `
+      <td>
+        <span style="font-weight: 600; color: ${isSelectedMonth ? 'var(--accent-color)' : 'var(--text-primary)'};">
+          ${monthLabel} ${yearFilter ? `(${yearFilter})` : ''}
+        </span>
+      </td>
+      <td style="color: #facc15; font-weight: 600;">${mDayHours.toLocaleString()} ชม.</td>
+      <td style="color: #60a5fa; font-weight: 600;">${mNightHours.toLocaleString()} ชม.</td>
+      <td style="font-weight: 700;">${mTotal.toLocaleString()} ชม.</td>
+    `;
+
+    tbody.appendChild(row);
+  }
+
+  if (tbody.children.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
+  }
 }
 
 // ----------------------------------------------------
