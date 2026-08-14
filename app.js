@@ -2245,13 +2245,10 @@ function renderAdminDashboard() {
 function renderTimeSlotStats() {
   const dayHoursEl = document.getElementById('txtDayHours');
   const nightHoursEl = document.getElementById('txtNightHours');
-  const rainoutHoursEl = document.getElementById('txtRainoutHours');
   const dayPercentEl = document.getElementById('txtDayPercent');
   const nightPercentEl = document.getElementById('txtNightPercent');
-  const rainoutPercentEl = document.getElementById('txtRainoutPercent');
   const dayBarEl = document.getElementById('barDayProgress');
   const nightBarEl = document.getElementById('barNightProgress');
-  const rainoutBarEl = document.getElementById('barRainoutProgress');
   const tbody = document.getElementById('slotMonthlyComparisonTbody');
   const slotYearSelect = document.getElementById('slotStatYearFilter');
 
@@ -2268,40 +2265,30 @@ function renderTimeSlotStats() {
 
   let totalDayHours = 0;
   let totalNightHours = 0;
-  let totalRainoutHours = 0;
 
   activeBookings.forEach(b => {
     if (b.date && b.date.startsWith(`${activeYear}-${targetMonthStr}`)) {
-      const isRain = b.isRainout || (b.adminNotes && b.adminNotes.includes('[ฝนตก]'));
-      if (isRain) {
-        totalRainoutHours += 1;
-      } else {
-        const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
-        if (startHour >= 8 && startHour < 16) {
-          totalDayHours += 1;
-        } else if (startHour >= 16 && startHour <= 23) {
-          totalNightHours += 1;
-        }
+      const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+      if (startHour >= 8 && startHour < 16) {
+        totalDayHours += 1;
+      } else if (startHour >= 16 && startHour <= 23) {
+        totalNightHours += 1;
       }
     }
   });
 
-  const totalBookedHours = totalDayHours + totalNightHours + totalRainoutHours;
+  const totalBookedHours = totalDayHours + totalNightHours;
   const dayPct = totalBookedHours > 0 ? Math.round((totalDayHours / totalBookedHours) * 100) : 0;
   const nightPct = totalBookedHours > 0 ? Math.round((totalNightHours / totalBookedHours) * 100) : 0;
-  const rainoutPct = totalBookedHours > 0 ? Math.round((totalRainoutHours / totalBookedHours) * 100) : 0;
 
   dayHoursEl.textContent = totalDayHours.toLocaleString();
   nightHoursEl.textContent = totalNightHours.toLocaleString();
-  if (rainoutHoursEl) rainoutHoursEl.textContent = totalRainoutHours.toLocaleString();
 
   if (dayPercentEl) dayPercentEl.textContent = `${dayPct}%`;
   if (nightPercentEl) nightPercentEl.textContent = `${nightPct}%`;
-  if (rainoutPercentEl) rainoutPercentEl.textContent = `${rainoutPct}%`;
 
   if (dayBarEl) dayBarEl.style.width = `${dayPct}%`;
   if (nightBarEl) nightBarEl.style.width = `${nightPct}%`;
-  if (rainoutBarEl) rainoutBarEl.style.width = `${rainoutPct}%`;
 
   const monthNamesTh = [
     "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
@@ -2320,25 +2307,19 @@ function renderTimeSlotStats() {
     const monthStr = String(m).padStart(2, '0');
     let mDayHours = 0;
     let mNightHours = 0;
-    let mRainoutHours = 0;
 
     activeBookings.forEach(b => {
       if (b.date && b.date.startsWith(`${activeYear}-${monthStr}`)) {
-        const isRain = b.isRainout || (b.adminNotes && b.adminNotes.includes('[ฝนตก]'));
-        if (isRain) {
-          mRainoutHours += 1;
-        } else {
-          const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
-          if (startHour >= 8 && startHour < 16) {
-            mDayHours += 1;
-          } else if (startHour >= 16 && startHour <= 23) {
-            mNightHours += 1;
-          }
+        const startHour = parseInt((b.slot || '').split(' - ')[0] || '0', 10);
+        if (startHour >= 8 && startHour < 16) {
+          mDayHours += 1;
+        } else if (startHour >= 16 && startHour <= 23) {
+          mNightHours += 1;
         }
       }
     });
 
-    const mNetTotal = mDayHours + mNightHours;
+    const mTotal = mDayHours + mNightHours;
     const isSelectedMonth = targetMonthStr === monthStr;
 
     const row = document.createElement('tr');
@@ -2357,15 +2338,14 @@ function renderTimeSlotStats() {
       </td>
       <td style="color: #facc15; font-weight: 600; padding: 0.4rem 0.6rem;">${mDayHours.toLocaleString()} ชม.</td>
       <td style="color: #60a5fa; font-weight: 600; padding: 0.4rem 0.6rem;">${mNightHours.toLocaleString()} ชม.</td>
-      <td style="color: #f87171; font-weight: 600; padding: 0.4rem 0.6rem;">${mRainoutHours.toLocaleString()} ชม.</td>
-      <td style="font-weight: 700; padding: 0.4rem 0.6rem;">${mNetTotal.toLocaleString()} ชม.</td>
+      <td style="font-weight: 700; padding: 0.4rem 0.6rem;">${mTotal.toLocaleString()} ชม.</td>
     `;
 
     tbody.appendChild(row);
   }
 
   if (tbody.children.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 1rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1rem;">${state.language === 'th' ? 'ไม่มีข้อมูลการจองในปีนี้' : 'No booking data for this year'}</td></tr>`;
   }
 }
     gasUrlInput.value = state.config.gasUrl || '';
