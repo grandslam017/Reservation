@@ -244,6 +244,27 @@ const translations = {
   }
 };
 
+// Helper: Parse YYYY-MM-DD cleanly as local Date without UTC midnight timezone shifting
+function parseLocalDate(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return new Date();
+  const parts = dateStr.split('T')[0].split('-').map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
+    return new Date(dateStr);
+  }
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+// Helper: Safely convert date string + slot time to Date object for sorting/comparison
+function parseBookingDateTime(dateStr, slotStr) {
+  if (!dateStr) return new Date(0);
+  const startTime = (slotStr || '').split(' - ')[0] || '00:00';
+  const timeParts = startTime.split(':').map(Number);
+  const hh = String(isNaN(timeParts[0]) ? 0 : timeParts[0]).padStart(2, '0');
+  const mm = String(isNaN(timeParts[1]) ? 0 : timeParts[1]).padStart(2, '0');
+  const cleanDate = dateStr.split('T')[0];
+  return new Date(`${cleanDate}T${hh}:${mm}:00`);
+}
+
 // Global App State
 const state = {
   bookings: [],
@@ -809,24 +830,28 @@ async function fetchBookingsFromSupabase(silent = false) {
       // Filter out cancelled bookings in JavaScript to preserve rows where status is NULL/undefined (legacy bookings)
       const activeData = data.filter(b => b.status !== 'cancelled');
       
-      const dbBookings = activeData.map(b => ({
-        id: b.id,
-        date: b.booking_date,
-        slot: b.time_slot,
-        name: b.customer_name,
-        phone: b.phone,
-        email: b.email,
-        lineIdInput: b.line_id_input,
-        lineUserId: b.line_user_id,
-        slipUrl: b.slip_url,
-        invoiceNo: b.invoice_no,
-        receiptNo: b.receipt_no,
-        court: b.court,
-        requireCoach: b.require_coach,
-        fee: parseFloat(b.fee) || 0,
-        adminNotes: b.admin_notes || "",
-        calendarEventId: b.calendar_event_id || ""
-      }));
+      const dbBookings = activeData.map(b => {
+        const notes = b.admin_notes || "";
+        return {
+          id: b.id,
+          date: b.booking_date,
+          slot: b.time_slot,
+          name: b.customer_name,
+          phone: b.phone,
+          email: b.email,
+          lineIdInput: b.line_id_input,
+          lineUserId: b.line_user_id,
+          slipUrl: b.slip_url,
+          invoiceNo: b.invoice_no,
+          receiptNo: b.receipt_no,
+          court: b.court,
+          requireCoach: b.require_coach,
+          fee: parseFloat(b.fee) || 0,
+          adminNotes: notes,
+          isRainout: notes.includes('[ฝนตก]'),
+          calendarEventId: b.calendar_event_id || ""
+        };
+      });
       
       // ดึงการตั้งค่าล็อกเดือนจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
       const configRow = dbBookings.find(b => b.id === '00000000-0000-0000-0000-000000000001' || b.slot === 'config');
@@ -938,43 +963,50 @@ async function saveSystemConfigToSupabase(id, slot, value) {
 }
 
 async function addTransactionToSupabase(tx) {
+  const txObj = {
+    id: tx.id || generateUUID(),
+    date: tx.date,
+    type: tx.type,
+    category: tx.category,
+    amount: parseFloat(tx.amount) || 0,
+    description: tx.description || '',
+    bookingId: tx.bookingId || null
+  };
+
   if (!supabaseClient) {
-    state.transactions.push({
-      id: tx.id || generateUUID(),
-      ...tx
-    });
+    state.transactions.push(txObj);
     saveStateToStorage();
-    return;
+    return txObj;
   }
   try {
     const { data, error } = await supabaseClient
       .from('transactions')
       .insert([{
-        transaction_date: tx.date,
-        type: tx.type,
-        category: tx.category,
-        amount: tx.amount,
-        description: tx.description,
-        booking_id: tx.bookingId || null
+        transaction_date: txObj.date,
+        type: txObj.type,
+        category: txObj.category,
+        amount: txObj.amount,
+        description: txObj.description,
+        booking_id: txObj.bookingId
       }])
       .select();
 
     if (error) throw error;
     
     if (data && data[0]) {
-      state.transactions.push({
-        id: data[0].id,
-        date: data[0].transaction_date,
-        type: data[0].type,
-        category: data[0].category,
-        amount: parseFloat(data[0].amount),
-        description: data[0].description,
-        bookingId: data[0].booking_id
-      });
-      saveStateToStorage();
+      txObj.id = data[0].id;
+      txObj.date = data[0].transaction_date;
     }
+    state.transactions.push(txObj);
+    saveStateToStorage();
+    return txObj;
   } catch (error) {
     console.error("Failed to save transaction to Supabase:", error);
+    // Push locally so transaction is never lost silently
+    state.transactions.push(txObj);
+    saveStateToStorage();
+    showToast(state.language === 'th' ? "บันทึกในเครื่องเรียบร้อย (เซิร์ฟเวอร์ตอบกลับผิดพลาด)" : "Saved locally (Server error)", 'warning');
+    return txObj;
   }
 }
 
@@ -984,7 +1016,8 @@ async function fetchTransactionsFromSupabase() {
     const { data, error } = await supabaseClient
       .from('transactions')
       .select('*')
-      .order('transaction_date', { ascending: false });
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
@@ -2283,8 +2316,12 @@ function initAdminForms() {
       const desc = descEl.value.trim();
       const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
-      if (!date || amount <= 0) {
+      if (!date) {
         showToast(translations[state.language].toastFillRequired, 'error');
+        return;
+      }
+      if (amount <= 0) {
+        showToast(state.language === 'th' ? 'กรุณาระบุจำนวนเงินที่มากกว่า 0 บาท' : 'Please enter an amount greater than 0', 'error');
         return;
       }
 
@@ -2597,7 +2634,7 @@ function renderBookingsTable() {
   }
 
   // Sort bookings: newest bookings first
-  filteredBookings.sort((a, b) => new Date(b.date + 'T' + b.slot.split(' - ')[0]) - new Date(a.date + 'T' + a.slot.split(' - ')[0]));
+  filteredBookings.sort((a, b) => parseBookingDateTime(b.date, b.slot) - parseBookingDateTime(a.date, a.slot));
 
   // Get Admin Search query
   const query = document.getElementById('bookingSearchInput')?.value.toLowerCase().trim() || '';
@@ -2619,31 +2656,51 @@ function renderBookingsTable() {
     const row = document.createElement('tr');
     
     const dOpt = { day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = new Date(booking.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
+    const formattedDate = parseLocalDate(booking.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
 
     const coachBadgeText = booking.requireCoach ? 
       translations[state.language].txtNeedCoach : translations[state.language].txtNoCoach;
     const coachBadgeClass = booking.requireCoach ? 'badge coach' : 'badge no-coach';
 
     // Check if booking has already passed
-    const slotEndTimeStr = booking.slot.split(' - ')[1];
-    const bookingEndDateTime = new Date(`${booking.date}T${slotEndTimeStr}:00`);
+    const rawEndTime = ((booking.slot || '').split(' - ')[1] || '00:00').trim();
+    const endParts = rawEndTime.split(':').map(Number);
+    const endHH = String(isNaN(endParts[0]) ? 0 : endParts[0]).padStart(2, '0');
+    const endMM = String(isNaN(endParts[1]) ? 0 : endParts[1]).padStart(2, '0');
+    const cleanDate = (booking.date || '').split('T')[0];
+    const bookingEndDateTime = new Date(`${cleanDate}T${endHH}:${endMM}:00`);
     const isPast = bookingEndDateTime < new Date();
 
+    const isRainout = booking.isRainout || (booking.adminNotes || '').includes('[ฝนตก]');
+
     let actionCellHTML = '';
-    if (isPast) {
+    if (isRainout) {
       actionCellHTML = `
+        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.35rem 0.65rem; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+          <i class="fa-solid fa-cloud-rain"></i> ${state.language === 'th' ? 'ฝนตก (หักรายได้แล้ว)' : 'Rainout (-Fee)'}
+        </span>
+        <button class="btn-undo-rainout" data-undo-id="${booking.id}" title="${state.language === 'th' ? 'ยกเลิกสถานะฝนตก (คืนค่ารายได้)' : 'Undo Rainout'}" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; font-size: 0.85rem; display: inline-flex; align-items: center; transition: color 0.2s;">
+          <i class="fa-solid fa-rotate-left"></i>
+        </button>
+      `;
+    } else {
+      const normalButtons = isPast ? `
         <span class="badge" style="background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">
           <i class="fa-solid fa-circle-check"></i> ${state.language === 'th' ? 'สำเร็จ' : 'Completed'}
         </span>
-      `;
-    } else {
-      actionCellHTML = `
+      ` : `
         <button class="btn-reschedule" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: opacity 0.2s;">
           <i class="fa-regular fa-clock"></i> ${state.language === 'th' ? 'เลื่อนเวลา' : 'Reschedule'}
         </button>
         <button class="btn-danger-sm" data-cancel-id="${booking.id}">
           <i class="fa-regular fa-trash-can"></i> ${translations[state.language].btnCancelBooking}
+        </button>
+      `;
+
+      actionCellHTML = `
+        ${normalButtons}
+        <button class="btn-rainout-sm" data-rain-id="${booking.id}" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s;" title="${state.language === 'th' ? 'ระบุว่าฝนตกเพื่อหักลบรายได้' : 'Mark as Rainout'}">
+          <i class="fa-solid fa-cloud-rain"></i> ${state.language === 'th' ? 'ฝนตก' : 'Rainout'}
         </button>
       `;
     }
@@ -2699,6 +2756,20 @@ function renderBookingsTable() {
       });
     }
 
+    const rainoutBtn = row.querySelector('.btn-rainout-sm');
+    if (rainoutBtn) {
+      rainoutBtn.addEventListener('click', () => {
+        markBookingAsRainout(booking.id);
+      });
+    }
+
+    const undoRainoutBtn = row.querySelector('.btn-undo-rainout');
+    if (undoRainoutBtn) {
+      undoRainoutBtn.addEventListener('click', () => {
+        undoBookingRainout(booking.id);
+      });
+    }
+
     const editCustBtn = row.querySelector('.btn-edit-cust-info');
     if (editCustBtn) {
       editCustBtn.addEventListener('click', () => {
@@ -2749,11 +2820,18 @@ function renderLedgerTable(filteredTxs) {
   tbody.innerHTML = '';
 
   const txsSource = filteredTxs || state.transactions;
-  const sortedTxs = [...txsSource].sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Reverse before sorting to keep newly added items for the same date at the top
+  const sortedTxs = [...txsSource].reverse().sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
 
   if (sortedTxs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-receipt"></i>${state.language === 'th' ? 'ไม่มีรายการประวัติการเงิน' : 'No transactions recorded'}</td></tr>`;
     return;
+  }
+
+  // Scroll table container to top to show newly added row immediately
+  const tableContainer = tbody.closest('.table-responsive') || tbody.parentElement;
+  if (tableContainer) {
+    tableContainer.scrollTop = 0;
   }
 
   const limitedTxs = sortedTxs.slice(0, 50);
@@ -2780,7 +2858,7 @@ function renderLedgerTable(filteredTxs) {
     else if (tx.category === 'Other Expense') labelCat = currentDict.txtOtherExpenseCat;
 
     const dOpt = { day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = new Date(tx.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
+    const formattedDate = parseLocalDate(tx.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
     
     const amountVal = parseFloat(tx.amount) || 0;
     const amountColor = tx.type === 'income' ? 'text-green' : 'text-red';
@@ -2860,6 +2938,104 @@ async function cancelBooking(bookingId) {
   renderCalendar();
   renderTimeSlots();
   renderAdminDashboard();
+}
+
+async function markBookingAsRainout(bookingId) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+
+  const confirmMsg = state.language === 'th' ?
+    `ยืนยันระบุรายการจองของ '${booking.name}' เวลา [${booking.slot}] เป็น 'ฝนตก'?\n\n(ระบบจะทำการหักลบรายได้จำนวน ${booking.fee.toLocaleString()} บาท ออกจาก Dashboard อัตโนมัติ โดยยังคงบันทึกคิวบนปฏิทินไว้ตามเดิม)` :
+    `Mark booking for '${booking.name}' [${booking.slot}] as 'Rainout'?\n\n(This will deduct ${booking.fee} ฿ from revenue metrics while keeping the slot reserved on the calendar).`;
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast(state.language === 'th' ? "กำลังปรับปรุงข้อมูล..." : "Updating...", 'info');
+
+    // 1. Delete associated transaction from Supabase (if connected)
+    if (supabaseClient) {
+      const { error: txErr } = await supabaseClient
+        .from('transactions')
+        .delete()
+        .eq('booking_id', bookingId);
+      if (txErr) console.warn("Error deleting transaction for rainout:", txErr);
+    }
+
+    // 2. Remove from local state.transactions
+    state.transactions = state.transactions.filter(tx => tx.bookingId !== bookingId && tx.id !== 'tx_b_' + bookingId);
+
+    // 3. Mark booking as rainout and append [ฝนตก] tag to adminNotes
+    booking.isRainout = true;
+    const rainTag = '[ฝนตก]';
+    if (!booking.adminNotes) {
+      booking.adminNotes = rainTag;
+    } else if (!booking.adminNotes.includes(rainTag)) {
+      booking.adminNotes = `${rainTag} ${booking.adminNotes}`;
+    }
+
+    if (supabaseClient) {
+      await updateBookingNoteInSupabase(booking.id, booking.adminNotes);
+    }
+
+    // 4. Record Admin Log
+    logAdminActionToGas(
+      "ระบุฝนตก (Rainout)", 
+      booking.name, 
+      booking.phone || "-", 
+      `ระบุฝนตกวันที่ ${booking.date} (${booking.slot}) หักรายได้ ${booking.fee} ฿`
+    );
+
+    saveStateToStorage();
+    showToast(state.language === 'th' ? "ระบุรายการเป็น 'ฝนตก' และหักลบรายได้เรียบร้อยแล้ว" : "Marked as Rainout and deducted revenue successfully", 'success');
+    renderAdminDashboard();
+  } catch (err) {
+    console.error("Failed to mark booking as rainout:", err);
+    showToast(state.language === 'th' ? "ไม่สามารถปรับสถานะฝนตกได้" : "Failed to mark as rainout", 'error');
+  }
+}
+
+async function undoBookingRainout(bookingId) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+
+  const confirmMsg = state.language === 'th' ?
+    `คุณต้องการยกเลิกสถานะ 'ฝนตก' ของคุณ '${booking.name}' และคืนค่ารายได้ (${booking.fee.toLocaleString()} บาท) เข้าสู่ Dashboard ใช่หรือไม่?` :
+    `Undo Rainout for '${booking.name}' and restore ${booking.fee} ฿ revenue?`;
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    showToast(state.language === 'th' ? "กำลังคืนค่ารายได้..." : "Restoring revenue...", 'info');
+
+    // 1. Re-add revenue transaction
+    const courtTx = {
+      id: 'tx_b_' + booking.id,
+      date: booking.date,
+      type: 'income',
+      category: 'Court Rental',
+      amount: booking.fee,
+      description: `ค่าเช่าสนาม: คุณ ${booking.name} (${booking.slot}) [Receipt: ${booking.receiptNo || 'N/A'}]` + (booking.requireCoach ? ' (+โค้ช)' : ''),
+      bookingId: booking.id
+    };
+    await addTransactionToSupabase(courtTx);
+
+    // 2. Remove [ฝนตก] tag from admin notes & state
+    booking.isRainout = false;
+    if (booking.adminNotes) {
+      booking.adminNotes = booking.adminNotes.replace(/\[ฝนตก\]\s*/g, '').trim();
+      if (supabaseClient) {
+        await updateBookingNoteInSupabase(booking.id, booking.adminNotes);
+      }
+    }
+
+    saveStateToStorage();
+    showToast(state.language === 'th' ? "คืนค่ารายได้เรียบร้อยแล้ว" : "Restored revenue successfully", 'success');
+    renderAdminDashboard();
+  } catch (err) {
+    console.error("Failed to undo rainout:", err);
+    showToast(state.language === 'th' ? "ไม่สามารถคืนค่ารายได้ได้" : "Failed to restore revenue", 'error');
+  }
 }
 
 // === Reschedule Booking functions ===
@@ -3059,7 +3235,7 @@ function openRescheduleModal(booking) {
     
     inputDate.value = booking.date;
     rescheduleSelectedDateStr = booking.date;
-    rescheduleCalendarDate = new Date(booking.date);
+    rescheduleCalendarDate = parseLocalDate(booking.date);
     selectSlot.value = booking.slot;
     modal.style.display = 'flex';
 
@@ -3545,7 +3721,7 @@ function performBookingSearch(query, isSilent = false) {
   }
 
   // Sort results: newest bookings first
-  results.sort((a, b) => new Date(b.date + 'T' + b.slot.split(' - ')[0]) - new Date(a.date + 'T' + a.slot.split(' - ')[0]));
+  results.sort((a, b) => parseBookingDateTime(b.date, b.slot) - parseBookingDateTime(a.date, a.slot));
 
   // Calculate stats for matching bookings
   const totalHours = results.length;
@@ -3562,7 +3738,7 @@ function performBookingSearch(query, isSilent = false) {
     const row = document.createElement('tr');
     
     const dOpt = { day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = new Date(booking.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
+    const formattedDate = parseLocalDate(booking.date).toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', dOpt);
 
     const coachBadgeText = booking.requireCoach ? 
       translations[state.language].txtNeedCoach : translations[state.language].txtNoCoach;

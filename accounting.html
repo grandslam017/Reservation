@@ -680,7 +680,7 @@
       config: {
         supabaseUrl: localConfig.supabaseUrl || 'https://eqwmodrhorcbwsshbepg.supabase.co',
         supabaseKey: localConfig.supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY',
-        adminPassword: localConfig.adminPassword || 'Zxcv1234'
+        adminPassword: localConfig.adminPassword || ''
       },
       accounting: {
         depreciationRate: 5,
@@ -731,8 +731,8 @@
       }
 
       // 2. Fallback static validation (Offline or test mode)
-      const staticPassword = state.config.adminPassword || 'Zxcv1234';
-      if (enteredPassword === staticPassword || enteredPassword === 'Zxcv1234') {
+      const staticPassword = state.config.adminPassword;
+      if (staticPassword && enteredPassword === staticPassword) {
         loginSuccessful = true;
       }
 
@@ -1083,8 +1083,9 @@
       filtered.forEach(tx => {
         const tr = document.createElement('tr');
         
-        const dParts = tx.transaction_date.split('-');
-        const formattedDate = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
+        const rawDate = (tx.transaction_date || '').split('T')[0].split(' ')[0];
+        const dParts = rawDate.split('-');
+        const formattedDate = dParts.length === 3 ? `${dParts[2]}-${dParts[1]}-${dParts[0]}` : tx.transaction_date;
 
         const typeBadge = tx.type === 'income' 
           ? `<span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2);">รายรับ</span>`
