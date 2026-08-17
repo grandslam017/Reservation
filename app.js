@@ -290,7 +290,10 @@ const state = {
   currentSlipData: null,
   lastSearchQuery: "",
   isFetchingBookings: false,
-  autoRefreshTimer: null
+  autoRefreshTimer: null,
+  currentHoldId: null,
+  holdExpiresAt: null,
+  holdTimerInterval: null
 };
 
 // UUID Generator (RFC 4122 Compliant v4)
@@ -420,12 +423,16 @@ function isMonthLocked(date) {
     return false;
   }
 
-  // Check Sunday advance booking options (21_days_sunday or legacy 14_days_sunday)
+  // Check Sunday advance booking options (Cutoff at Sunday 09:00 AM)
   if (state.config.advanceBookingMonths === "14_days_sunday" || state.config.advanceBookingMonths === "21_days_sunday") {
-    // Find the most recent Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-    const currentDay = today.getDay(); 
-    const recentSunday = new Date(today);
-    recentSunday.setDate(today.getDate() - currentDay);
+    const now = new Date();
+    // If it's Sunday before 09:00 AM, the 09:00 AM cutoff has not passed yet, so treat recent Sunday as 7 days ago
+    let daysBack = now.getDay();
+    if (now.getDay() === 0 && now.getHours() < 9) {
+      daysBack = 7;
+    }
+    const recentSunday = new Date(now);
+    recentSunday.setDate(now.getDate() - daysBack);
     recentSunday.setHours(0, 0, 0, 0);
 
     const advanceDays = (state.config.advanceBookingMonths === "14_days_sunday") ? 14 : 21;
@@ -830,14 +837,26 @@ async function fetchBookingsFromSupabase(silent = false) {
       // Filter out cancelled bookings in JavaScript to preserve rows where status is NULL/undefined (legacy bookings)
       const activeData = data.filter(b => b.status !== 'cancelled');
       
+      const nowTs = Date.now();
       const dbBookings = activeData.map(b => {
         const notes = b.admin_notes || "";
+        let isPendingHold = (b.status === 'pending_hold');
+        let expTime = null;
+        let hId = null;
+        if (notes.includes('[pending_hold:')) {
+          const match = notes.match(/\[pending_hold:(\d+):([^\]]+)\]/);
+          if (match) {
+            expTime = parseInt(match[1], 10);
+            hId = match[2];
+            isPendingHold = true;
+          }
+        }
         return {
           id: b.id,
           date: b.booking_date,
           slot: b.time_slot,
-          name: b.customer_name,
-          phone: b.phone,
+          name: isPendingHold ? "ลูกค้ากำลังโอนเงิน" : b.customer_name,
+          phone: isPendingHold ? "-" : b.phone,
           email: b.email,
           lineIdInput: b.line_id_input,
           lineUserId: b.line_user_id,
@@ -848,9 +867,17 @@ async function fetchBookingsFromSupabase(silent = false) {
           requireCoach: b.require_coach,
           fee: parseFloat(b.fee) || 0,
           adminNotes: notes,
+          status: isPendingHold ? "pending_hold" : (b.status || "confirmed"),
+          holdId: hId,
+          holdExpiresAt: expTime,
           isRainout: notes.includes('[ฝนตก]'),
           calendarEventId: b.calendar_event_id || ""
         };
+      }).filter(b => {
+        if (b.status === 'pending_hold' && b.holdExpiresAt && nowTs >= b.holdExpiresAt) {
+          return false; // Filter out expired hold
+        }
+        return true;
       });
       
       // ดึงการตั้งค่าล็อกเดือนจากแถวพิเศษในฐานข้อมูล (ถ้ามี)
@@ -1233,6 +1260,131 @@ function renderTimeSlots() {
   }
 }
 
+// === 3-Minute Temporary Slot Hold Manager ===
+async function createSlotHold(dateStr, slots) {
+  const holdId = "hold_" + generateUUID();
+  const expiresAt = Date.now() + (3 * 60 * 1000); // 3 minutes = 180,000 ms
+
+  state.currentHoldId = holdId;
+  state.holdExpiresAt = expiresAt;
+
+  // Insert local hold entries into state.bookings
+  slots.forEach(slot => {
+    state.bookings.push({
+      id: generateUUID(),
+      date: dateStr,
+      slot: slot,
+      name: "ลูกค้ากำลังโอนเงิน",
+      phone: "-",
+      email: "",
+      holdId: holdId,
+      status: "pending_hold",
+      holdExpiresAt: expiresAt,
+      adminNotes: `[pending_hold:${expiresAt}:${holdId}]`,
+      court: "Main Court",
+      fee: getSlotPrice(slot)
+    });
+  });
+
+  // If Supabase is connected, write pending_hold entries to database
+  if (supabaseClient) {
+    try {
+      const dbHolds = slots.map(slot => ({
+        booking_date: dateStr,
+        time_slot: slot,
+        customer_name: "ลูกค้ากำลังโอนเงิน",
+        phone: "-",
+        email: "",
+        require_coach: state.requireCoach,
+        fee: getSlotPrice(slot),
+        invoice_no: "HOLD_" + holdId.substring(5, 13),
+        receipt_no: "HOLD",
+        status: "pending_hold",
+        admin_notes: `[pending_hold:${expiresAt}:${holdId}]`
+      }));
+      await supabaseClient.from('bookings').insert(dbHolds);
+    } catch (err) {
+      console.error("Failed to sync hold to Supabase:", err);
+    }
+  }
+
+  startHoldTimer();
+  renderTimeSlotsUI();
+}
+
+function startHoldTimer() {
+  if (state.holdTimerInterval) {
+    clearInterval(state.holdTimerInterval);
+    state.holdTimerInterval = null;
+  }
+
+  const updateTimerUI = () => {
+    if (!state.holdExpiresAt) return;
+    const remainingMs = state.holdExpiresAt - Date.now();
+    if (remainingMs <= 0) {
+      if (state.holdTimerInterval) clearInterval(state.holdTimerInterval);
+      state.holdTimerInterval = null;
+      releaseSlotHold(true);
+      return;
+    }
+
+    const totalSec = Math.ceil(remainingMs / 1000);
+    const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const secs = String(totalSec % 60).padStart(2, '0');
+    const countdownEl = document.getElementById('holdCountdownText');
+    if (countdownEl) countdownEl.textContent = `${mins}:${secs}`;
+  };
+
+  updateTimerUI();
+  state.holdTimerInterval = setInterval(updateTimerUI, 1000);
+}
+
+async function releaseSlotHold(isExpired = false) {
+  if (state.holdTimerInterval) {
+    clearInterval(state.holdTimerInterval);
+    state.holdTimerInterval = null;
+  }
+
+  const holdId = state.currentHoldId;
+  state.currentHoldId = null;
+  state.holdExpiresAt = null;
+
+  if (holdId) {
+    // Remove local holds
+    state.bookings = state.bookings.filter(b => {
+      if (b.holdId === holdId) return false;
+      if (b.adminNotes && b.adminNotes.includes(holdId)) return false;
+      return true;
+    });
+
+    // Delete holds from Supabase
+    if (supabaseClient) {
+      try {
+        await supabaseClient
+          .from('bookings')
+          .delete()
+          .like('admin_notes', `%${holdId}%`);
+      } catch (err) {
+        console.error("Failed to delete hold from Supabase:", err);
+      }
+    }
+  }
+
+  if (isExpired) {
+    showToast(
+      state.language === 'th'
+        ? "หมดเวลาชำระเงิน (3 นาที) ระบบได้ปลดล็อคช่วงเวลาให้ผู้อื่นจองแล้ว"
+        : "Payment time expired (3 mins). Slots released.",
+      'error'
+    );
+    const modal = document.getElementById('invoiceSlipModal');
+    if (modal) modal.style.display = 'none';
+    state.selectedSlots = [];
+    showSummaryPanel();
+    renderTimeSlotsUI();
+  }
+}
+
 // renderTimeSlotsUI: แสดง time slots จากข้อมูล state.bookings ปัจจุบัน
 function renderTimeSlotsUI() {
   const slotsGrid = document.getElementById('slotsGrid');
@@ -1241,6 +1393,22 @@ function renderTimeSlotsUI() {
   const lockedMonthPanel = document.getElementById('lockedMonthPanel');
 
   if (!slotsGrid || !titleEl || !activeSlotsPanel || !lockedMonthPanel) return;
+
+  // Filter out any expired holds from local state
+  const nowTs = Date.now();
+  state.bookings = state.bookings.filter(b => {
+    if (b.status === 'pending_hold' || (b.adminNotes && b.adminNotes.includes('[pending_hold:'))) {
+      let expTime = b.holdExpiresAt;
+      if (!expTime && b.adminNotes) {
+        const match = b.adminNotes.match(/\[pending_hold:(\d+):/);
+        if (match) expTime = parseInt(match[1], 10);
+      }
+      if (expTime && nowTs >= expTime) {
+        return false; // Expired hold!
+      }
+    }
+    return true;
+  });
 
   slotsGrid.innerHTML = '';
 
@@ -1267,9 +1435,11 @@ function renderTimeSlotsUI() {
     const endStr = String(hour + 1).padStart(2, '0') + ":00";
     const slot = `${startStr} - ${endStr}`;
 
-    // ค้นหาว่า slot นี้ถูกจองหรือไม่ พร้อมดึงข้อมูลผู้จอง
+    // ค้นหาว่า slot นี้ถูกจองหรือล็อคอยู่หรือไม่
     const bookedEntry = state.bookings.find(b => b.date === dateStr && b.slot === slot);
     const isBooked = !!bookedEntry;
+    const isPendingHold = isBooked && (bookedEntry.status === 'pending_hold' || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes('[pending_hold:')));
+    const isMyHold = isPendingHold && (bookedEntry.holdId === state.currentHoldId || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes(state.currentHoldId || '___NONE___')));
     
     // Check if this slot is in the past (for today's date)
     const now = new Date();
@@ -1278,7 +1448,11 @@ function renderTimeSlotsUI() {
     
     const slotItem = document.createElement('div');
     
-    if (isBooked || isPastSlot) {
+    if (isPendingHold && !isMyHold) {
+      // Held by another customer -> Anonymous "⏳ กำลังโอนเงิน"
+      slotItem.className = 'slot-item pending-hold';
+      slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.9; display: block; margin-top: 2px;">⏳ กำลังโอนเงิน</span>`;
+    } else if ((isBooked && !isPendingHold) || isPastSlot) {
       slotItem.className = 'slot-item booked';
       if (isBooked) {
         slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.8; display: block; margin-top: 2px;">🔒 จองแล้ว</span>`;
@@ -1596,15 +1770,22 @@ function initBookingWizard() {
         await fetchBookingsFromSupabase(true);
       }
       
-      // ตรวจสอบ collision หลัง fetch ล่าสุด
+      // ตรวจสอบ collision หลัง fetch ล่าสุด (รวมทั้งเวลาที่ผู้อื่นกำลังทำรายการโอนเงินอยู่)
+      const nowTs = Date.now();
       const collisionSlots = state.selectedSlots.filter(slot => 
-        state.bookings.some(b => b.date === dateStr && b.slot === slot)
+        state.bookings.some(b => {
+          if (b.date !== dateStr || b.slot !== slot) return false;
+          if (b.status === 'pending_hold') {
+            return b.holdExpiresAt && nowTs < b.holdExpiresAt && b.holdId !== state.currentHoldId;
+          }
+          return true; // Confirmed booking
+        })
       );
 
       if (collisionSlots.length > 0) {
         const collisionMsg = state.language === 'th' 
-          ? `เวลา ${collisionSlots.join(', ')} ถูกจองไปแล้ว! กรุณาเลือกเวลาใหม่` 
-          : `Slots ${collisionSlots.join(', ')} are already booked! Please choose another time.`;
+          ? `ขออภัย เวลา ${collisionSlots.join(', ')} มีผู้ใช้งานท่านอื่นกำลังทำรายการโอนเงินหรือถูกจองไปแล้ว! กรุณาเลือกเวลาใหม่` 
+          : `Slots ${collisionSlots.join(', ')} are currently being booked or already reserved! Please choose another time.`;
         showToast(collisionMsg, 'error');
         // ลบ slot ที่ชนออกจากที่เลือก
         state.selectedSlots = state.selectedSlots.filter(s => !collisionSlots.includes(s));
@@ -1613,6 +1794,9 @@ function initBookingWizard() {
         showSummaryPanel();
         return;
       }
+
+      // สร้างรายการล็อคเวลาชั่วคราว 3 นาที ป้องกันคนอื่นจองตัดหน้า
+      await createSlotHold(dateStr, state.selectedSlots);
 
       // Generate Invoice
       const invoiceNumber = 'INV.' + getRunningNumber('invoice');
@@ -1750,6 +1934,27 @@ function initBookingWizard() {
 
         // Close modal after successful upload
         document.getElementById('invoiceSlipModal').style.display = 'none';
+
+        // Stop hold timer interval and clear hold session
+        if (state.holdTimerInterval) {
+          clearInterval(state.holdTimerInterval);
+          state.holdTimerInterval = null;
+        }
+        const activeHoldId = state.currentHoldId;
+        state.currentHoldId = null;
+        state.holdExpiresAt = null;
+
+        // Delete temporary hold entries from Supabase before finalizing booking
+        if (activeHoldId && supabaseClient) {
+          try {
+            await supabaseClient
+              .from('bookings')
+              .delete()
+              .like('admin_notes', `%${activeHoldId}%`);
+          } catch (e) {
+            console.error("Failed to delete hold before confirmation:", e);
+          }
+        }
 
         const bookingKey = "bk_" + generateUUID();
 
@@ -1905,6 +2110,7 @@ function initBookingWizard() {
       // Close invoice modal if clicked X
       document.getElementById('btnInvoiceClose').onclick = () => {
         document.getElementById('invoiceSlipModal').style.display = 'none';
+        releaseSlotHold(false);
         state.selectedSlots = [];
         showSummaryPanel();
         renderTimeSlots();
@@ -2737,8 +2943,8 @@ function renderBookingsTable() {
   const monthFilter = document.getElementById('bookingMonthFilter')?.value || '';
   const yearFilter = document.getElementById('bookingYearFilter')?.value || '';
 
-  // Filter bookings first
-  let filteredBookings = [...state.bookings];
+  // Filter bookings first (exclude temporary pending_hold entries)
+  let filteredBookings = state.bookings.filter(b => b.status !== 'pending_hold');
   if (monthFilter && yearFilter) {
     filteredBookings = filteredBookings.filter(b => b.date.startsWith(`${yearFilter}-${monthFilter}`));
   } else if (monthFilter) {

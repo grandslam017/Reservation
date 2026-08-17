@@ -429,6 +429,7 @@ header {
 }
 
 .legend-dot.available { background-color: #10b981; }
+.legend-dot.pending-hold { background-color: #f59e0b; }
 .legend-dot.booked { background-color: #ef4444; }
 .legend-dot.selected { background-color: var(--accent-color); }
 
@@ -496,6 +497,13 @@ header {
   color: var(--booked-color) !important;
   cursor: not-allowed;
   text-decoration: line-through;
+}
+
+.slot-item.pending-hold {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid #f59e0b !important;
+  color: #fbbf24 !important;
+  cursor: not-allowed;
 }
 
 .slot-item.selected {
@@ -1438,4 +1446,6 @@ header {
   margin-bottom: 2px;
   opacity: 0.85;
 }
+
+
 

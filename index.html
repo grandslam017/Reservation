@@ -147,6 +147,10 @@
                   <span data-translate="legendAvailable">ว่าง</span>
                 </div>
                 <div class="legend-item">
+                  <div class="legend-dot pending-hold"></div>
+                  <span>กำลังโอนเงิน</span>
+                </div>
+                <div class="legend-item">
                   <div class="legend-dot booked"></div>
                   <span data-translate="legendBooked">จองแล้ว</span>
                 </div>
@@ -373,6 +377,12 @@
           <button id="btnInvoiceClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body" style="text-align: center; overflow-y: auto; flex: 1; padding: 1.25rem 1.5rem;">
+          <!-- 3-Minute Hold Countdown Timer Banner -->
+          <div id="holdTimerBanner" style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 0.6rem 0.8rem; border-radius: 10px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #fbbf24; font-weight: 600; font-size: 0.9rem;">
+            <i class="fa-solid fa-hourglass-half fa-spin" style="color: #f59e0b; font-size: 1rem;"></i>
+            <span>กรุณาชำระเงินและแนบสลิปภายใน <span id="holdCountdownText" style="color: #ffffff; font-size: 1.1rem; font-weight: 700; font-family: monospace;">03:00</span> นาที</span>
+          </div>
+
           <div class="invoice-box" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px dashed var(--accent-color); margin-bottom: 1rem;">
             <div style="font-size: 0.85rem; color: var(--text-secondary);">หมายเลขใบแจ้งหนี้ (Invoice No.)</div>
             <div id="invoiceNumber" style="font-size: 1.3rem; font-weight: 700; color: var(--accent-color); margin-bottom: 0.75rem;">-</div>
@@ -678,7 +688,7 @@
                 <option value="3">3 เดือนล่วงหน้า (3 Months Advance)</option>
                 <option value="6">6 เดือนล่วงหน้า (6 Months Advance)</option>
                 <option value="12">1 ปีล่วงหน้า (12 Months Advance)</option>
-                <option value="21_days_sunday">เปิดจองล่วงหน้า 21 วัน ทุกวันอาทิตย์ (21 Days Advance every Sunday 00:00)</option>
+                <option value="21_days_sunday">เปิดจองล่วงหน้า 21 วัน ทุกวันอาทิตย์ 09:00 น. (21 Days Advance every Sunday 09:00)</option>
                 <option value="99">เปิดจองตลอดไป (Unlimited)</option>
               </select>
             </div>
@@ -1199,7 +1209,7 @@
 
   <!-- Charts & Core Scripts -->
   <script src="charts.js?v=7"></script>
-  <script src="app.js?v=103"></script>
+  <script src="app.js?v=105"></script>
 </body>
 </html>
 
