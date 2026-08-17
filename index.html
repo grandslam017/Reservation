@@ -320,7 +320,7 @@
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
               <span style="color: var(--text-secondary);">วันที่ (Date):</span>
-              <span id="modalSelectedDate" style="font-weight:600; color: var(--text-primary);">-</span>
+              <span id="modalSelectedDate" style="font-weight:600; color: var(--accent-color);">-</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; align-items: flex-start;">
               <span style="color: var(--text-secondary); white-space: nowrap;">ช่วงเวลา (Time):</span>
@@ -328,11 +328,11 @@
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
               <span style="color: var(--text-secondary);">ผู้ฝึกสอน (Coach):</span>
-              <span id="modalSelectedCoach" style="font-weight:600; color: var(--text-primary);">-</span>
+              <span id="modalSelectedCoach" style="font-weight:600; color: var(--accent-color);">-</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--text-secondary);">อีเมล (Email):</span>
-              <span id="modalSelectedEmail" style="font-weight:600; color: var(--text-primary);">-</span>
+              <span id="modalSelectedEmail" style="font-weight:600; color: var(--accent-color);">-</span>
             </div>
           </div>
           
@@ -400,11 +400,18 @@
               <span id="invoiceAmount" style="font-weight: 700; color: var(--text-primary); font-size: 1rem;">-</span>
             </div>
             
-            <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 8px;">
+            <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 8px; text-align: center;">
               <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">บัญชีสำหรับโอนเงิน</div>
               <div style="font-weight: 600; color: #00c300; font-size: 0.9rem;"><i class="fa-solid fa-qrcode"></i> พร้อมเพย์ (PromptPay)</div>
-              <div style="font-size: 1.1rem; letter-spacing: 1px; color: #00e676; margin: 0.25rem 0;">0894932242</div>
-              <div style="font-size: 0.85rem;">ชื่อบัญชี: ณฐกร เอียสกุล</div>
+              <div style="font-size: 1.1rem; letter-spacing: 1px; color: #00e676; margin: 0.25rem 0; font-weight: bold;">0894932242</div>
+              
+              <div style="margin: 0.6rem 0; display: flex; justify-content: center;">
+                <div style="background: #ffffff; padding: 8px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); display: inline-block;">
+                  <img src="promptpay_qr.png" alt="PromptPay QR Code" style="width: 170px; height: 170px; display: block; border-radius: 6px;">
+                </div>
+              </div>
+
+              <div style="font-size: 0.85rem; color: var(--text-primary);">ชื่อบัญชี: <strong>ณฐกร เอียสกุล</strong></div>
             </div>
           </div>
 
@@ -1209,7 +1216,7 @@
 
   <!-- Charts & Core Scripts -->
   <script src="charts.js?v=7"></script>
-  <script src="app.js?v=105"></script>
+  <script src="app.js?v=106"></script>
 </body>
 </html>
 
