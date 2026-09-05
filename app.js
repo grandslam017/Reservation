@@ -781,12 +781,42 @@ function initSupabaseClient() {
   }
 }
 
-async function syncBookingWithSupabase(booking) {
+async function syncBookingWithSupabase(booking, activeHoldId = null) {
   if (!supabaseClient) {
     return { status: "local" };
   }
 
   try {
+    // If there is an active hold for this slot in Supabase, update the existing hold row directly to 'confirmed'
+    if (activeHoldId) {
+      const { data: updateData, error: updateError } = await supabaseClient
+        .from('bookings')
+        .update({
+          customer_name: booking.name,
+          phone: booking.phone,
+          email: booking.email,
+          line_id_input: booking.lineIdInput,
+          line_user_id: booking.lineUserId,
+          slip_url: booking.slipUrl || null,
+          invoice_no: booking.invoiceNo,
+          receipt_no: booking.receiptNo,
+          court: booking.court,
+          require_coach: booking.requireCoach,
+          fee: booking.fee,
+          status: 'confirmed',
+          admin_notes: '' // Clear hold notes
+        })
+        .eq('booking_date', booking.date)
+        .eq('time_slot', booking.slot)
+        .like('admin_notes', `%${activeHoldId}%`)
+        .select();
+
+      if (!updateError && updateData && updateData.length > 0) {
+        return { status: "success", data: updateData[0] };
+      }
+    }
+
+    // Fallback: If no hold row was updated, insert a new row
     const { data, error } = await supabaseClient
       .from('bookings')
       .insert([{
@@ -851,9 +881,19 @@ async function fetchBookingsFromSupabase(silent = false) {
             isPendingHold = true;
           }
         }
+        let rawDate = b.booking_date;
+        let normalizedDate = rawDate;
+        if (rawDate) {
+          if (rawDate instanceof Date) {
+            normalizedDate = formatDateString(rawDate);
+          } else if (typeof rawDate === 'string') {
+            normalizedDate = rawDate.split('T')[0].trim();
+          }
+        }
+
         return {
           id: b.id,
-          date: b.booking_date,
+          date: normalizedDate,
           slot: b.time_slot,
           name: isPendingHold ? "ลูกค้ากำลังโอนเงิน" : b.customer_name,
           phone: isPendingHold ? "-" : b.phone,
@@ -1293,8 +1333,8 @@ async function createSlotHold(dateStr, slots) {
         booking_date: dateStr,
         time_slot: slot,
         customer_name: "ลูกค้ากำลังโอนเงิน",
-        phone: "-",
-        email: "",
+        phone: "0800000000",
+        email: "hold@grandslam.com",
         require_coach: state.requireCoach,
         fee: getSlotPrice(slot),
         invoice_no: "HOLD_" + holdId.substring(5, 13),
@@ -1302,7 +1342,10 @@ async function createSlotHold(dateStr, slots) {
         status: "pending_hold",
         admin_notes: `[pending_hold:${expiresAt}:${holdId}]`
       }));
-      await supabaseClient.from('bookings').insert(dbHolds);
+      const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
+      if (error) {
+        console.error("Supabase Hold Insert Error:", error);
+      }
     } catch (err) {
       console.error("Failed to sync hold to Supabase:", err);
     }
@@ -1605,9 +1648,33 @@ function initBookingWizard() {
   const btnModalConfirm = document.getElementById('btnModalConfirm');
 
   if (btnBookNow && modal) {
-    btnBookNow.addEventListener('click', () => {
+    btnBookNow.addEventListener('click', async () => {
       if (state.selectedSlots.length === 0) {
         showToast(translations[state.language].toastSelectSlot, 'error');
+        return;
+      }
+      
+      // Check if selected slots were recently held or booked by someone else
+      const dateStr = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
+      const nowTs = Date.now();
+      const collisionSlots = state.selectedSlots.filter(slot =>
+        state.bookings.some(b => {
+          if (b.date !== dateStr || b.slot !== slot) return false;
+          if (b.status === 'pending_hold') {
+            return b.holdExpiresAt && nowTs < b.holdExpiresAt && b.holdId !== state.currentHoldId;
+          }
+          return true;
+        })
+      );
+
+      if (collisionSlots.length > 0) {
+        const collisionMsg = state.language === 'th'
+          ? `ขออภัย เวลา ${collisionSlots.join(', ')} มีผู้ใช้งานท่านอื่นกำลังทำรายการโอนเงินหรือถูกจองไปแล้ว!`
+          : `Slots ${collisionSlots.join(', ')} are currently being booked or already reserved!`;
+        showToast(collisionMsg, 'error');
+        state.selectedSlots = state.selectedSlots.filter(s => !collisionSlots.includes(s));
+        renderTimeSlotsUI();
+        showSummaryPanel();
         return;
       }
       
@@ -1809,9 +1876,9 @@ function initBookingWizard() {
       document.getElementById('invoiceAmount').textContent = `${invoiceAmount.toLocaleString()} ฿`;
       
       // Reset Slip UI
-      document.getElementById('slipUpload').value = '';
-      document.getElementById('slipValidationLoader').style.display = 'none';
-      document.getElementById('receiptBox').style.display = 'none';
+      const fileInputEl = document.getElementById('slipUpload') || document.getElementById('slipInput'); if (fileInputEl) fileInputEl.value = '';
+      if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
+      if (document.getElementById('receiptBox')) document.getElementById('receiptBox').style.display = 'none';
       document.getElementById('btnConfirmPayment').style.display = 'block';
       document.getElementById('btnFinishBooking').style.display = 'none';
 
@@ -1825,7 +1892,7 @@ function initBookingWizard() {
       let receiptNumber = '';
       
       btnConfirmPayment.onclick = () => {
-        const fileInput = document.getElementById('slipUpload');
+        const fileInput = document.getElementById('slipUpload') || document.getElementById('slipInput');
         if (!fileInput.files || fileInput.files.length === 0) {
           showToast('กรุณาแนบหลักฐานการโอนเงินก่อนแจ้งชำระ', 'error');
           return;
@@ -1878,7 +1945,7 @@ function initBookingWizard() {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             
-            document.getElementById('slipValidationLoader').style.display = 'none';
+            if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
             
             receiptNumber = 'R.' + invoiceNumber.replace('INV.', '');
             document.getElementById('receiptNumber').textContent = receiptNumber;
@@ -1944,21 +2011,9 @@ function initBookingWizard() {
         state.currentHoldId = null;
         state.holdExpiresAt = null;
 
-        // Delete temporary hold entries from Supabase before finalizing booking
-        if (activeHoldId && supabaseClient) {
-          try {
-            await supabaseClient
-              .from('bookings')
-              .delete()
-              .like('admin_notes', `%${activeHoldId}%`);
-          } catch (e) {
-            console.error("Failed to delete hold before confirmation:", e);
-          }
-        }
-
         const bookingKey = "bk_" + generateUUID();
 
-        // 2. Insert bookings
+        // 2. Insert/Update bookings in Supabase
         for (const slot of slotsBooked) {
           const bookingId = generateUUID();
           const slotPrice = getSlotPrice(slot);
@@ -1980,7 +2035,7 @@ function initBookingWizard() {
             receiptNo: receiptNumber
           };
 
-          const result = await syncBookingWithSupabase(newBooking);
+          const result = await syncBookingWithSupabase(newBooking, activeHoldId);
 
           if (result && result.status === "collision") {
              hasCollision = true;
@@ -3962,6 +4017,31 @@ async function initLiff() {
     await new Promise(resolve => setTimeout(resolve, 100));
     retries++;
   }
+
+  // === Auto-refresh mechanism ===
+  // Fetch latest bookings from Supabase every 4 seconds to keep timeslots updated in real-time
+  if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
+  state.autoRefreshTimer = setInterval(async () => {
+    if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
+      // Fetch data silently
+      await fetchBookingsFromSupabase(true);
+      
+      // If user is viewing the slots, re-render them smoothly
+      if (document.getElementById('booking').classList.contains('active')) {
+        renderTimeSlotsUI();
+      }
+      
+      // If user is viewing the availability grid, re-render it smoothly
+      if (document.getElementById('availability').classList.contains('active')) {
+        renderAvailabilityGrid();
+      }
+      
+      // If admin is viewing the admin dashboard, re-render dashboard
+      if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+        renderAdminDashboard();
+      }
+    }
+  }, 4000);
 
   if (state.config.liffId && typeof liff !== 'undefined') {
     try {
