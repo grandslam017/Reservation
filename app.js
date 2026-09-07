@@ -969,6 +969,9 @@ async function fetchBookingsFromSupabase(silent = false) {
     }
   } finally {
     state.isFetchingBookings = false;
+    if (document.getElementById('booking') && document.getElementById('booking').classList.contains('active')) {
+      renderTimeSlotsUI();
+    }
   }
 }
 
@@ -2040,8 +2043,13 @@ function initBookingWizard() {
           if (result && result.status === "collision") {
              hasCollision = true;
           } else if (result && result.status === "success") {
-             // Handled automatically by Supabase Database Trigger (trigger_after_booking_insert)
-             // No client-side call to addTransactionToSupabase needed to avoid RLS blocks and duplicate transactions
+             // Remove any temporary hold entry for this date+slot in local memory and push confirmed booking
+             state.bookings = state.bookings.filter(b => !(b.date === dateStr && b.slot === slot));
+             state.bookings.push({
+               ...newBooking,
+               status: 'confirmed',
+               adminNotes: ''
+             });
           } else if (result && result.status === "local") {
              state.bookings.push(newBooking);
              const courtTx = {
