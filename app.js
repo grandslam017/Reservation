@@ -1015,6 +1015,12 @@ async function fetchBookingsFromSupabase(silent = false) {
         (b.date && String(b.date).startsWith('1970-01-01'))
       ));
       saveStateToStorage();
+
+      // Trigger automatic UI refresh whenever latest bookings arrive from Supabase
+      renderTimeSlotsUI();
+      if (document.getElementById('availability') && document.getElementById('availability').classList.contains('active')) {
+        renderAvailabilityGrid();
+      }
     }
   } catch (error) {
     console.error("Failed to fetch bookings from Supabase:", error);
