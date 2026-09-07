@@ -816,7 +816,15 @@ async function syncBookingWithSupabase(booking, activeHoldId = null) {
       }
     }
 
-    // Fallback: If no hold row was updated, insert a new row
+    // Fallback: Delete any leftover pending_hold rows for the same slot first to prevent 23505 constraint collision
+    await supabaseClient
+      .from('bookings')
+      .delete()
+      .eq('booking_date', booking.date)
+      .eq('time_slot', booking.slot)
+      .eq('status', 'pending_hold');
+
+    // Insert a new confirmed row
     const { data, error } = await supabaseClient
       .from('bookings')
       .insert([{
@@ -860,7 +868,9 @@ function isSameDate(d1, d2) {
     const str = String(d).split('T')[0].trim();
     const parts = str.split('-');
     if (parts.length === 3) {
-      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      let y = parseInt(parts[0], 10);
+      if (!isNaN(y) && y > 2400) y -= 543;
+      return `${y}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
     }
     return str;
   };
