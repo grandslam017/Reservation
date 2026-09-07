@@ -851,6 +851,28 @@ async function syncBookingWithSupabase(booking, activeHoldId = null) {
   }
 }
 
+function isSameDate(d1, d2) {
+  if (!d1 || !d2) return false;
+  const normalizeDate = (d) => {
+    if (d instanceof Date) {
+      return `${getGregorianYear(d)}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    const str = String(d).split('T')[0].trim();
+    const parts = str.split('-');
+    if (parts.length === 3) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+    return str;
+  };
+  return normalizeDate(d1) === normalizeDate(d2);
+}
+
+function isSameSlot(s1, s2) {
+  if (!s1 || !s2) return false;
+  const normalizeSlot = (s) => String(s).replace(/\./g, ':').replace(/\s*-\s*/g, ' - ').trim();
+  return normalizeSlot(s1) === normalizeSlot(s2);
+}
+
 async function fetchBookingsFromSupabase(silent = false) {
   if (!supabaseClient) return;
   
@@ -1482,7 +1504,7 @@ function renderTimeSlotsUI() {
     const slot = `${startStr} - ${endStr}`;
 
     // ค้นหาว่า slot นี้ถูกจองหรือล็อคอยู่หรือไม่
-    const bookedEntry = state.bookings.find(b => b.date === dateStr && b.slot === slot);
+    const bookedEntry = state.bookings.find(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
     const isBooked = !!bookedEntry;
     const isPendingHold = isBooked && (bookedEntry.status === 'pending_hold' || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes('[pending_hold:')));
     const isMyHold = isPendingHold && (bookedEntry.holdId === state.currentHoldId || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes(state.currentHoldId || '___NONE___')));
@@ -4538,7 +4560,7 @@ function renderAvailabilityGrid() {
         // Render as empty/blank slot if in the past
         cell.classList.add('empty-cell');
       } else {
-        const isBooked = state.bookings.some(b => b.date === dateStr && b.slot === slot);
+        const isBooked = state.bookings.some(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
         if (isBooked) {
           cell.classList.add('booked-cell');
           cell.innerHTML = `
