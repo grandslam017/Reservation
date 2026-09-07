@@ -889,12 +889,34 @@ async function fetchBookingsFromSupabase(silent = false) {
   state.isFetchingBookings = true;
   
   try {
-    const { data, error } = await supabaseClient
-      .from('bookings')
-      .select('*')
-      .limit(10000);
+    let allData = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      const { data: pageData, error } = await supabaseClient
+        .from('bookings')
+        .select('*')
+        .range(from, to);
+
+      if (error) throw error;
+      
+      if (pageData && pageData.length > 0) {
+        allData = allData.concat(pageData);
+        if (pageData.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const data = allData;
     
     if (data) {
       // Filter out cancelled bookings in JavaScript to preserve rows where status is NULL/undefined (legacy bookings)
@@ -1112,13 +1134,36 @@ async function addTransactionToSupabase(tx) {
 async function fetchTransactionsFromSupabase() {
   if (!supabaseClient) return;
   try {
-    const { data, error } = await supabaseClient
-      .from('transactions')
-      .select('*')
-      .order('transaction_date', { ascending: false })
-      .order('created_at', { ascending: false });
+    let allData = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      const { data: pageData, error } = await supabaseClient
+        .from('transactions')
+        .select('*')
+        .order('transaction_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      if (pageData && pageData.length > 0) {
+        allData = allData.concat(pageData);
+        if (pageData.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const data = allData;
 
     state.transactions = (data || []).map(tx => ({
       id: tx.id,
