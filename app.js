@@ -891,7 +891,8 @@ async function fetchBookingsFromSupabase(silent = false) {
   try {
     const { data, error } = await supabaseClient
       .from('bookings')
-      .select('*');
+      .select('*')
+      .limit(10000);
 
     if (error) throw error;
     
@@ -905,12 +906,11 @@ async function fetchBookingsFromSupabase(silent = false) {
         let isPendingHold = (b.status === 'pending_hold');
         let expTime = null;
         let hId = null;
-        if (notes.includes('[pending_hold:')) {
+        if (isPendingHold && notes.includes('[pending_hold:')) {
           const match = notes.match(/\[pending_hold:(\d+):([^\]]+)\]/);
           if (match) {
             expTime = parseInt(match[1], 10);
             hId = match[2];
-            isPendingHold = true;
           }
         }
         let rawDate = b.booking_date;
@@ -1513,8 +1513,8 @@ function renderTimeSlotsUI() {
     // ค้นหาว่า slot นี้ถูกจองหรือล็อคอยู่หรือไม่
     const bookedEntry = state.bookings.find(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
     const isBooked = !!bookedEntry;
-    const isPendingHold = isBooked && (bookedEntry.status === 'pending_hold' || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes('[pending_hold:')));
-    const isMyHold = isPendingHold && (bookedEntry.holdId === state.currentHoldId || (bookedEntry.adminNotes && bookedEntry.adminNotes.includes(state.currentHoldId || '___NONE___')));
+    const isPendingHold = isBooked && (bookedEntry.status === 'pending_hold');
+    const isMyHold = isPendingHold && !!state.currentHoldId && !!bookedEntry.holdId && (bookedEntry.holdId === state.currentHoldId);
     
     // Check if this slot is in the past (for today's date)
     const now = new Date();
@@ -1527,7 +1527,7 @@ function renderTimeSlotsUI() {
       // Held by another customer -> Anonymous "⏳ กำลังโอนเงิน"
       slotItem.className = 'slot-item pending-hold';
       slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.9; display: block; margin-top: 2px;">⏳ กำลังโอนเงิน</span>`;
-    } else if ((isBooked && !isPendingHold) || isPastSlot) {
+    } else if (isBooked || isPastSlot) {
       slotItem.className = 'slot-item booked';
       if (isBooked) {
         slotItem.innerHTML = `<span class="slot-time">${slot}</span><span class="slot-booker" style="font-size: 0.7rem; opacity: 0.8; display: block; margin-top: 2px;">🔒 จองแล้ว</span>`;
