@@ -1181,15 +1181,35 @@ async function fetchTransactionsFromSupabase() {
 
     const data = allData;
 
-    state.transactions = (data || []).map(tx => ({
-      id: tx.id,
-      date: tx.transaction_date,
-      type: tx.type,
-      category: tx.category,
-      amount: parseFloat(tx.amount),
-      description: tx.description,
-      bookingId: tx.booking_id
-    }));
+    const seenBookingIds = new Set();
+    const seenTxKeys = new Set();
+    const cleanTransactions = [];
+
+    (data || []).forEach(tx => {
+      const bId = tx.booking_id;
+      const key = `${tx.transaction_date}_${tx.type}_${tx.category}_${tx.amount}_${tx.description}`;
+
+      if (tx.type === 'income' && tx.category === 'Court Rental') {
+        if (bId) {
+          if (seenBookingIds.has(bId)) return; // Skip duplicate transaction for same booking
+          seenBookingIds.add(bId);
+        }
+        if (seenTxKeys.has(key)) return; // Skip duplicate identical transaction
+        seenTxKeys.add(key);
+      }
+
+      cleanTransactions.push({
+        id: tx.id,
+        date: tx.transaction_date,
+        type: tx.type,
+        category: tx.category,
+        amount: parseFloat(tx.amount) || 0,
+        description: tx.description || '',
+        bookingId: tx.booking_id
+      });
+    });
+
+    state.transactions = cleanTransactions;
     saveStateToStorage();
   } catch (error) {
     console.error("Failed to fetch transactions from Supabase:", error);
@@ -2489,10 +2509,11 @@ function populateYearFilter() {
 
   yearFilterSelect.innerHTML = html;
 
+  const currentYearStr = getGregorianYear(new Date()).toString();
   if (sortedYears.includes(currentValue)) {
     yearFilterSelect.value = currentValue;
   } else {
-    yearFilterSelect.value = '';
+    yearFilterSelect.value = currentYearStr;
   }
 
   const bookingYearSelect = document.getElementById('bookingYearFilter');
@@ -2518,7 +2539,7 @@ function populateYearFilter() {
     if (sortedYears.includes(prevVal)) {
       slotYearSelect.value = prevVal;
     } else {
-      slotYearSelect.value = getGregorianYear(new Date()).toString();
+      slotYearSelect.value = yearFilterSelect.value || currentYearStr;
     }
     slotYearSelect.onchange = () => renderTimeSlotStats();
   }
@@ -2564,18 +2585,47 @@ function renderAdminDashboard() {
   });
 
   // Calculate Metrics Card Values
-  let totalRevenue = 0;
+  // 1. Calculate Net Court Rental Revenue directly from confirmed active bookings (excluding rainouts & cancelled)
+  const activeYear = yearFilter || getGregorianYear(new Date()).toString();
+  const filteredBookingsForMetrics = state.bookings.filter(b => {
+    if (b.status === 'pending_hold' || b.status === 'cancelled') return false;
+    if (monthFilter && activeYear) {
+      return b.date && b.date.startsWith(`${activeYear}-${monthFilter}`);
+    }
+    if (monthFilter) {
+      const parts = (b.date || '').split('-');
+      return parts.length >= 2 && parts[1] === monthFilter;
+    }
+    if (activeYear) {
+      return b.date && b.date.startsWith(activeYear);
+    }
+    return true;
+  });
+
+  let courtRentalRevenue = 0;
+  filteredBookingsForMetrics.forEach(b => {
+    const isRain = b.isRainout || (b.adminNotes || '').includes('[ฝนตก]') || (b.adminNotes || '').includes('[🌧️]');
+    if (!isRain) {
+      courtRentalRevenue += parseFloat(b.fee) || 0;
+    }
+  });
+
+  // 2. Calculate Other Incomes and Total Expenses from Transactions (excluding Court Rental to prevent trigger duplicates)
+  let otherIncomeRevenue = 0;
   let totalExpense = 0;
 
   filteredTxsForMetrics.forEach(tx => {
     const amount = parseFloat(tx.amount) || 0;
     if (tx.type === 'income') {
-      totalRevenue += amount;
+      if (tx.category !== 'Court Rental') {
+        otherIncomeRevenue += amount;
+      }
     } else if (tx.type === 'expense') {
       totalExpense += amount;
     }
   });
 
+  const totalRevenue = courtRentalRevenue + otherIncomeRevenue;
   const netProfit = totalRevenue - totalExpense;
 
   // Calculate Occupancy Rate
@@ -4436,6 +4486,10 @@ async function init() {
 
   if (yearFilter) {
     yearFilter.addEventListener('change', () => {
+      const slotYearSelect = document.getElementById('slotStatYearFilter');
+      if (slotYearSelect && yearFilter.value !== '') {
+        slotYearSelect.value = yearFilter.value;
+      }
       renderAdminDashboard();
     });
   }
