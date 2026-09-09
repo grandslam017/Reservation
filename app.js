@@ -2078,8 +2078,15 @@ function initBookingWizard() {
       const btnConfirmPayment = document.getElementById('btnConfirmPayment');
       const btnFinishBooking = document.getElementById('btnFinishBooking');
       let receiptNumber = '';
+      // Guard flags: prevent double-click while processing, and prevent stale closures from
+      // a previous modal session from running when the modal is reopened.
+      let isConfirmProcessing = false;
+      let isFinishProcessing = false;
       
       btnConfirmPayment.onclick = () => {
+        // Prevent double-click while image is being compressed
+        if (isConfirmProcessing) return;
+
         const fileInput = document.getElementById('slipUpload') || document.getElementById('slipInput');
         if (!fileInput.files || fileInput.files.length === 0) {
           showToast('กรุณาแนบหลักฐานการโอนเงินก่อนแจ้งชำระ', 'error');
@@ -2103,6 +2110,7 @@ function initBookingWizard() {
           return;
         }
 
+        isConfirmProcessing = true; // Lock until image compression finishes
         btnConfirmPayment.style.display = 'none';
         document.getElementById('slipValidationLoader').style.display = 'block';
         
@@ -2139,11 +2147,19 @@ function initBookingWizard() {
             document.getElementById('receiptNumber').textContent = receiptNumber;
             document.getElementById('receiptBox').style.display = 'block';
             btnFinishBooking.style.display = 'block';
+            isConfirmProcessing = false; // Unlock after image is ready
 
             // Convert canvas content to blob and save for Supabase Storage upload
             canvas.toBlob((blob) => {
               state.currentSlipFile = new File([blob], `${receiptNumber}.jpg`, { type: 'image/jpeg' });
             }, 'image/jpeg', 0.7);
+          };
+          img.onerror = () => {
+            // Unlock on error so user can try again
+            isConfirmProcessing = false;
+            if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
+            btnConfirmPayment.style.display = 'block';
+            showToast(state.language === 'th' ? 'ไม่สามารถอ่านไฟล์รูปภาพได้ กรุณาลองใหม่' : 'Cannot read image file. Please try again.', 'error');
           };
           img.src = reader.result;
         };
@@ -2151,172 +2167,180 @@ function initBookingWizard() {
       };
       
       btnFinishBooking.onclick = async () => {
-        const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
-        showToast(translations[state.language].toastGasSyncing, 'info');
+        // Prevent double-click while booking/upload is in progress
+        if (isFinishProcessing) return;
+        isFinishProcessing = true;
 
-        const lineIdInput = document.getElementById('custVehicle')?.value.trim() || '';
+        try {
+          const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
+          showToast(translations[state.language].toastGasSyncing, 'info');
 
-        let hasCollision = false;
-        let hasError = false;
-        let gasErrorMessage = '';
+          const lineIdInput = document.getElementById('custVehicle')?.value.trim() || '';
 
-        // 1. Upload payment slip to Supabase Storage if file exists
-        let slipUrl = '';
-        if (state.currentSlipFile && supabaseClient) {
-          try {
-            const fileExt = state.currentSlipFile.name.split('.').pop() || 'jpg';
-            const timestamp = Date.now();
-            const fileName = `${receiptNumber}_${timestamp}.${fileExt}`;
-            const { data, error: uploadError } = await supabaseClient.storage
-              .from('slips')
-              .upload(fileName, state.currentSlipFile);
+          let hasCollision = false;
+          let hasError = false;
+          let gasErrorMessage = '';
 
-            if (uploadError) throw uploadError;
+          // 1. Upload payment slip to Supabase Storage if file exists
+          let slipUrl = '';
+          if (state.currentSlipFile && supabaseClient) {
+            try {
+              const fileExt = state.currentSlipFile.name.split('.').pop() || 'jpg';
+              const timestamp = Date.now();
+              const fileName = `${receiptNumber}_${timestamp}.${fileExt}`;
+              const { data, error: uploadError } = await supabaseClient.storage
+                .from('slips')
+                .upload(fileName, state.currentSlipFile);
 
-            const { data: { publicUrl } } = supabaseClient.storage
-              .from('slips')
-              .getPublicUrl(fileName);
-            
-            slipUrl = publicUrl;
-          } catch (err) {
-            console.error("Storage upload failed:", err);
-            showToast(state.language === 'th' 
-              ? 'อัปโหลดหลักฐานการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' 
-              : 'Failed to upload payment slip. Please try again.', 'error');
-            return;
+              if (uploadError) throw uploadError;
+
+              const { data: { publicUrl } } = supabaseClient.storage
+                .from('slips')
+                .getPublicUrl(fileName);
+              
+              slipUrl = publicUrl;
+            } catch (err) {
+              console.error("Storage upload failed:", err);
+              showToast(state.language === 'th' 
+                ? 'อัปโหลดหลักฐานการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' 
+                : 'Failed to upload payment slip. Please try again.', 'error');
+              return;
+            }
           }
-        }
 
-        // Close modal after successful upload
-        document.getElementById('invoiceSlipModal').style.display = 'none';
+          // Close modal after successful upload
+          document.getElementById('invoiceSlipModal').style.display = 'none';
 
-        // Stop hold timer interval and clear hold session
-        if (state.holdTimerInterval) {
-          clearInterval(state.holdTimerInterval);
-          state.holdTimerInterval = null;
-        }
-        const activeHoldId = state.currentHoldId;
-        state.currentHoldId = null;
-        state.holdExpiresAt = null;
+          // Stop hold timer interval and clear hold session
+          if (state.holdTimerInterval) {
+            clearInterval(state.holdTimerInterval);
+            state.holdTimerInterval = null;
+          }
+          const activeHoldId = state.currentHoldId;
+          state.currentHoldId = null;
+          state.holdExpiresAt = null;
 
-        const isCoachRequired = getRequireCoach();
+          const isCoachRequired = getRequireCoach();
 
-        // 2. Insert/Update bookings in Supabase
-        for (const slot of slotsBooked) {
-          const bookingId = generateUUID();
-          const slotPrice = getSlotPrice(slot);
+          // 2. Insert/Update bookings in Supabase
+          for (const slot of slotsBooked) {
+            const bookingId = generateUUID();
+            const slotPrice = getSlotPrice(slot);
 
-          const newBooking = {
-            id: bookingId,
-            date: dateStr,
-            slot: slot,
-            name: name,
-            phone: phone,
-            email: email,
-            lineIdInput: lineIdInput,
-            lineUserId: state.liffProfile ? state.liffProfile.userId : '',
-            slipUrl: slipUrl,
-            court: "Main Court",
-            requireCoach: isCoachRequired,
-            fee: slotPrice,
-            invoiceNo: invoiceNumber,
-            receiptNo: receiptNumber
-          };
+            const newBooking = {
+              id: bookingId,
+              date: dateStr,
+              slot: slot,
+              name: name,
+              phone: phone,
+              email: email,
+              lineIdInput: lineIdInput,
+              lineUserId: state.liffProfile ? state.liffProfile.userId : '',
+              slipUrl: slipUrl,
+              court: "Main Court",
+              requireCoach: isCoachRequired,
+              fee: slotPrice,
+              invoiceNo: invoiceNumber,
+              receiptNo: receiptNumber
+            };
 
-          const result = await syncBookingWithSupabase(newBooking, activeHoldId);
+            const result = await syncBookingWithSupabase(newBooking, activeHoldId);
 
-          if (result && result.status === "collision") {
-             hasCollision = true;
-          } else if (result && result.status === "success") {
-             // Handled automatically by Supabase Database Trigger (trigger_after_booking_insert)
-             // No client-side call to addTransactionToSupabase needed to avoid RLS blocks and duplicate transactions
-          } else if (result && result.status === "local") {
-             state.bookings.push(newBooking);
-             const courtTx = {
-               id: 'tx_b_' + bookingId,
-               date: dateStr,
-               type: 'income',
-               category: 'Court Rental',
-               amount: slotPrice,
-               description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (isCoachRequired ? ' (+โค้ช)' : '')
-             };
-             await addTransactionToSupabase(courtTx);
+            if (result && result.status === "collision") {
+               hasCollision = true;
+            } else if (result && result.status === "success") {
+               // Handled automatically by Supabase Database Trigger (trigger_after_booking_insert)
+               // No client-side call to addTransactionToSupabase needed to avoid RLS blocks and duplicate transactions
+            } else if (result && result.status === "local") {
+               state.bookings.push(newBooking);
+               const courtTx = {
+                 id: 'tx_b_' + bookingId,
+                 date: dateStr,
+                 type: 'income',
+                 category: 'Court Rental',
+                 amount: slotPrice,
+                 description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (isCoachRequired ? ' (+โค้ช)' : '')
+               };
+               await addTransactionToSupabase(courtTx);
+            } else {
+               hasError = true;
+               if (result && result.message) {
+                 gasErrorMessage = result.message;
+               }
+            }
+          }
+
+          saveStateToStorage();
+
+          state.selectedSlots = [];
+          showSummaryPanel(); // Resets back to 0 ฿
+
+          if (hasCollision) {
+             showToast(translations[state.language].toastBookingCollision, 'error');
+          } else if (hasError) {
+             let errorMsg = translations[state.language].toastGasFail;
+             if (gasErrorMessage) {
+               errorMsg += `: ${gasErrorMessage}`;
+             }
+             showToast(errorMsg, 'error');
           } else {
-             hasError = true;
-             if (result && result.message) {
-               gasErrorMessage = result.message;
+             showToast(translations[state.language].toastBookingSuccess, 'success');
+
+             // Reset coach selection to default "No Coach" for next booking
+             const noCoachRadio = document.getElementById('coachNoRadio');
+             const yesCoachRadio = document.getElementById('coachYesRadio');
+             if (noCoachRadio && yesCoachRadio) {
+               noCoachRadio.checked = true;
+               yesCoachRadio.checked = false;
+               state.requireCoach = false;
+             }
+
+             // Save booking profile to localStorage for auto-filling next time
+             try {
+               localStorage.setItem('bookingProfile', JSON.stringify({
+                 name: name,
+                 phone: phone,
+                 email: email,
+                 carPlate: lineIdInput
+               }));
+             } catch (e) {
+               console.error("Failed to save booking profile to localStorage:", e);
+             }
+
+             // Trigger notifications via GAS
+             if (state.config.gasUrl) {
+               sendBookingConfirmationNotifications({
+                 bookingKey: invoiceNumber,
+                 name: name,
+                 phone: phone,
+                 email: email,
+                 date: dateStr,
+                 slots: slotsBooked,
+                 invoiceNo: invoiceNumber,
+                 receiptNo: receiptNumber || ('R.' + invoiceNumber.replace('INV.', '')),
+                 lineIdInput: lineIdInput,
+                 lineUserId: state.liffProfile ? state.liffProfile.userId : '',
+                 requireCoach: isCoachRequired,
+                 slipUrl: slipUrl,
+                 court: "Main Court"
+               });
              }
           }
-        }
 
-        saveStateToStorage();
+          // Clean up temporary slip file reference
+          state.currentSlipFile = null;
 
-        state.selectedSlots = [];
-        showSummaryPanel(); // Resets back to 0 ฿
-
-        if (hasCollision) {
-           showToast(translations[state.language].toastBookingCollision, 'error');
-        } else if (hasError) {
-           let errorMsg = translations[state.language].toastGasFail;
-           if (gasErrorMessage) {
-             errorMsg += `: ${gasErrorMessage}`;
-           }
-           showToast(errorMsg, 'error');
-        } else {
-           showToast(translations[state.language].toastBookingSuccess, 'success');
-
-           // Reset coach selection to default "No Coach" for next booking
-           const noCoachRadio = document.getElementById('coachNoRadio');
-           const yesCoachRadio = document.getElementById('coachYesRadio');
-           if (noCoachRadio && yesCoachRadio) {
-             noCoachRadio.checked = true;
-             yesCoachRadio.checked = false;
-             state.requireCoach = false;
-           }
-
-           // Save booking profile to localStorage for auto-filling next time
-           try {
-             localStorage.setItem('bookingProfile', JSON.stringify({
-               name: name,
-               phone: phone,
-               email: email,
-               carPlate: lineIdInput
-             }));
-           } catch (e) {
-             console.error("Failed to save booking profile to localStorage:", e);
-           }
-
-           // Trigger notifications via GAS
-           if (state.config.gasUrl) {
-             sendBookingConfirmationNotifications({
-               bookingKey: bookingKey,
-               name: name,
-               phone: phone,
-               email: email,
-               date: dateStr,
-               slots: slotsBooked,
-               invoiceNo: invoiceNumber,
-               receiptNo: receiptNumber,
-               lineIdInput: lineIdInput,
-               lineUserId: state.liffProfile ? state.liffProfile.userId : '',
-               requireCoach: isCoachRequired,
-               slipUrl: slipUrl,
-               court: "Main Court"
-             });
-           }
-        }
-
-        // Clean up temporary slip file reference
-        state.currentSlipFile = null;
-
-        await fetchBookingsFromSupabase();
-        if (state.isAdminLoggedIn) {
-          await fetchTransactionsFromSupabase();
-        }
-        renderCalendar();
-        renderTimeSlots();
-        if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
-          renderAdminDashboard();
+          await fetchBookingsFromSupabase();
+          if (state.isAdminLoggedIn) {
+            await fetchTransactionsFromSupabase();
+          }
+          renderCalendar();
+          renderTimeSlots();
+          if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+            renderAdminDashboard();
+          }
+        } finally {
+          isFinishProcessing = false; // Always unlock after entire flow completes or errors out
         }
       };
 
@@ -4245,30 +4269,8 @@ async function initLiff() {
     retries++;
   }
 
-  // === Auto-refresh mechanism ===
-  // Fetch latest bookings from Supabase every 4 seconds to keep timeslots updated in real-time
-  if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
-  state.autoRefreshTimer = setInterval(async () => {
-    if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
-      // Fetch data silently
-      await fetchBookingsFromSupabase(true);
-      
-      // If user is viewing the slots, re-render them smoothly
-      if (document.getElementById('booking').classList.contains('active')) {
-        renderTimeSlotsUI();
-      }
-      
-      // If user is viewing the availability grid, re-render it smoothly
-      if (document.getElementById('availability').classList.contains('active')) {
-        renderAvailabilityGrid();
-      }
-      
-      // If admin is viewing the admin dashboard, re-render dashboard
-      if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
-        renderAdminDashboard();
-      }
-    }
-  }, 4000);
+  // NOTE: Auto-refresh timer is managed exclusively in init() to avoid duplicate API calls.
+  // Do NOT add another setInterval here.
 
   if (state.config.liffId && typeof liff !== 'undefined') {
     try {
