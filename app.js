@@ -1418,11 +1418,40 @@ async function createSlotHold(dateStr, slots) {
   const holdId = "hold_" + generateUUID();
   const expiresAt = Date.now() + (3 * 60 * 1000); // 3 minutes = 180,000 ms
 
+  const cleanDate = (dateStr || '').split('T')[0].trim();
+
   // If Supabase is connected, write pending_hold entries to database first
   if (supabaseClient) {
     try {
+      // 1. Direct DB check for existing active bookings/holds on target slots right before insertion
+      const { data: existing, error: checkError } = await supabaseClient
+        .from('bookings')
+        .select('time_slot, status, admin_notes')
+        .eq('booking_date', cleanDate)
+        .neq('status', 'cancelled')
+        .in('time_slot', slots);
+
+      if (!checkError && existing && existing.length > 0) {
+        const nowTs = Date.now();
+        const activeCollisions = existing.filter(row => {
+          if (row.status === 'pending_hold') {
+            const match = (row.admin_notes || '').match(/\[pending_hold:(\d+):/);
+            if (match) {
+              const expTime = parseInt(match[1], 10);
+              return nowTs < expTime; // Valid active hold by another user
+            }
+          }
+          return true; // Confirmed booking
+        });
+
+        if (activeCollisions.length > 0) {
+          console.warn("Pre-hold collision detected in Supabase DB:", activeCollisions);
+          return false;
+        }
+      }
+
       const dbHolds = slots.map(slot => ({
-        booking_date: dateStr,
+        booking_date: cleanDate,
         time_slot: slot,
         customer_name: "ลูกค้ากำลังโอนเงิน",
         phone: "0800000000",
