@@ -469,7 +469,7 @@ header {
   user-select: none;
 }
 
-.slot-item:hover:not(.booked) {
+.slot-item:hover:not(.booked):not(.pending-hold) {
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
@@ -484,7 +484,7 @@ header {
   font-weight: 500;
 }
 
-/* Slot Status Styles (Green vs Red) */
+/* Slot Status Styles (Green vs Red vs Amber) */
 .slot-item.available {
   background: var(--accent-color) !important;
   border-color: var(--accent-color) !important;
@@ -500,10 +500,12 @@ header {
 }
 
 .slot-item.pending-hold {
-  background: rgba(245, 158, 11, 0.15) !important;
+  background: rgba(245, 158, 11, 0.18) !important;
   border: 1px solid #f59e0b !important;
   color: #fbbf24 !important;
-  cursor: not-allowed;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
 }
 
 .slot-item.selected {

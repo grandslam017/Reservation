@@ -4468,7 +4468,7 @@ async function init() {
   }
 
   // === Auto-refresh mechanism ===
-  // Fetch latest bookings from Supabase every 10 seconds to keep timeslots updated
+  // Fetch latest bookings from Supabase every 4 seconds to keep timeslots updated
   if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
   state.autoRefreshTimer = setInterval(async () => {
     if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
@@ -4495,7 +4495,7 @@ async function init() {
         renderAdminDashboard();
       }
     }
-  }, 10000);
+  }, 4000);
 
   // Initialize Weekly Availability Start Date (Monday of current week)
   state.availabilityStartOfWeek = getMonday(new Date());
