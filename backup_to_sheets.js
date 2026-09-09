@@ -14,7 +14,7 @@ function getCleanScriptProperty(key) {
 const LINE_CHANNEL_ACCESS_TOKEN = getCleanScriptProperty("LINE_CHANNEL_ACCESS_TOKEN");
 const ADMIN_LINE_USER_ID = getCleanScriptProperty("ADMIN_LINE_USER_ID");
 const COACH_CALENDAR_ID = getCleanScriptProperty("COACH_CALENDAR_ID");
-const WEBHOOK_SECRET = getCleanScriptProperty("WEBHOOK_SECRET");
+const WEBHOOK_SECRET = getCleanScriptProperty("WEBHOOK_SECRET") || "grandslam_secret_key_2026";
 
 // อีเมลปฏิทินหลัก (MAIN_CALENDAR_ID) - เลือกกรอกได้ หากว่างจะใช้ปฏิทินเริ่มต้น (Default Calendar)
 const MAIN_CALENDAR_ID = getCleanScriptProperty("MAIN_CALENDAR_ID");
@@ -753,7 +753,8 @@ function handleSendConfirmation(data) {
   if (ADMIN_LINE_USER_ID && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
       const slipUrl = data.slipUrl || "";
-      sendAdminSlipNotification(name, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach);
+      const phone = data.phone || "-";
+      sendAdminSlipNotification(name, phone, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach);
       adminLineSent = true;
     } catch (e) {
       logError("Admin LINE Notification Error", "sendAdminSlipNotification", e.toString(), "WARNING");
@@ -767,7 +768,9 @@ function handleSendConfirmation(data) {
     emailSent: emailSent,
     lineSent: lineSent,
     calendarCreated: calendarEventIds.length > 0,
-    sheetSaved: uuids.length > 0
+    sheetSaved: uuids.length > 0,
+    calendarEventIds: calendarEventIds,
+    uuids: uuids
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -817,6 +820,7 @@ function removeBookingFromSheet(dateStr, slotStr, courtStr) {
     
     if (row) {
       const eventId = bookingSheet.getRange(row, 17).getValue();
+      const customerName = bookingSheet.getRange(row, 4).getValue() || "";
       
       // ปรับปรุงเป็น Soft Delete: เปลี่ยนสถานะแถวจองในชีตเป็น CANCELLED แทนการลบแถว
       bookingSheet.getRange(row, 17).setValue("CANCELLED");
@@ -827,7 +831,7 @@ function removeBookingFromSheet(dateStr, slotStr, courtStr) {
         lockReleased = true;
       }
       
-      deleteGoogleCalendarEvent("", dateStr, slotStr, eventId);
+      deleteGoogleCalendarEvent(customerName, dateStr, slotStr, eventId);
       console.log("Cancelled row " + row + " (Soft Delete) and synced Calendar event.");
     }
   } catch (e) {
@@ -1300,6 +1304,11 @@ function deleteGoogleCalendarEvent(name, dateStr, slotStr, eventIdStr) {
   }
 
   // Fallback
+  if (!name || name.trim() === "") {
+    console.warn("deleteGoogleCalendarEvent: Fallback triggered but name is empty. Skipping fallback delete to prevent accidental calendar wipeout.");
+    return;
+  }
+
   try {
     const dateParts = dateStr.split('-');
     if (dateParts.length !== 3) return;
@@ -1427,6 +1436,11 @@ function updateGoogleCalendarEventNotes(name, phone, dateStr, slotStr, receiptNo
   }
 
   // Fallback
+  if ((!name || name.trim() === "") && (!receiptNo || receiptNo.trim() === "")) {
+    console.warn("updateGoogleCalendarEventNotes: Fallback triggered but both name and receiptNo are empty. Skipping fallback update.");
+    return;
+  }
+
   try {
     const dateParts = dateStr.split('-');
     if (dateParts.length !== 3) return;
@@ -1705,8 +1719,8 @@ function checkAndSendReminders() {
     const diffMs = bookingTime.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     
-    // ส่งเตือนล่วงหน้าช่วง 0 - 36 ชั่วโมงก่อนถึงเวลาใช้งาน (ครอบคลุมทั้งวันรุ่งขึ้น)
-    if (diffHours > 0 && diffHours <= 36.0) {
+    // ส่งเตือนล่วงหน้าช่วง 0 - 25 ชั่วโมงก่อนถึงเวลาใช้งาน (แนะนำให้ตั้งทริกเกอร์ใน GAS ทำงานทุกชั่วโมง)
+    if (diffHours > 0 && diffHours <= 25.0) {
       const success = sendLineReminder(lineUserId, row[3], row[1], row[2], token);
       if (success) {
         bookingSheet.getRange(i + 2, 15).setValue("Yes");
@@ -1758,7 +1772,7 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
     dateText = dateVal;
   }
   
-  const textMessage = `🔔 แจ้งเตือนการใช้บริการสนาม (ล่วงหน้า 24 ชม.)
+  const textMessage = `🔔 ระบบแจ้งเตือนการใช้บริการสนามล่วงหน้า
  
 📅 วันที่: ${dateText}
 ⏰ เวลา: ${slotStr}
@@ -1799,7 +1813,7 @@ function sendLineReminder(lineUserId, name, dateVal, slotStr, token) {
 }
 
 // ส่งแจ้งสลิปและข้อมูลการจองไปยังแอดมินทาง LINE Messaging API Push Message
-function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, requireCoach, lineIdInput) {
+function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipUrl, requireCoach) {
   if (!LINE_CHANNEL_ACCESS_TOKEN || !ADMIN_LINE_USER_ID) {
     console.warn("Skipping Admin LINE notification: missing LINE_CHANNEL_ACCESS_TOKEN or ADMIN_LINE_USER_ID.");
     return;
@@ -1808,12 +1822,12 @@ function sendAdminSlipNotification(name, dateStr, slots, receiptNo, slipUrl, req
   const url = "https://api.line.me/v2/bot/message/push";
   const formattedSlots = slots.join(", ");
   const coachText = requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌";
-  const contactText = lineIdInput || "-";
+  const phoneText = phone || "-";
   
   const textMessage = `🔔 มีรายการจองใหม่และสลิปแจ้งชำระเงินเข้ามา!
  
 👤 ลูกค้า: คุณ ${name}
-📞 LINE ID / ติดต่อ: ${contactText}
+📞 เบอร์โทรศัพท์: ${phoneText}
 📅 วันที่: ${dateStr}
 ⏰ เวลา: ${formattedSlots}
 🧸 โค้ช: ${coachText}

@@ -2352,10 +2352,20 @@ function initBookingWizard() {
           };
           sendGasRequest(payload)
             .then(async res => {
-              if (res && res.status === "warning" && res.warnings) {
+              if (!res) {
+                console.error("GAS returned null/empty response.");
+                showToast(state.language === 'th' ? "การซิงก์ Google ไม่ตอบกลับ" : "Google sync did not respond", 'error');
+                return;
+              }
+              if (res.status === "error") {
+                console.error("GAS returned error:", res.message || res);
+                showToast((state.language === 'th' ? "การส่งข้อมูล Google ล้มเหลว: " : "Google sync error: ") + (res.message || "Unknown error"), 'error');
+                return;
+              }
+              if (res.status === "warning" && res.warnings) {
                 console.warn("GAS notification warnings:", res.warnings);
               }
-              if (res && (res.status === "success" || res.status === "warning") && res.calendarEventIds && res.uuids && supabaseClient) {
+              if ((res.status === "success" || res.status === "warning") && res.calendarEventIds && res.uuids && supabaseClient) {
                 for (let i = 0; i < res.uuids.length; i++) {
                   const bId = res.uuids[i];
                   const cId = res.calendarEventIds[i];
@@ -2377,7 +2387,10 @@ function initBookingWizard() {
                 saveStateToStorage();
               }
             })
-            .catch(err => console.error("GAS notification trigger failed:", err));
+            .catch(err => {
+              console.error("GAS notification trigger failed:", err);
+              showToast(state.language === 'th' ? "เกิดข้อผิดพลาดในการเชื่อมต่อ Google" : "Google connection failed", 'error');
+            });
         } catch (e) {
           console.error("Error triggering booking notifications:", e);
         }
