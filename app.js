@@ -1388,6 +1388,33 @@ async function createSlotHold(dateStr, slots) {
   const holdId = "hold_" + generateUUID();
   const expiresAt = Date.now() + (3 * 60 * 1000); // 3 minutes = 180,000 ms
 
+  // If Supabase is connected, write pending_hold entries to database first
+  if (supabaseClient) {
+    try {
+      const dbHolds = slots.map(slot => ({
+        booking_date: dateStr,
+        time_slot: slot,
+        customer_name: "ลูกค้ากำลังโอนเงิน",
+        phone: "0800000000",
+        email: "hold@grandslam.com",
+        require_coach: state.requireCoach,
+        fee: getSlotPrice(slot),
+        invoice_no: "HOLD_" + holdId.substring(5, 13),
+        receipt_no: "HOLD",
+        status: "pending_hold",
+        admin_notes: `[pending_hold:${expiresAt}:${holdId}]`
+      }));
+      const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
+      if (error) {
+        console.error("Supabase Hold Insert Error:", error);
+        return false; // Hold creation failed due to DB collision or constraint
+      }
+    } catch (err) {
+      console.error("Failed to sync hold to Supabase:", err);
+      return false;
+    }
+  }
+
   state.currentHoldId = holdId;
   state.holdExpiresAt = expiresAt;
 
@@ -1409,33 +1436,9 @@ async function createSlotHold(dateStr, slots) {
     });
   });
 
-  // If Supabase is connected, write pending_hold entries to database
-  if (supabaseClient) {
-    try {
-      const dbHolds = slots.map(slot => ({
-        booking_date: dateStr,
-        time_slot: slot,
-        customer_name: "ลูกค้ากำลังโอนเงิน",
-        phone: "0800000000",
-        email: "hold@grandslam.com",
-        require_coach: state.requireCoach,
-        fee: getSlotPrice(slot),
-        invoice_no: "HOLD_" + holdId.substring(5, 13),
-        receipt_no: "HOLD",
-        status: "pending_hold",
-        admin_notes: `[pending_hold:${expiresAt}:${holdId}]`
-      }));
-      const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
-      if (error) {
-        console.error("Supabase Hold Insert Error:", error);
-      }
-    } catch (err) {
-      console.error("Failed to sync hold to Supabase:", err);
-    }
-  }
-
   startHoldTimer();
   renderTimeSlotsUI();
+  return true; // Successfully created hold
 }
 
 function startHoldTimer() {
@@ -1739,10 +1742,16 @@ function initBookingWizard() {
       
       // Check if selected slots were recently held or booked by someone else
       const dateStr = `${getGregorianYear(state.selectedDate)}-${String(state.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(state.selectedDate.getDate()).padStart(2, '0')}`;
+      
+      if (state.config.supabaseUrl && state.config.supabaseKey) {
+        showToast(state.language === 'th' ? 'กำลังตรวจสอบสถานะเวลาว่าง...' : 'Checking availability...', 'info');
+        await fetchBookingsFromSupabase(true);
+      }
+
       const nowTs = Date.now();
       const collisionSlots = state.selectedSlots.filter(slot =>
         state.bookings.some(b => {
-          if (b.date !== dateStr || b.slot !== slot) return false;
+          if (!isSameDate(b.date, dateStr) || !isSameSlot(b.slot, slot)) return false;
           if (b.status === 'pending_hold') {
             return b.holdExpiresAt && nowTs < b.holdExpiresAt && b.holdId !== state.currentHoldId;
           }
@@ -1756,6 +1765,19 @@ function initBookingWizard() {
           : `Slots ${collisionSlots.join(', ')} are currently being booked or already reserved!`;
         showToast(collisionMsg, 'error');
         state.selectedSlots = state.selectedSlots.filter(s => !collisionSlots.includes(s));
+        renderTimeSlotsUI();
+        showSummaryPanel();
+        return;
+      }
+
+      // ล็อคระดับฐานข้อมูลทันทีที่กดปุ่มเริ่มจองสนาม (คนอื่นจะไม่สามารถกดเลือกได้ทันที)
+      const holdSuccess = await createSlotHold(dateStr, state.selectedSlots);
+      if (!holdSuccess) {
+        const collisionMsg = state.language === 'th'
+          ? `ขออภัย เวลา ${state.selectedSlots.join(', ')} มีผู้ใช้งานท่านอื่นกำลังทำรายการโอนเงินหรือถูกจองไปแล้ว!`
+          : `Slots ${state.selectedSlots.join(', ')} are currently being booked or already reserved!`;
+        showToast(collisionMsg, 'error');
+        await fetchBookingsFromSupabase(true);
         renderTimeSlotsUI();
         showSummaryPanel();
         return;
@@ -1809,6 +1831,10 @@ function initBookingWizard() {
       btnModalConfirm.disabled = true;
       btnModalConfirm.style.opacity = '0.5';
       btnModalConfirm.style.cursor = 'not-allowed';
+    }
+    // Release hold if user closes/cancels modal 1 before confirming
+    if (state.currentHoldId && document.getElementById('invoiceSlipModal').style.display !== 'flex') {
+      releaseSlotHold(false);
     }
   };
 
@@ -1924,7 +1950,7 @@ function initBookingWizard() {
       const nowTs = Date.now();
       const collisionSlots = state.selectedSlots.filter(slot => 
         state.bookings.some(b => {
-          if (b.date !== dateStr || b.slot !== slot) return false;
+          if (!isSameDate(b.date, dateStr) || !isSameSlot(b.slot, slot)) return false;
           if (b.status === 'pending_hold') {
             return b.holdExpiresAt && nowTs < b.holdExpiresAt && b.holdId !== state.currentHoldId;
           }
@@ -1945,8 +1971,15 @@ function initBookingWizard() {
         return;
       }
 
-      // สร้างรายการล็อคเวลาชั่วคราว 3 นาที ป้องกันคนอื่นจองตัดหน้า
-      await createSlotHold(dateStr, state.selectedSlots);
+      // ตรวจสอบว่า Hold ยังคงอยู่และไม่หมดอายุ
+      if (!state.currentHoldId || !state.holdExpiresAt || Date.now() >= state.holdExpiresAt) {
+        showToast(state.language === 'th' ? 'หมดเวลาทำรายการ (3 นาที) กรุณาเริ่มจองใหม่อีกครั้ง' : 'Session expired (3 mins). Please try again.', 'error');
+        closeModal();
+        await fetchBookingsFromSupabase(true);
+        renderTimeSlotsUI();
+        showSummaryPanel();
+        return;
+      }
 
       // Generate Invoice
       const invoiceNumber = 'INV.' + getRunningNumber('invoice');
