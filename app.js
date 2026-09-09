@@ -2088,9 +2088,9 @@ function initBookingWizard() {
 
         const file = fileInput.files[0];
         
-        // 1. ตรวจสอบขนาดไฟล์ (ไม่เกิน 1MB)
-        if (file.size > 1024 * 1024) {
-          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 1MB' : 'Image size cannot exceed 1MB', 'error');
+        // 1. ตรวจสอบขนาดไฟล์รูปถ่ายจากมือถือ (ไม่เกิน 15MB)
+        if (file.size > 15 * 1024 * 1024) {
+          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 15MB' : 'Image size cannot exceed 15MB', 'error');
           return;
         }
 
@@ -2932,9 +2932,9 @@ function initAdminForms() {
 
       // Check if file is selected for upload to Google Drive
       if (file) {
-        // 1. ตรวจสอบขนาดไฟล์ (ไม่เกิน 1MB)
-        if (file.size > 1024 * 1024) {
-          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 1MB' : 'Image size cannot exceed 1MB', 'error');
+        // 1. ตรวจสอบขนาดไฟล์รูปถ่ายจากมือถือ (ไม่เกิน 15MB)
+        if (file.size > 15 * 1024 * 1024) {
+          showToast(state.language === 'th' ? 'ขนาดไฟล์รูปภาพห้ามเกิน 15MB' : 'Image size cannot exceed 15MB', 'error');
           return;
         }
 
