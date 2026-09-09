@@ -376,10 +376,22 @@ async function sendGasRequest(payload) {
     
     const response = await fetch(state.config.gasUrl, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
       body: JSON.stringify(payload)
     });
     
-    return await response.json();
+    const textRes = await response.text();
+    try {
+      return JSON.parse(textRes);
+    } catch(jsonErr) {
+      console.error("GAS response is not valid JSON:", textRes);
+      if (textRes.indexOf("Google Accounts") !== -1 || textRes.indexOf("accounts.google.com") !== -1 || textRes.indexOf("Service Login") !== -1) {
+        throw new Error("Google Apps Script Access Error: 'Who has access' must be set to 'Anyone' in GAS deployment settings.");
+      }
+      throw new Error("GAS returned non-JSON response: " + textRes.substring(0, 100));
+    }
   } catch (err) {
     console.error("GAS request failed:", err);
     throw err;
@@ -583,16 +595,14 @@ function loadStateFromStorage() {
   try {
     if (localConfig) {
       const parsedConfig = JSON.parse(localConfig);
-      // Merge values but keep hardcoded defaults if local storage values are empty
-      if (!parsedConfig.supabaseUrl) parsedConfig.supabaseUrl = state.config.supabaseUrl;
-      if (!parsedConfig.supabaseKey) parsedConfig.supabaseKey = state.config.supabaseKey;
-      if (!parsedConfig.liffId) parsedConfig.liffId = state.config.liffId;
-      if (!parsedConfig.gasUrl) parsedConfig.gasUrl = state.config.gasUrl;
-      if (!parsedConfig.webhookSecret) parsedConfig.webhookSecret = state.config.webhookSecret;
-      if (parsedConfig.bookingNotice !== undefined) state.config.bookingNotice = parsedConfig.bookingNotice;
-      if (parsedConfig.adminNotepad !== undefined) state.config.adminNotepad = parsedConfig.adminNotepad;
       state.config = { ...state.config, ...parsedConfig };
     }
+    // Always enforce fallback defaults if empty or undefined
+    if (!state.config.supabaseUrl) state.config.supabaseUrl = "https://eqwmodrhorcbwsshbepg.supabase.co";
+    if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
+    if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
+    if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
+    if (!state.config.webhookSecret) state.config.webhookSecret = "grandslam_secret_key_2026";
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
@@ -2284,6 +2294,7 @@ function initBookingWizard() {
              }
              showToast(errorMsg, 'error');
           } else {
+             // Supabase recorded 100% successfully!
              showToast(translations[state.language].toastBookingSuccess, 'success');
 
              // Reset coach selection to default "No Coach" for next booking
@@ -2307,7 +2318,7 @@ function initBookingWizard() {
                console.error("Failed to save booking profile to localStorage:", e);
              }
 
-             // Trigger notifications via GAS
+             // Trigger notifications & Google Sheets/Calendar sync via GAS (ONLY AFTER SUPABASE SUCCEEDS!)
              if (state.config.gasUrl) {
                sendBookingConfirmationNotifications({
                  bookingKey: invoiceNumber,
