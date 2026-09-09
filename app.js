@@ -521,6 +521,16 @@ function calculateTotalFee() {
   return total;
 }
 
+// Helper: Dynamically get current coach selection status directly from DOM radio or state fallback
+function getRequireCoach() {
+  const yesRadio = document.getElementById('coachYesRadio');
+  if (yesRadio) {
+    state.requireCoach = yesRadio.checked;
+    return yesRadio.checked;
+  }
+  return !!state.requireCoach;
+}
+
 // ----------------------------------------------------
 // UI Notification Toast System
 // ----------------------------------------------------
@@ -1397,7 +1407,7 @@ async function createSlotHold(dateStr, slots) {
         customer_name: "ลูกค้ากำลังโอนเงิน",
         phone: "0800000000",
         email: "hold@grandslam.com",
-        require_coach: state.requireCoach,
+        require_coach: getRequireCoach(),
         fee: getSlotPrice(slot),
         invoice_no: "HOLD_" + holdId.substring(5, 13),
         receipt_no: "HOLD",
@@ -1715,14 +1725,27 @@ function initBookingWizard() {
   const noCoachRadio = document.getElementById('coachNoRadio');
   const yesCoachRadio = document.getElementById('coachYesRadio');
 
+  const updateCoachState = () => {
+    const isCoach = getRequireCoach();
+    state.requireCoach = isCoach;
+    showSummaryPanel();
+  };
+
   if (noCoachRadio && yesCoachRadio) {
-    noCoachRadio.addEventListener('change', () => {
-      state.requireCoach = false;
-      showSummaryPanel();
+    ['change', 'click', 'input'].forEach(evtType => {
+      noCoachRadio.addEventListener(evtType, updateCoachState);
+      yesCoachRadio.addEventListener(evtType, updateCoachState);
     });
-    yesCoachRadio.addEventListener('change', () => {
-      state.requireCoach = true;
-      showSummaryPanel();
+
+    noCoachRadio.closest('label')?.addEventListener('click', () => {
+      noCoachRadio.checked = true;
+      yesCoachRadio.checked = false;
+      updateCoachState();
+    });
+    yesCoachRadio.closest('label')?.addEventListener('click', () => {
+      yesCoachRadio.checked = true;
+      noCoachRadio.checked = false;
+      updateCoachState();
     });
   }
 
@@ -1789,7 +1812,7 @@ function initBookingWizard() {
 
       document.getElementById('modalSelectedDate').textContent = dateText;
       document.getElementById('modalSelectedSlot').textContent = sortedSlots.join(', ');
-      document.getElementById('modalSelectedCoach').textContent = state.requireCoach ? 
+      document.getElementById('modalSelectedCoach').textContent = getRequireCoach() ? 
         translations[state.language].txtNeedCoach : translations[state.language].txtNoCoach;
       
       // Pre-fill user profile from localStorage if exists
@@ -2127,7 +2150,7 @@ function initBookingWizard() {
         state.currentHoldId = null;
         state.holdExpiresAt = null;
 
-        const bookingKey = "bk_" + generateUUID();
+        const isCoachRequired = getRequireCoach();
 
         // 2. Insert/Update bookings in Supabase
         for (const slot of slotsBooked) {
@@ -2145,7 +2168,7 @@ function initBookingWizard() {
             lineUserId: state.liffProfile ? state.liffProfile.userId : '',
             slipUrl: slipUrl,
             court: "Main Court",
-            requireCoach: state.requireCoach,
+            requireCoach: isCoachRequired,
             fee: slotPrice,
             invoiceNo: invoiceNumber,
             receiptNo: receiptNumber
@@ -2166,7 +2189,7 @@ function initBookingWizard() {
                type: 'income',
                category: 'Court Rental',
                amount: slotPrice,
-               description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (state.requireCoach ? ' (+โค้ช)' : '')
+               description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (isCoachRequired ? ' (+โค้ช)' : '')
              };
              await addTransactionToSupabase(courtTx);
           } else {
@@ -2193,6 +2216,15 @@ function initBookingWizard() {
         } else {
            showToast(translations[state.language].toastBookingSuccess, 'success');
 
+           // Reset coach selection to default "No Coach" for next booking
+           const noCoachRadio = document.getElementById('coachNoRadio');
+           const yesCoachRadio = document.getElementById('coachYesRadio');
+           if (noCoachRadio && yesCoachRadio) {
+             noCoachRadio.checked = true;
+             yesCoachRadio.checked = false;
+             state.requireCoach = false;
+           }
+
            // Save booking profile to localStorage for auto-filling next time
            try {
              localStorage.setItem('bookingProfile', JSON.stringify({
@@ -2218,7 +2250,7 @@ function initBookingWizard() {
                receiptNo: receiptNumber,
                lineIdInput: lineIdInput,
                lineUserId: state.liffProfile ? state.liffProfile.userId : '',
-               requireCoach: state.requireCoach,
+               requireCoach: isCoachRequired,
                slipUrl: slipUrl,
                court: "Main Court"
              });
