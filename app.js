@@ -943,7 +943,7 @@ async function fetchBookingsFromSupabase(silent = false) {
       const activeData = data.filter(b => b.status !== 'cancelled');
       
       const nowTs = Date.now();
-      const dbBookings = activeData.map(b => {
+      let dbBookings = activeData.map(b => {
         const notes = b.admin_notes || "";
         let isPendingHold = (b.status === 'pending_hold');
         let expTime = null;
