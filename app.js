@@ -1050,15 +1050,20 @@ async function fetchBookingsFromSupabase(silent = false) {
       saveStateToStorage();
 
       // Trigger automatic UI refresh whenever latest bookings arrive from Supabase
-      renderTimeSlotsUI();
-      if (document.getElementById('availability') && document.getElementById('availability').classList.contains('active')) {
-        renderAvailabilityGrid();
+      try {
+        renderTimeSlotsUI();
+        if (document.getElementById('availability') && document.getElementById('availability').classList.contains('active')) {
+          renderAvailabilityGrid();
+        }
+      } catch (uiErr) {
+        console.warn("UI refresh warning inside fetchBookingsFromSupabase:", uiErr);
       }
     }
   } catch (error) {
     console.error("Failed to fetch bookings from Supabase:", error);
     if (!silent) {
-      showToast("ไม่สามารถดึงข้อมูลการจองล่าสุดจากเซิร์ฟเวอร์ได้", "error");
+      const errMsg = (error && error.message) ? error.message : String(error);
+      showToast("ไม่สามารถดึงข้อมูลการจองล่าสุดจากเซิร์ฟเวอร์ได้ (" + errMsg + ")", "error");
     }
   } finally {
     state.isFetchingBookings = false;
@@ -4475,7 +4480,7 @@ async function init() {
 
   // Fetch remote bookings asynchronously in background
   try {
-    await fetchBookingsFromSupabase();
+    await fetchBookingsFromSupabase(true);
     await checkAdminSession();
   } catch (err) {
     console.warn("Background fetch error on init:", err);
@@ -4724,6 +4729,9 @@ function renderAvailabilityGrid() {
 
   // Get date range array (7 days: Monday to Sunday)
   const days = [];
+  if (!state.availabilityStartOfWeek || isNaN(new Date(state.availabilityStartOfWeek).getTime())) {
+    state.availabilityStartOfWeek = getMonday(new Date());
+  }
   const start = new Date(state.availabilityStartOfWeek);
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
