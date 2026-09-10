@@ -987,7 +987,20 @@ async function fetchBookingsFromSupabase(silent = false) {
           isRainout: notes.includes('[ฝนตก]'),
           calendarEventId: b.calendar_event_id || ""
         };
-      }).filter(b => {
+      });
+
+      // Background purge: Delete expired pending_hold rows from Supabase DB automatically
+      const expiredHoldIds = dbBookings
+        .filter(b => b.status === 'pending_hold' && b.holdExpiresAt && nowTs >= b.holdExpiresAt)
+        .map(b => b.id);
+
+      if (expiredHoldIds.length > 0 && supabaseClient) {
+        supabaseClient.from('bookings').delete().in('id', expiredHoldIds).then(({ error }) => {
+          if (error) console.warn("Background purge of expired holds failed:", error);
+        });
+      }
+
+      dbBookings = dbBookings.filter(b => {
         if (b.status === 'pending_hold' && b.holdExpiresAt && nowTs >= b.holdExpiresAt) {
           return false; // Filter out expired hold
         }
@@ -2034,9 +2047,11 @@ function initBookingWizard() {
         state.bookings.some(b => {
           if (!isSameDate(b.date, dateStr) || !isSameSlot(b.slot, slot)) return false;
           if (b.status === 'pending_hold') {
-            return b.holdExpiresAt && nowTs < b.holdExpiresAt && b.holdId !== state.currentHoldId;
+            const isHoldActive = b.holdExpiresAt ? (nowTs < b.holdExpiresAt) : false;
+            if (!isHoldActive) return false; // Expired or invalid hold is NOT a collision
+            return b.holdId !== state.currentHoldId; // Collision only if held by another active hold session
           }
-          return true; // Confirmed booking
+          return true; // Confirmed booking collision
         })
       );
 
