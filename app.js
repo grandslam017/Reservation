@@ -3287,6 +3287,11 @@ function renderBookingsTable() {
   const tbody = document.getElementById('bookingsTableBody');
   if (!tbody) return;
 
+  // Protect active user typing: If user is currently focused inside the bookings table (e.g. editing notes), skip re-rendering to prevent focus loss & premature auto-save.
+  if (tbody.contains(document.activeElement)) {
+    return;
+  }
+
   tbody.innerHTML = '';
 
   // Get Admin filters
@@ -4662,7 +4667,7 @@ async function init() {
   }
 
   // === Auto-refresh mechanism ===
-  // Fetch latest bookings from Supabase every 4 seconds to keep timeslots updated
+  // Fetch latest bookings from Supabase every 60 seconds (1 minute) to keep timeslots updated
   if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
   state.autoRefreshTimer = setInterval(async () => {
     if (state.config.supabaseUrl && state.config.supabaseKey && !state.isFetchingBookings) {
@@ -4689,7 +4694,7 @@ async function init() {
         renderAdminDashboard();
       }
     }
-  }, 4000);
+  }, 60000);
 
   // Initialize Weekly Availability Start Date (Monday of current week)
   state.availabilityStartOfWeek = getMonday(new Date());
