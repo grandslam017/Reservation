@@ -3481,10 +3481,10 @@ function renderBookingsTable() {
       </td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td>
-        <input type="text" class="form-control customer-booking-note" 
+        <input type="text" class="form-control customer-booking-note text-accent" 
                data-booking-id="${booking.id}" 
                value="${booking.customerNotes || ''}" 
-               style="width: 130px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: #facc15;" 
+               style="width: 130px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: var(--accent-color);" 
                placeholder="ไม่มีโน้ต"
                title="${booking.customerNotes || 'ไม่มีโน้ตจากลูกค้า'}">
       </td>
