@@ -1483,7 +1483,8 @@ async function createSlotHold(dateStr, slots) {
         }
       }
 
-      const dbHolds = slots.map(slot => ({
+      const dbHolds = slots.map((slot, idx) => ({
+        id: generateUUID(),
         booking_date: cleanDate,
         time_slot: slot,
         customer_name: "ลูกค้ากำลังโอนเงิน",
@@ -1491,19 +1492,20 @@ async function createSlotHold(dateStr, slots) {
         email: "hold@grandslam.com",
         require_coach: getRequireCoach(),
         fee: getSlotPrice(slot),
-        invoice_no: "HOLD_" + holdId.substring(5, 13),
-        receipt_no: "HOLD",
+        invoice_no: "HOLD_" + generateUUID().substring(0, 12),
+        receipt_no: "HOLD_" + generateUUID().substring(0, 12),
         status: "pending_hold",
         admin_notes: `[pending_hold:${expiresAt}:${holdId}]`
       }));
       const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
       if (error) {
         console.error("Supabase Hold Insert Error:", error);
-        return false; // Hold creation failed due to DB collision or constraint
+        if (error.code === '23505') {
+          return false; // Hold creation failed due to DB collision
+        }
       }
     } catch (err) {
       console.error("Failed to sync hold to Supabase:", err);
-      return false;
     }
   }
 
@@ -1598,8 +1600,10 @@ async function releaseSlotHold(isExpired = false) {
         : "Payment time expired (3 mins). Slots released.",
       'error'
     );
-    const modal = document.getElementById('invoiceSlipModal');
-    if (modal) modal.style.display = 'none';
+    const invoiceModal = document.getElementById('invoiceSlipModal');
+    if (invoiceModal) invoiceModal.style.display = 'none';
+    const bookingModal = document.getElementById('bookingModal');
+    if (bookingModal) bookingModal.style.display = 'none';
     state.selectedSlots = [];
     showSummaryPanel();
     renderTimeSlotsUI();
@@ -2115,6 +2119,17 @@ function initBookingWizard() {
       closeModal();
       document.getElementById('invoiceSlipModal').style.display = 'flex';
       state.isTransitioningToInvoice = false;
+
+      if (state.holdExpiresAt) {
+        const remainingMs = state.holdExpiresAt - Date.now();
+        if (remainingMs > 0) {
+          const totalSec = Math.ceil(remainingMs / 1000);
+          const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+          const secs = String(totalSec % 60).padStart(2, '0');
+          const countdownEl = document.getElementById('holdCountdownText');
+          if (countdownEl) countdownEl.textContent = `${mins}:${secs}`;
+        }
+      }
       
       // Setup Slip Upload Flow
       const btnConfirmPayment = document.getElementById('btnConfirmPayment');
