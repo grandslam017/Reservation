@@ -824,7 +824,8 @@ async function syncBookingWithSupabase(booking, activeHoldId = null) {
           require_coach: booking.requireCoach,
           fee: booking.fee,
           status: 'confirmed',
-          admin_notes: '' // Clear hold notes
+          customer_notes: booking.customerNotes || '',
+          admin_notes: booking.adminNotes || ''
         })
         .eq('booking_date', booking.date)
         .eq('time_slot', booking.slot)
@@ -861,7 +862,9 @@ async function syncBookingWithSupabase(booking, activeHoldId = null) {
         court: booking.court,
         require_coach: booking.requireCoach,
         fee: booking.fee,
-        status: 'confirmed'
+        status: 'confirmed',
+        customer_notes: booking.customerNotes || '',
+        admin_notes: booking.adminNotes || ''
       }])
       .select();
 
@@ -979,7 +982,8 @@ async function fetchBookingsFromSupabase(silent = false) {
           receiptNo: b.receipt_no,
           court: b.court,
           requireCoach: b.require_coach,
-          fee: parseFloat(b.fee) || 0,
+          fee: (!isNaN(parseFloat(b.fee)) && parseFloat(b.fee) > 0) ? parseFloat(b.fee) : getSlotPrice(b.time_slot),
+          customerNotes: b.customer_notes || "",
           adminNotes: notes,
           status: isPendingHold ? "pending_hold" : (b.status || "confirmed"),
           holdId: hId,
@@ -1925,6 +1929,7 @@ function initBookingWizard() {
     document.getElementById('custPhone').value = '';
     document.getElementById('custEmail').value = '';
     document.getElementById('custVehicle').value = '';
+    if (document.getElementById('custCustomerNote')) document.getElementById('custCustomerNote').value = '';
     const checkPrivacy = document.getElementById('consentPrivacyCheck');
     if (checkPrivacy) checkPrivacy.checked = false;
     if (btnModalConfirm) {
@@ -2022,6 +2027,8 @@ function initBookingWizard() {
       const name = nameInput.value.trim();
       const phone = phoneInput.value.trim();
       const email = emailInput.value.trim();
+      const userNote = document.getElementById('custCustomerNote')?.value.trim() || '';
+      state.pendingUserNote = userNote;
 
       if (!name) {
         showToast(translations[state.language].toastFillRequired, 'error');
@@ -2271,7 +2278,9 @@ function initBookingWizard() {
               requireCoach: isCoachRequired,
               fee: slotPrice,
               invoiceNo: invoiceNumber,
-              receiptNo: receiptNumber
+              receiptNo: receiptNumber,
+              customerNotes: state.pendingUserNote || '',
+              adminNotes: ''
             };
 
             const result = await syncBookingWithSupabase(newBooking, activeHoldId);
@@ -2303,6 +2312,7 @@ function initBookingWizard() {
           saveStateToStorage();
 
           state.selectedSlots = [];
+          state.pendingUserNote = '';
           showSummaryPanel(); // Resets back to 0 ฿
 
           if (hasCollision) {
@@ -3317,21 +3327,25 @@ function renderBookingsTable() {
   // Get Admin Search query
   const query = document.getElementById('bookingSearchInput')?.value.toLowerCase().trim() || '';
   
-  // Filter bookings by customer name, phone number, or admin notes
+  // Filter bookings by customer name, email, phone number, invoice/receipt, customer notes, or admin notes
   if (query !== '') {
     const cleanQueryPhone = query.replace(/[^0-9]/g, '');
     filteredBookings = filteredBookings.filter(b => {
       const nameMatch = (b.name || '').toLowerCase().includes(query);
+      const emailMatch = (b.email || '').toLowerCase().includes(query);
       const cleanPhone = (b.phone || '').toString().replace(/[^0-9]/g, '');
       const phoneMatch = cleanQueryPhone !== '' && cleanPhone.includes(cleanQueryPhone);
       const rawPhoneMatch = (b.phone || '').toString().toLowerCase().includes(query);
       const notesMatch = (b.adminNotes || '').toLowerCase().includes(query);
-      return nameMatch || phoneMatch || rawPhoneMatch || notesMatch;
+      const custNotesMatch = (b.customerNotes || '').toLowerCase().includes(query);
+      const invoiceMatch = (b.invoiceNo || '').toLowerCase().includes(query);
+      const receiptMatch = (b.receiptNo || '').toLowerCase().includes(query);
+      return nameMatch || emailMatch || phoneMatch || rawPhoneMatch || notesMatch || custNotesMatch || invoiceMatch || receiptMatch;
     });
   }
 
   if (filteredBookings.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบรายการจองสนามที่ค้นหา' : 'No matching bookings found'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><i class="fa-regular fa-calendar-xmark"></i>${state.language === 'th' ? 'ไม่พบรายการจองสนามที่ค้นหา' : 'No matching bookings found'}</td></tr>`;
     return;
   }
 
@@ -3411,10 +3425,17 @@ function renderBookingsTable() {
       </td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td>
+        ${booking.customerNotes ? `
+          <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); padding: 0.3rem 0.55rem; border-radius: 6px; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${booking.customerNotes}">
+            <i class="fa-regular fa-comment-dots"></i> ${booking.customerNotes}
+          </span>
+        ` : `<span style="color: var(--text-secondary); font-size: 0.8rem;">-</span>`}
+      </td>
+      <td>
         <input type="text" class="form-control admin-booking-note" 
                data-booking-id="${booking.id}" 
                value="${booking.adminNotes || ''}" 
-               style="width: 150px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: var(--text-primary);" 
+               style="width: 130px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: var(--text-primary);" 
                placeholder="จดโน้ต...">
       </td>
       <td style="display: flex; gap: 0.5rem; align-items: center; min-height: 55px;">
@@ -4084,6 +4105,7 @@ function openEditBookingModal(booking) {
   const inputPhone = document.getElementById('editCustPhone');
   const inputEmail = document.getElementById('editCustEmail');
   const inputLineId = document.getElementById('editCustLineId');
+  const inputFee = document.getElementById('editCustFee');
 
   if (modal && txtId && inputName && inputPhone && inputEmail && inputLineId) {
     txtId.value = booking.id;
@@ -4091,6 +4113,9 @@ function openEditBookingModal(booking) {
     inputPhone.value = booking.phone || "";
     inputEmail.value = booking.email || "";
     inputLineId.value = booking.lineUserId || "";
+    if (inputFee) {
+      inputFee.value = (typeof booking.fee !== 'undefined' && booking.fee !== null) ? booking.fee : getSlotPrice(booking.slot);
+    }
     modal.style.display = 'flex';
   }
 }
@@ -4101,6 +4126,7 @@ async function handleEditBookingSave() {
   const newPhone = document.getElementById('editCustPhone')?.value.trim();
   const newEmail = document.getElementById('editCustEmail')?.value.trim();
   const newLineUserId = document.getElementById('editCustLineId')?.value.trim();
+  const rawFeeVal = parseFloat(document.getElementById('editCustFee')?.value);
 
   if (!bookingId || !newName || !newPhone) {
     showToast(state.language === 'th' ? "กรุณากรอกชื่อและเบอร์โทรศัพท์" : "Please fill in Name and Phone number", 'error');
@@ -4110,6 +4136,7 @@ async function handleEditBookingSave() {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (!booking) return;
 
+  const newFee = (!isNaN(rawFeeVal) && rawFeeVal >= 0) ? rawFeeVal : getSlotPrice(booking.slot);
   const effectiveLineUserId = newLineUserId ? newLineUserId : (booking.lineUserId || "");
 
   showToast(state.language === 'th' ? "กำลังบันทึกข้อมูล..." : "Saving customer info...", 'info');
@@ -4123,7 +4150,8 @@ async function handleEditBookingSave() {
           customer_name: newName, 
           phone: newPhone,
           email: newEmail || null,
-          line_user_id: effectiveLineUserId || null
+          line_user_id: effectiveLineUserId || null,
+          fee: newFee
         })
         .eq('id', bookingId);
 
@@ -4140,6 +4168,7 @@ async function handleEditBookingSave() {
   booking.phone = newPhone;
   booking.email = newEmail;
   booking.lineUserId = effectiveLineUserId;
+  booking.fee = newFee;
   saveStateToStorage();
 
   // 2. Notify Google Apps Script to update sheet and calendar event

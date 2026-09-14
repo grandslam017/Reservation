@@ -317,43 +317,44 @@
           <button id="btnModalClose" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 0.65rem 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
               <span style="color: var(--text-secondary);">วันที่ (Date):</span>
               <span id="modalSelectedDate" style="font-weight:600; color: var(--accent-color);">-</span>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem; align-items: flex-start;">
               <span style="color: var(--text-secondary); white-space: nowrap;">ช่วงเวลา (Time):</span>
               <span id="modalSelectedSlot" style="font-weight:600; color: var(--accent-color); text-align: right; word-break: break-all; max-width: 70%;">-</span>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--text-secondary);">ผู้ฝึกสอน (Coach):</span>
               <span id="modalSelectedCoach" style="font-weight:600; color: var(--accent-color);">-</span>
             </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary);">อีเมล (Email):</span>
-              <span id="modalSelectedEmail" style="font-weight:600; color: var(--accent-color);">-</span>
-            </div>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 0.6rem;">
             <label for="custName" class="form-label" data-translate="labelCustName">ชื่อลูกค้า *</label>
             <input type="text" id="custName" class="form-control" data-translate-placeholder="placeholderName" placeholder="เช่น หนูดี" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 0.6rem;">
             <label for="custVehicle" class="form-label">ทะเบียนรถ</label>
             <input type="text" id="custVehicle" class="form-control" placeholder="กรณีมีเหตุสุดวิสัยจะได้สามารถติดต่อได้สะดวก" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
           </div>
 
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 0.6rem;">
             <label for="custPhone" class="form-label" data-translate="labelCustPhone">เบอร์โทรศัพท์ติดต่อ (ไม่บังคับ)</label>
             <input type="tel" id="custPhone" class="form-control" data-translate-placeholder="placeholderPhone" placeholder="เช่น 089-4932242 (เบอร์แอดมิน)">
           </div>
 
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 0.6rem;">
             <label for="custEmail" class="form-label" data-translate="labelCustEmail">อีเมลสำหรับการยืนยันการจอง (ไม่บังคับ)</label>
             <input type="email" id="custEmail" class="form-control" data-translate-placeholder="placeholderEmail" placeholder="เช่น grandslamcourt@gmail.com">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.6rem;">
+            <label for="custCustomerNote" class="form-label" style="color: var(--accent-color);"><i class="fa-regular fa-comment-dots"></i> โน้ตถึงแอดมิน (Note to Admin)</label>
+            <textarea id="custCustomerNote" class="form-control" style="height: 55px; resize: none; font-size: 0.85rem; background: rgba(0,0,0,0.25);" placeholder="ระบุข้อความเพิ่มเติมถึงแอดมิน (เช่น ขอยืมไม้เทนนิส, ขอน้ำดื่ม)..."></textarea>
           </div>
           
           <div class="checkbox-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--panel-border); display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; width: 100%;">
@@ -549,6 +550,11 @@
           <div class="form-group">
             <label for="editCustLineId" class="form-label">LINE User ID</label>
             <input type="text" id="editCustLineId" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);">
+          </div>
+
+          <div class="form-group">
+            <label for="editCustFee" class="form-label">ค่าสนาม (Court Fee ฿) *</label>
+            <input type="number" id="editCustFee" class="form-control" style="background: rgba(0,0,0,0.1); border: 1px solid var(--panel-border); color: var(--text-primary);" min="0" step="50">
           </div>
         </div>
         <div class="modal-footer" style="justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid var(--panel-border);">
@@ -1018,7 +1024,7 @@
               <!-- Search bar -->
               <div style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 0.4rem 0.8rem; border-radius: 8px;">
                 <i class="fa-solid fa-magnifying-glass" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
-                <input type="text" id="bookingSearchInput" style="background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.9rem; flex-grow: 1; font-family: var(--font-family);" placeholder="ค้นหาด้วยชื่อ หรือ เบอร์โทรศัพท์ (Search by name or phone)...">
+                <input type="text" id="bookingSearchInput" style="background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.9rem; flex-grow: 1; font-family: var(--font-family);" placeholder="ค้นหาด้วยชื่อ, เบอร์โทรศัพท์ หรือ อีเมล (Search by name, phone, or email)...">
               </div>
               
               <!-- Year filter -->
@@ -1062,7 +1068,8 @@
                   <th data-translate="thBookPhone">เบอร์โทร</th>
                   <th data-translate="thBookCoach">โค้ช</th>
                   <th data-translate="thBookFee">ค่าบริการ</th>
-                  <th>โน้ตเพิ่มเติม</th>
+                  <th style="color: #60a5fa;"><i class="fa-regular fa-comment-dots"></i> โน้ตจากลูกค้า</th>
+                  <th>โน้ตแอดมิน</th>
                   <th data-translate="thBookAction">จัดการ</th>
                 </tr>
               </thead>
