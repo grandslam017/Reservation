@@ -3484,7 +3484,7 @@ function renderBookingsTable() {
         <input type="text" class="form-control customer-booking-note" 
                data-booking-id="${booking.id}" 
                value="${booking.customerNotes || ''}" 
-               style="width: 140px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px dashed #f59e0b; border-radius: 4px; color: #fbbf24;" 
+               style="width: 130px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(0,0,0,0.1); border: 1px dashed var(--panel-border); border-radius: 4px; color: #facc15;" 
                placeholder="ไม่มีโน้ต"
                title="${booking.customerNotes || 'ไม่มีโน้ตจากลูกค้า'}">
       </td>
