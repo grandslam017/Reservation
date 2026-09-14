@@ -293,7 +293,8 @@ const state = {
   autoRefreshTimer: null,
   currentHoldId: null,
   holdExpiresAt: null,
-  holdTimerInterval: null
+  holdTimerInterval: null,
+  isTransitioningToInvoice: false
 };
 
 // UUID Generator (RFC 4122 Compliant v4)
@@ -1938,7 +1939,7 @@ function initBookingWizard() {
       btnModalConfirm.style.cursor = 'not-allowed';
     }
     // Release hold if user closes/cancels modal 1 before confirming
-    if (state.currentHoldId && document.getElementById('invoiceSlipModal').style.display !== 'flex') {
+    if (state.currentHoldId && !state.isTransitioningToInvoice && document.getElementById('invoiceSlipModal').style.display !== 'flex') {
       releaseSlotHold(false);
     }
   };
@@ -2103,13 +2104,17 @@ function initBookingWizard() {
       // Reset Slip UI
       const fileInputEl = document.getElementById('slipUpload') || document.getElementById('slipInput'); if (fileInputEl) fileInputEl.value = '';
       if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
+      if (document.getElementById('promptPayBox')) document.getElementById('promptPayBox').style.display = 'block';
+      if (document.getElementById('slipUploadGroup')) document.getElementById('slipUploadGroup').style.display = 'block';
       if (document.getElementById('receiptBox')) document.getElementById('receiptBox').style.display = 'none';
       document.getElementById('btnConfirmPayment').style.display = 'block';
       document.getElementById('btnFinishBooking').style.display = 'none';
 
       // Hide booking modal, show invoice modal
+      state.isTransitioningToInvoice = true;
       closeModal();
       document.getElementById('invoiceSlipModal').style.display = 'flex';
+      state.isTransitioningToInvoice = false;
       
       // Setup Slip Upload Flow
       const btnConfirmPayment = document.getElementById('btnConfirmPayment');
@@ -2182,6 +2187,8 @@ function initBookingWizard() {
             
             receiptNumber = 'R.' + invoiceNumber.replace('INV.', '');
             document.getElementById('receiptNumber').textContent = receiptNumber;
+            if (document.getElementById('promptPayBox')) document.getElementById('promptPayBox').style.display = 'none';
+            if (document.getElementById('slipUploadGroup')) document.getElementById('slipUploadGroup').style.display = 'none';
             document.getElementById('receiptBox').style.display = 'block';
             btnFinishBooking.style.display = 'block';
             isConfirmProcessing = false; // Unlock after image is ready
