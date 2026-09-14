@@ -883,6 +883,40 @@ async function syncBookingWithSupabase(booking, activeHoldId = null) {
   }
 }
 
+async function updateBookingNoteInSupabase(bookingId, adminNotes) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (booking) {
+    booking.adminNotes = adminNotes;
+    saveStateToStorage();
+  }
+  if (!supabaseClient) return;
+  try {
+    await supabaseClient
+      .from('bookings')
+      .update({ admin_notes: adminNotes })
+      .eq('id', bookingId);
+  } catch (err) {
+    console.error("Failed to update admin_notes in Supabase:", err);
+  }
+}
+
+async function updateCustomerNoteInSupabase(bookingId, customerNotes) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (booking) {
+    booking.customerNotes = customerNotes;
+    saveStateToStorage();
+  }
+  if (!supabaseClient) return;
+  try {
+    await supabaseClient
+      .from('bookings')
+      .update({ customer_notes: customerNotes })
+      .eq('id', bookingId);
+  } catch (err) {
+    console.error("Failed to update customer_notes in Supabase:", err);
+  }
+}
+
 function isSameDate(d1, d2) {
   if (!d1 || !d2) return false;
   const normalizeDate = (d) => {
@@ -3447,11 +3481,12 @@ function renderBookingsTable() {
       </td>
       <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
       <td>
-        ${booking.customerNotes ? `
-          <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); padding: 0.3rem 0.55rem; border-radius: 6px; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${booking.customerNotes}">
-            <i class="fa-regular fa-comment-dots"></i> ${booking.customerNotes}
-          </span>
-        ` : `<span style="color: var(--text-secondary); font-size: 0.8rem;">-</span>`}
+        <input type="text" class="form-control customer-booking-note" 
+               data-booking-id="${booking.id}" 
+               value="${booking.customerNotes || ''}" 
+               style="width: 140px; font-size: 0.85rem; padding: 0.25rem 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px dashed #f59e0b; border-radius: 4px; color: #fbbf24;" 
+               placeholder="ไม่มีโน้ต"
+               title="${booking.customerNotes || 'ไม่มีโน้ตจากลูกค้า'}">
       </td>
       <td>
         <input type="text" class="form-control admin-booking-note" 
@@ -3512,6 +3547,18 @@ function renderBookingsTable() {
         if (confirm(confirmMsg)) {
           toggleCoachStatus(booking.id);
         }
+      });
+    }
+
+    const custNoteInput = row.querySelector('.customer-booking-note');
+    if (custNoteInput) {
+      custNoteInput.addEventListener('change', async (e) => {
+        const newCustNote = e.target.value.trim();
+        const bId = e.target.getAttribute('data-booking-id');
+        
+        showToast(state.language === 'th' ? "กำลังบันทึกโน้ตลูกค้า..." : "Saving customer note...", 'info');
+        await updateCustomerNoteInSupabase(bId, newCustNote);
+        showToast(state.language === 'th' ? "บันทึกโน้ตลูกค้าเรียบร้อย" : "Customer note saved successfully", 'success');
       });
     }
 
