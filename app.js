@@ -905,6 +905,22 @@ async function updateCustomerNoteInSupabase(bookingId, customerNotes) {
   if (booking) {
     booking.customerNotes = customerNotes;
     saveStateToStorage();
+
+    if (state.config.gasUrl) {
+      sendGasRequest({
+        action: "updateNotes",
+        id: bookingId,
+        name: booking.name,
+        phone: booking.phone,
+        date: booking.date,
+        slot: booking.slot,
+        receiptNo: booking.receiptNo,
+        requireCoach: booking.requireCoach,
+        customerNotes: customerNotes,
+        adminNotes: booking.adminNotes || "",
+        calendarEventId: booking.calendarEventId || ""
+      }).catch(err => console.error("GAS customer notes update trigger failed:", err));
+    }
   }
   if (!supabaseClient) return;
   try {
@@ -3668,7 +3684,8 @@ async function cancelBooking(bookingId) {
       name: booking.name,
       date: booking.date,
       slot: booking.slot,
-      court: booking.court || "Main Court"
+      court: booking.court || "Main Court",
+      calendarEventId: booking.calendarEventId || booking.calendar_event_id || ""
     }).catch(err => console.error("GAS booking cancellation trigger failed:", err));
   }
 
@@ -4100,7 +4117,8 @@ async function handleRescheduleSave() {
         name: booking.name,
         date: oldDate,
         slot: oldSlot,
-        court: booking.court || "Main Court"
+        court: booking.court || "Main Court",
+        calendarEventId: booking.calendarEventId || booking.calendar_event_id || ""
       });
 
       // Step B: Send new confirmation for the rescheduled booking details
@@ -4372,7 +4390,9 @@ async function updateBookingNoteInSupabase(bookingId, noteText) {
         slot: booking.slot,
         receiptNo: booking.receiptNo,
         requireCoach: booking.requireCoach,
-        adminNotes: noteText
+        customerNotes: booking.customerNotes || "",
+        adminNotes: noteText,
+        calendarEventId: booking.calendarEventId || ""
       }).catch(err => console.error("GAS booking notes update trigger failed:", err));
     }
   }
