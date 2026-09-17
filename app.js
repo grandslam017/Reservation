@@ -274,7 +274,7 @@ const state = {
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
     liffId: "2010398825-4Z3Ff2Gf",
     gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
-    webhookSecret: "grandslam_secret_key_2026", // คีย์รหัสความปลอดภัยสำหรับ Webhook
+    webhookSecret: "", // [Fix 1] ต้องตั้งค่าใน Admin Panel > Webhook Secret — ห้าม hardcode ที่นี่
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 1,    // Default 1 (อนุญาตจองล่วงหน้า 1 เดือน)
@@ -545,6 +545,20 @@ function getRequireCoach() {
 }
 
 // ----------------------------------------------------
+// Security Helper: HTML Escape (ป้องกัน XSS)
+// ----------------------------------------------------
+// ใช้ครอบข้อมูลที่มาจาก user/database ก่อนแทรกลง innerHTML ทุกครั้ง
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ----------------------------------------------------
 // UI Notification Toast System
 // ----------------------------------------------------
 function showToast(message, type = 'info', title = null) {
@@ -603,7 +617,7 @@ function loadStateFromStorage() {
     if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
     if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
     if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
-    if (!state.config.webhookSecret) state.config.webhookSecret = "grandslam_secret_key_2026";
+    // [Fix 1] webhookSecret ต้องตั้งค่าผ่าน Admin Panel เท่านั้น — ไม่มี hardcoded fallback
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
@@ -800,6 +814,113 @@ function initSupabaseClient() {
     console.error("Failed to initialize Supabase client:", err);
     supabaseClient = null;
   }
+}
+
+// ----------------------------------------------------
+// Atomic Multi-Slot Booking Confirmation via Supabase RPC
+// ----------------------------------------------------
+async function confirmBatchBookingsInSupabase({
+  dateStr,
+  slotsBooked,
+  name,
+  phone,
+  email,
+  lineIdInput,
+  lineUserId,
+  slipUrl,
+  invoiceNumber,
+  receiptNumber,
+  isCoachRequired,
+  activeHoldId,
+  customerNotes,
+  court = "Main Court"
+}) {
+  if (!supabaseClient) {
+    return { status: "local" };
+  }
+
+  const slotFees = slotsBooked.map(slot => getSlotPrice(slot));
+
+  try {
+    const { data, error } = await supabaseClient.rpc('confirm_booking_batch', {
+      p_booking_date: dateStr,
+      p_slots: slotsBooked,
+      p_court: court,
+      p_customer_name: name,
+      p_phone: phone,
+      p_email: email || '',
+      p_line_id_input: lineIdInput || '',
+      p_line_user_id: lineUserId || '',
+      p_slip_url: slipUrl || null,
+      p_invoice_no: invoiceNumber,
+      p_receipt_no: receiptNumber,
+      p_require_coach: isCoachRequired,
+      p_slot_fees: slotFees,
+      p_hold_id: activeHoldId || null,
+      p_customer_notes: customerNotes || '',
+      p_admin_notes: ''
+    });
+
+    if (error) {
+      console.error("Supabase RPC confirm_booking_batch error:", error);
+      // Fallback สำหรับกรณีที่ยังไม่ได้รัน SQL Migration ใน Supabase
+      if (error.code === 'PGRST202' || (error.message && error.message.includes('confirm_booking_batch'))) {
+        console.warn("RPC function confirm_booking_batch not found in Supabase. Running sequential fallback...");
+        return await fallbackSequentialSync({
+          dateStr, slotsBooked, name, phone, email, lineIdInput, lineUserId,
+          slipUrl, invoiceNumber, receiptNumber, isCoachRequired, activeHoldId, customerNotes, court
+        });
+      }
+      return { status: "error", message: error.message || error.toString() };
+    }
+
+    if (data && data.success === true) {
+      return { status: "success", bookingIds: data.booking_ids || [] };
+    } else if (data && data.error === 'COLLISION') {
+      return { status: "collision", conflictSlots: data.conflict_slots || [] };
+    } else {
+      return { status: "error", message: data ? (data.message || data.error) : "Unknown booking error" };
+    }
+  } catch (err) {
+    console.error("Exception in confirmBatchBookingsInSupabase:", err);
+    return { status: "error", message: err.message || err.toString() };
+  }
+}
+
+// Fallback sequential sync if RPC function is not yet created on DB
+async function fallbackSequentialSync({
+  dateStr, slotsBooked, name, phone, email, lineIdInput, lineUserId,
+  slipUrl, invoiceNumber, receiptNumber, isCoachRequired, activeHoldId, customerNotes, court
+}) {
+  for (const slot of slotsBooked) {
+    const bookingId = generateUUID();
+    const slotPrice = getSlotPrice(slot);
+    const newBooking = {
+      id: bookingId,
+      date: dateStr,
+      slot: slot,
+      name: name,
+      phone: phone,
+      email: email,
+      lineIdInput: lineIdInput,
+      lineUserId: lineUserId,
+      slipUrl: slipUrl,
+      court: court,
+      requireCoach: isCoachRequired,
+      fee: slotPrice,
+      invoiceNo: invoiceNumber,
+      receiptNo: receiptNumber,
+      customerNotes: customerNotes || '',
+      adminNotes: ''
+    };
+    const res = await syncBookingWithSupabase(newBooking, activeHoldId);
+    if (res && res.status === "collision") {
+      return { status: "collision", conflictSlots: [slot] };
+    } else if (res && res.status !== "success" && res.status !== "local") {
+      return { status: "error", message: res.message || "Sequential booking failed" };
+    }
+  }
+  return { status: "success" };
 }
 
 async function syncBookingWithSupabase(booking, activeHoldId = null) {
@@ -2331,53 +2452,71 @@ function initBookingWizard() {
 
           const isCoachRequired = getRequireCoach();
 
-          // 2. Insert/Update bookings in Supabase
-          for (const slot of slotsBooked) {
-            const bookingId = generateUUID();
-            const slotPrice = getSlotPrice(slot);
-
-            const newBooking = {
-              id: bookingId,
-              date: dateStr,
-              slot: slot,
-              name: name,
-              phone: phone,
-              email: email,
-              lineIdInput: lineIdInput,
+          // 2. Insert/Update bookings in Supabase atomically via RPC
+          let batchResult;
+          if (supabaseClient) {
+            batchResult = await confirmBatchBookingsInSupabase({
+              dateStr,
+              slotsBooked,
+              name,
+              phone,
+              email,
+              lineIdInput,
               lineUserId: state.liffProfile ? state.liffProfile.userId : '',
-              slipUrl: slipUrl,
-              court: "Main Court",
-              requireCoach: isCoachRequired,
-              fee: slotPrice,
-              invoiceNo: invoiceNumber,
-              receiptNo: receiptNumber,
+              slipUrl,
+              invoiceNumber,
+              receiptNumber,
+              isCoachRequired,
+              activeHoldId,
               customerNotes: state.pendingUserNote || '',
-              adminNotes: ''
-            };
+              court: "Main Court"
+            });
+          } else {
+            batchResult = { status: "local" };
+          }
 
-            const result = await syncBookingWithSupabase(newBooking, activeHoldId);
-
-            if (result && result.status === "collision") {
-               hasCollision = true;
-            } else if (result && result.status === "success") {
-               // Handled automatically by Supabase Database Trigger (trigger_after_booking_insert)
-               // No client-side call to addTransactionToSupabase needed to avoid RLS blocks and duplicate transactions
-            } else if (result && result.status === "local") {
-               state.bookings.push(newBooking);
-               const courtTx = {
-                 id: 'tx_b_' + bookingId,
-                 date: dateStr,
-                 type: 'income',
-                 category: 'Court Rental',
-                 amount: slotPrice,
-                 description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (isCoachRequired ? ' (+โค้ช)' : '')
-               };
-               await addTransactionToSupabase(courtTx);
-            } else {
-               hasError = true;
-               if (result && result.message) {
-                 gasErrorMessage = result.message;
-               }
+          if (batchResult && batchResult.status === "collision") {
+            hasCollision = true;
+            if (batchResult.conflictSlots && batchResult.conflictSlots.length > 0) {
+              gasErrorMessage = batchResult.conflictSlots.join(', ');
+            }
+          } else if (batchResult && batchResult.status === "local") {
+            for (const slot of slotsBooked) {
+              const bookingId = generateUUID();
+              const slotPrice = getSlotPrice(slot);
+              const newBooking = {
+                id: bookingId,
+                date: dateStr,
+                slot: slot,
+                name: name,
+                phone: phone,
+                email: email,
+                lineIdInput: lineIdInput,
+                lineUserId: state.liffProfile ? state.liffProfile.userId : '',
+                slipUrl: slipUrl,
+                court: "Main Court",
+                requireCoach: isCoachRequired,
+                fee: slotPrice,
+                invoiceNo: invoiceNumber,
+                receiptNo: receiptNumber,
+                customerNotes: state.pendingUserNote || '',
+                adminNotes: ''
+              };
+              state.bookings.push(newBooking);
+              const courtTx = {
+                id: 'tx_b_' + bookingId,
+                date: dateStr,
+                type: 'income',
+                category: 'Court Rental',
+                amount: slotPrice,
+                description: `ค่าเช่าสนาม: คุณ ${name} (${slot}) [Receipt: ${receiptNumber}]` + (isCoachRequired ? ' (+โค้ช)' : '')
+              };
+              await addTransactionToSupabase(courtTx);
+            }
+          } else if (batchResult && batchResult.status !== "success") {
+            hasError = true;
+            if (batchResult.message) {
+              gasErrorMessage = batchResult.message;
             }
           }
 
@@ -2388,16 +2527,17 @@ function initBookingWizard() {
           showSummaryPanel(); // Resets back to 0 ฿
 
           if (hasCollision) {
-             showToast(translations[state.language].toastBookingCollision, 'error');
+            const conflictText = gasErrorMessage ? ` (${gasErrorMessage})` : '';
+            showToast(translations[state.language].toastBookingCollision + conflictText, 'error');
           } else if (hasError) {
-             let errorMsg = translations[state.language].toastGasFail;
-             if (gasErrorMessage) {
-               errorMsg += `: ${gasErrorMessage}`;
-             }
-             showToast(errorMsg, 'error');
+            let errorMsg = translations[state.language].toastGasFail;
+            if (gasErrorMessage) {
+              errorMsg += `: ${gasErrorMessage}`;
+            }
+            showToast(errorMsg, 'error');
           } else {
-             // Supabase recorded 100% successfully!
-             showToast(translations[state.language].toastBookingSuccess, 'success');
+            // Supabase recorded 100% successfully!
+            showToast(translations[state.language].toastBookingSuccess, 'success');
 
              // Reset coach selection to default "No Coach" for next booking
              const noCoachRadio = document.getElementById('coachNoRadio');
@@ -2560,11 +2700,11 @@ async function fetchAdminLogsFromGas() {
       
       container.innerHTML = response.logs.map(log => `
         <tr>
-          <td style="font-family: monospace; white-space: nowrap;">${log.timestamp}</td>
-          <td><span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: rgba(163, 230, 53, 0.1); color: var(--accent-color); border: 1px solid rgba(163, 230, 53, 0.2);">${log.actionType}</span></td>
-          <td style="font-weight: 500;">${log.name}</td>
-          <td style="font-family: monospace;">${log.phone}</td>
-          <td style="color: var(--text-secondary); font-size: 0.9rem;">${log.details}</td>
+          <td style="font-family: monospace; white-space: nowrap;">${escapeHTML(log.timestamp)}</td>
+          <td><span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: rgba(163, 230, 53, 0.1); color: var(--accent-color); border: 1px solid rgba(163, 230, 53, 0.2);">${escapeHTML(log.actionType)}</span></td>
+          <td style="font-weight: 500;">${escapeHTML(log.name)}</td>
+          <td style="font-family: monospace;">${escapeHTML(log.phone)}</td>
+          <td style="color: var(--text-secondary); font-size: 0.9rem;">${escapeHTML(log.details)}</td>
         </tr>
       `).join('');
     } else {
@@ -2583,8 +2723,23 @@ function initAdminAuth() {
   const loginBtn = document.getElementById('btnLogin');
   const passwordInput = document.getElementById('adminPassword');
 
+  // [Fix 3] Login attempt counter — ป้องกัน brute force (5 ครั้ง → ล็อค 60 วินาที)
+  let loginAttempts = 0;
+  const MAX_LOGIN_ATTEMPTS = 5;
+  const LOCKOUT_MS = 60000;
+  let loginLockedUntil = 0;
+
   if (loginBtn && passwordInput) {
     loginBtn.addEventListener('click', async () => {
+      // ตรวจสอบ lockout ก่อนทุกครั้ง
+      if (Date.now() < loginLockedUntil) {
+        const remaining = Math.ceil((loginLockedUntil - Date.now()) / 1000);
+        showToast(state.language === 'th'
+          ? `ระบบล็อคชั่วคราว กรุณารอ ${remaining} วินาทีแล้วลองใหม่`
+          : `Account locked. Please wait ${remaining} seconds.`, 'error');
+        return;
+      }
+
       const password = passwordInput.value;
       if (supabaseClient) {
         showToast(state.language === 'th' ? "กำลังเข้าสู่ระบบ..." : "Logging in...", 'info');
@@ -2596,6 +2751,8 @@ function initAdminAuth() {
           
           if (error) throw error;
           
+          // Login สำเร็จ — reset counter
+          loginAttempts = 0;
           state.isAdminLoggedIn = true;
           passwordInput.value = '';
           showToast(translations[state.language].toastLoginSuccess, 'success');
@@ -2607,28 +2764,25 @@ function initAdminAuth() {
           renderAdminDashboard();
         } catch (err) {
           console.error("supabaseClient login failed:", err);
-          // Fallback to static check for backward compatibility or local test mode
-          if (password === 'Zxcv1234') {
-            state.isAdminLoggedIn = true;
-            passwordInput.value = '';
-            showToast(translations[state.language].toastLoginSuccess, 'success');
-            showView('admin');
-            renderAdminDashboard();
+          // [Fix 3] ไม่มี hardcoded password fallback — นับ attempt แล้วแจ้ง error
+          loginAttempts++;
+          if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+            loginLockedUntil = Date.now() + LOCKOUT_MS;
+            loginAttempts = 0;
+            showToast(state.language === 'th'
+              ? 'พยายาม login ผิดพลาดหลายครั้งเกินไป ระบบล็อคชั่วคราว 1 นาที'
+              : 'Too many failed attempts. Locked for 1 minute.', 'error');
           } else {
-            showToast(translations[state.language].toastLoginFail, 'error');
+            showToast(state.language === 'th'
+              ? `รหัสผ่านไม่ถูกต้อง (${loginAttempts}/${MAX_LOGIN_ATTEMPTS})`
+              : `Incorrect password (${loginAttempts}/${MAX_LOGIN_ATTEMPTS})`, 'error');
           }
         }
       } else {
-        // Fallback static validation (Offline mode)
-        if (password === 'Zxcv1234') {
-          state.isAdminLoggedIn = true;
-          passwordInput.value = '';
-          showToast(translations[state.language].toastLoginSuccess, 'success');
-          showView('admin');
-          renderAdminDashboard();
-        } else {
-          showToast(translations[state.language].toastLoginFail, 'error');
-        }
+        // [Fix 3] Supabase ไม่พร้อม — ไม่มี hardcoded fallback อีกต่อไป
+        showToast(state.language === 'th'
+          ? 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่'
+          : 'Cannot connect to server. Please check your internet and try again.', 'error');
       }
     });
 
