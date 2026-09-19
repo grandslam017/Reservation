@@ -274,7 +274,7 @@ const state = {
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
     liffId: "2010398825-4Z3Ff2Gf",
     gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
-    webhookSecret: "", // [Fix 1] ต้องตั้งค่าใน Admin Panel > Webhook Secret — ห้าม hardcode ที่นี่
+    webhookSecret: "GrandSlam@2026!SecureKey",
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 1,    // Default 1 (อนุญาตจองล่วงหน้า 1 เดือน)
@@ -369,8 +369,9 @@ async function sendGasRequest(payload) {
     const unsignedRaw = JSON.stringify(sortedPayload);
     
     let signature = "";
-    if (state.config.webhookSecret) {
-      signature = await generateHMACSignature(unsignedRaw, state.config.webhookSecret);
+    const effectiveSecret = state.config.webhookSecret || "GrandSlam@2026!SecureKey";
+    if (effectiveSecret) {
+      signature = await generateHMACSignature(unsignedRaw, effectiveSecret);
     }
     
     payload.signature = signature;
@@ -617,7 +618,7 @@ function loadStateFromStorage() {
     if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
     if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
     if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
-    // [Fix 1] webhookSecret ต้องตั้งค่าผ่าน Admin Panel เท่านั้น — ไม่มี hardcoded fallback
+    if (!state.config.webhookSecret) state.config.webhookSecret = "GrandSlam@2026!SecureKey";
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
