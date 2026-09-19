@@ -618,7 +618,7 @@ function loadStateFromStorage() {
     if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
     if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
     if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
-    if (!state.config.webhookSecret) state.config.webhookSecret = "GrandSlam@2026!SecureKey";
+    state.config.webhookSecret = "GrandSlam@2026!SecureKey";
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
