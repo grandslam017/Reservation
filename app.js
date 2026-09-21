@@ -2891,8 +2891,24 @@ function renderAdminDashboard() {
   const monthFilter = document.getElementById('adminMonthFilter')?.value || '';
   const yearFilter = document.getElementById('adminYearFilter')?.value || '';
 
+  // Build clean transactions list where 'Court Rental' is dynamically derived from active confirmed non-rainout bookings
+  const nonCourtTransactions = state.transactions.filter(tx => tx.category !== 'Court Rental');
+  const activeCourtTransactions = state.bookings
+    .filter(b => b.status !== 'pending_hold' && b.status !== 'cancelled')
+    .filter(b => !(b.isRainout || (b.adminNotes || '').includes('[ฝนตก]') || (b.adminNotes || '').includes('[🌧️]')))
+    .map(b => ({
+      id: 'tx_b_' + b.id,
+      date: b.date,
+      type: 'income',
+      category: 'Court Rental',
+      amount: parseFloat(b.fee) || 0,
+      description: `ค่าเช่าสนาม: คุณ ${b.name || ''} (${b.slot || ''})`,
+      bookingId: b.id
+    }));
+  const sanitizedTransactions = [...nonCourtTransactions, ...activeCourtTransactions];
+
   // 1. Filter Transactions for Stats and Category Doughnuts
-  const filteredTxsForMetrics = state.transactions.filter(tx => {
+  const filteredTxsForMetrics = sanitizedTransactions.filter(tx => {
     if (monthFilter && yearFilter) {
       return tx.date.startsWith(`${yearFilter}-${monthFilter}`);
     }
@@ -2907,7 +2923,7 @@ function renderAdminDashboard() {
   });
 
   // 2. Filter Transactions for Trend Chart (Income vs Expense Monthly Trend)
-  const filteredTxsForTrend = state.transactions.filter(tx => {
+  const filteredTxsForTrend = sanitizedTransactions.filter(tx => {
     if (yearFilter) {
       return tx.date.startsWith(yearFilter);
     }
