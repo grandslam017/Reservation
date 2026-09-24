@@ -3850,14 +3850,18 @@ async function cancelBooking(bookingId) {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (booking && state.config.gasUrl) {
     // Notify Apps Script to delete calendar event and sheet row
-    sendGasRequest({
-      action: "cancelBooking",
-      name: booking.name,
-      date: booking.date,
-      slot: booking.slot,
-      court: booking.court || "Main Court",
-      calendarEventId: booking.calendarEventId || booking.calendar_event_id || ""
-    }).catch(err => console.error("GAS booking cancellation trigger failed:", err));
+    try {
+      await sendGasRequest({
+        action: "cancelBooking",
+        name: booking.name,
+        date: booking.date,
+        slot: booking.slot,
+        court: booking.court || "Main Court",
+        calendarEventId: booking.calendarEventId || booking.calendar_event_id || ""
+      });
+    } catch (err) {
+      console.error("GAS booking cancellation trigger failed:", err);
+    }
   }
 
   if (supabaseClient) {
