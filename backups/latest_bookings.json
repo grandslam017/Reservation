@@ -37,7 +37,7 @@
     "require_coach": true,
     "fee": 250,
     "status": "confirmed",
-    "admin_notes": "[ฝนตก] ครั้งที่ 9",
+    "admin_notes": "[ฝนตก]",
     "calendar_event_id": null,
     "customer_notes": ""
   },
@@ -17782,7 +17782,7 @@
     "require_coach": true,
     "fee": 250,
     "status": "confirmed",
-    "admin_notes": "[ฝนตก] ครั้งที่ 8",
+    "admin_notes": "[ฝนตก]",
     "calendar_event_id": null,
     "customer_notes": ""
   },
