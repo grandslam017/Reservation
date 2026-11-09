@@ -61,9 +61,9 @@
     const r=await makeRequest(liff,"create",{date,slots},fetcher);
     return r.success?{success:true,holdToken:r.hold_token,expiresAt:r.expires_at}:r;
    },
-   confirm:async({holdToken,requestId,name,phone,email})=>{
+   confirm:async({holdToken,requestId,name,phone,email,carPlate})=>{
     const r=await makeRequest(liff,"confirm",{
-     hold_token:holdToken,request_id:requestId,name,phone,email
+     hold_token:holdToken,request_id:requestId,name,phone,email,car_plate:carPlate
     },fetcher);
     return r.success?{success:true,status:"confirmed",paymentStatus:"pending_verification",
       bookingIds:r.booking_ids,invoiceNo:r.invoice_no,
@@ -2447,18 +2447,36 @@ function initBookingWizard() {
       const nameInput = document.getElementById('custName');
       const phoneInput = document.getElementById('custPhone');
       const emailInput = document.getElementById('custEmail');
+      const carPlateInput = document.getElementById('custVehicle');
 
-      if (!nameInput || !phoneInput || !emailInput) return;
+      if (!nameInput || !phoneInput || !emailInput || !carPlateInput) return;
 
       const name = nameInput.value.trim();
       const phone = phoneInput.value.trim();
       const email = emailInput.value.trim();
+      const carPlate = carPlateInput.value.trim();
       const userNote = document.getElementById('custCustomerNote')?.value.trim() || '';
       state.pendingUserNote = userNote;
 
       if (!name) {
         showToast(translations[state.language].toastFillRequired, 'error');
         return;
+      }
+
+      // The Staging booking API requires the same four customer fields as the
+      // business workflow. Validate before moving to the slip/payment modal.
+      if (GRANDSLAM_STAGING_ONLY) {
+        const phoneDigits = phone.replace(/[\\s()-]/g, '');
+        const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+        const platePattern = /^[0-9A-Za-zก-๙\\s-]+$/u;
+        if (name.length < 2 || name.length > 100 ||
+            !/^[0-9]{9,15}$/.test(phoneDigits) ||
+            !emailPattern.test(email) || email.length > 254 ||
+            carPlate.length < 2 || carPlate.length > 40 ||
+            !platePattern.test(carPlate)) {
+          showToast('กรุณากรอกชื่อ เบอร์โทร อีเมล และทะเบียนรถให้ครบและถูกต้อง', 'error');
+          return;
+        }
       }
 
       // Safe email pattern check (if provided)
@@ -2686,7 +2704,7 @@ function initBookingWizard() {
               }
               const result=await STAGING_BOOKING_API.confirm({
                 holdToken:token,requestId:state.currentRequestId,
-                name,phone,email
+                name,phone,email,carPlate
               });
               if(!result.success||result.status!=='confirmed')
                 throw Error(result.error||'BOOKING_CONFIRMATION_FAILED');
