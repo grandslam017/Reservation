@@ -605,14 +605,22 @@ const stagingBusyByDate=new Map();
 const stagingRatesByDate=new Map();
 const stagingWeeklyLoading=new Set(),stagingWeeklyFailed=new Set();
 let stagingAvailabilityReady=false,stagingPricingReady=false;
+let stagingRefreshSequence=0;
 function stagingSelectedDateKey(){return formatDateString(state.selectedDate);}
 async function stagingRefreshSelectedDate(){
   const date=stagingSelectedDateKey();
+  const sequence=++stagingRefreshSequence;
   stagingAvailabilityReady=false;stagingPricingReady=false;
-  const [a,p]=await Promise.all([STAGING_BOOKING_API.availability(date),STAGING_BOOKING_API.pricing(date)]);
-  if(!a.success||!p.success)throw Error('STAGING_AVAILABILITY_OR_PRICE_UNAVAILABLE');
-  stagingBusyByDate.set(date,new Set(a.busySlots));
-  stagingRatesByDate.set(date,new Map(p.prices.map(x=>[x.slot,Number(x.fee)])));
+  const [availability,pricing]=await Promise.all([
+    STAGING_BOOKING_API.availability(date),STAGING_BOOKING_API.pricing(date)
+  ]);
+  if(sequence!==stagingRefreshSequence || date!==stagingSelectedDateKey()) return false;
+  if(!availability.success||!pricing.success)throw Error('STAGING_AVAILABILITY_OR_PRICE_UNAVAILABLE');
+  const fees=new Map(pricing.prices.map(x=>[x.slot,Number(x.fee)]));
+  if(!fees.size || [...fees.values()].some(v=>!Number.isFinite(v)||v<0))
+    throw Error('INVALID_STAGING_SERVER_PRICES');
+  stagingBusyByDate.set(date,new Set(availability.busySlots));
+  stagingRatesByDate.set(date,fees);
   const bookings=[];
   for(const [day,slots] of stagingBusyByDate)for(const slot of slots){
     const own=day===date&&state.currentHoldId&&state.selectedSlots.includes(slot);
