@@ -17,7 +17,7 @@ test('legacy HTML remains and staging LIFF adapter is bundled in app.js',()=>{
  assert.match(source,/STAGING_BOOKING_API\.confirm/);
 });
 test('customer UI cannot claim paid from an uploaded slip',()=>{
- assert.match(source,/รับหลักฐานสลิปแล้ว/);
+ assert.match(source,/ได้รับสลิปแล้ว/);
  assert.match(source,/รอตรวจสอบการโอน SCB/);
  assert.match(source,/ไม่สามารถเตรียมรูปสลิปได้/);
 });
