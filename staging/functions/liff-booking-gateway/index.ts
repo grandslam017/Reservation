@@ -64,7 +64,7 @@ Deno.serve(async (req)=>{
       if(!UUID.test(data.hold_token??"")||!UUID.test(data.request_id??"")||
          typeof data.name!=="string"||typeof data.phone!=="string"||
          typeof data.email!=="string"||typeof data.car_plate!=="string"||
-         data.name.trim().length<2||data.name.length>100||
+         data.name.trim().length<1||data.name.length>100||
          !/^[0-9]{9,15}$/.test(data.phone.replace(/[\s()-]/g,""))||
          !/^[^ @]+@[^ @]+\.[^ @]+$/.test(data.email.trim())||data.email.length>254||
          data.car_plate.trim().length<2||data.car_plate.length>40)
