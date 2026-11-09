@@ -29,30 +29,6 @@ jobs:
         run: node --check app.js
       - name: Static and mocked hold tests
         run: node --test tests/*.test.cjs
-      - name: Staging preview HTTP asset parity (read-only)
-        shell: bash
-        run: |
-          base='https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-original-ui-preview'
-          for f in index.html style.css charts.js app.js; do
-            curl --fail --silent --show-error --location --max-time 20 "$base/$f" --output "/tmp/staging-preview-$f"
-            cmp "$f" "/tmp/staging-preview-$f" || {
-              echo "::error file=$f::Staging Preview asset differs from branch source"
-              exit 1
-            }
-          done
-      - name: Confirm Supabase Edge disallows HTML hosting (use static artifact)
-        shell: bash
-        run: |
-          set -euo pipefail
-          base='https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-original-ui-preview'
-          for f in index.html style.css charts.js app.js; do
-            echo "URL file: $f"
-            curl --fail --silent --show-error --location --max-time 20 -D "/tmp/headers-$f" "$base/$f" -o /dev/null
-            tr -d '\r' < "/tmp/headers-$f" | grep -iE '^(HTTP/|content-type:|content-disposition:|x-content-type-options:|content-security-policy:)' || true
-          done
-          ct=$(tr -d '\r' < /tmp/headers-index.html | grep -i '^content-type:' | tail -1 | tr '[:upper:]' '[:lower:]')
-          [[ "$ct" == *'text/plain'* ]] || { echo '::error::Unexpected Edge HTML content type - reevaluate restrictions'; exit 1; }
-          echo 'Supabase Edge intentionally rewrites text/html to text/plain: use the separate static artifact for live browser tests.'
       - name: Build separate static HTTPS staging site (safe payment placeholder)
         shell: bash
         run: |
@@ -61,6 +37,19 @@ jobs:
           test -f staging/site-dist/app.js
           ! grep -q '0894932242' staging/site-dist/index.html
           ! grep -q 'promptpay_qr.png' staging/site-dist/index.html
+          cmp app.js staging/site-dist/app.js
+          cmp style.css staging/site-dist/style.css
+          cmp charts.js staging/site-dist/charts.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          h=Path('staging/site-dist/index.html').read_text(encoding='utf-8')
+          for name in ('custName','custPhone','custEmail','custVehicle'):
+              tag=re.search(r'<input\\b[^>]*\\bid="'+name+r'"[^>]*>',h)
+              assert tag is not None and re.search(r'\\brequired\\b',tag.group(0)), name
+          assert 'ทะเบียนรถ *' in h
+          assert 'ไม่บังคับ)</label>' not in h
+          PY
       - name: Upload independent static staging preview for deployment
         uses: actions/upload-artifact@v4
         with:
