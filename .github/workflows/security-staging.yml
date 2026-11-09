@@ -29,6 +29,17 @@ jobs:
         run: node --check app.js
       - name: Static and mocked hold tests
         run: node --test tests/*.test.cjs
+      - name: Staging preview HTTP asset parity (read-only)
+        shell: bash
+        run: |
+          base='https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-original-ui-preview'
+          for f in index.html style.css charts.js app.js; do
+            curl --fail --silent --show-error --location --max-time 20 "$base/$f" --output "/tmp/staging-preview-$f"
+            cmp "$f" "/tmp/staging-preview-$f" || {
+              echo "::error file=$f::Staging Preview asset differs from branch source"
+              exit 1
+            }
+          done
       - name: Check staging config cannot point to production
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('staging/functions/booking-gateway/index.ts','utf8');if(!s.includes('EXPECTED_STAGING_REF = \"kssxxizhpoxxlbsehymk\"'))process.exit(1);if(/service[_-]?role|sb_secret_/i.test(fs.readFileSync('staging/preview/index.html','utf8')))process.exit(1);"
