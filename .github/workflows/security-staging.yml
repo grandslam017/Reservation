@@ -52,6 +52,20 @@ jobs:
           done
           ct=$(tr -d '\r' < /tmp/headers-index.html | grep -i '^content-type:' | tail -1 | tr '[:upper:]' '[:lower:]')
           [[ "$ct" == *'text/html'* ]] || { echo '::error::Preview HTML is not served with text/html'; exit 1; }
+      - name: Build separate static HTTPS staging site (safe payment placeholder)
+        shell: bash
+        run: |
+          python3 staging/scripts/build-static-preview.py
+          test -f staging/site-dist/index.html
+          test -f staging/site-dist/app.js
+          ! grep -q '0894932242' staging/site-dist/index.html
+          ! grep -q 'promptpay_qr.png' staging/site-dist/index.html
+      - name: Upload independent static staging preview for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: grand-slam-staging-static-site
+          path: staging/site-dist/
+          retention-days: 7
       - name: Staging API security smoke tests (negative cases only)
         run: node staging/tests/http-auth-smoke.mjs
       - name: Check staging config cannot point to production
