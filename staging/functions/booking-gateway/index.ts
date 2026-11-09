@@ -56,6 +56,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const action = body.action;
+    // Retire the older Supabase-Auth confirmation route: it does not require
+    // LINE-verified slip evidence and MUST NOT be a parallel booking path.
+    if (action === "confirm") {
+      return reply(410, { error: "LEGACY_CONFIRM_DISABLED_USE_VERIFIED_LIFF" }, origin);
+    }
     if (typeof action !== "string" || !allowedActions.has(action)) {
       return reply(400, { error: "INVALID_ACTION" }, origin);
     }
@@ -101,8 +106,8 @@ Deno.serve(async (req: Request) => {
           (body.email != null && typeof body.email !== "string")) {
         return reply(400, { error: "INVALID_INPUT" }, origin);
       }
-      // STAGING ONLY: confirmation is NOT payment verification.
-      // Block release to production until the payment-review workflow is implemented.
+      // Retired branch: the early action gate above returns 410.
+      // Kept temporarily for API shape compatibility; unreachable over HTTP.
       result = await backend.rpc("staging_confirm_hold_v2", {
         p_owner: user.id,
         p_token: body.hold_token,
