@@ -30,11 +30,14 @@ test('missing openid ID token fails closed',async()=>{
  assert.equal(r.error,'LINE_OPENID_SCOPE_REQUIRED');assert.equal(calls.length,0);
 });
 test('booking confirmed independently of payment and message delivery',async()=>{
- const {fetcher}=mock({success:true,environment:'staging',
+ const {fetcher,calls}=mock({success:true,environment:'staging',
   booking_ids:['synthetic-1'],invoice_no:'INV.202611042',line_notification:'queued'});
  const r=await create(liff,fetcher).confirm({
-  holdToken:'mock',requestId:'mock',name:'Synthetic',phone:'0812345678'
+  holdToken:'mock',requestId:'mock',name:'Synthetic',phone:'0812345678',
+  email:'synthetic@example.com',carPlate:'กก 1234'
  });
+ assert.equal(calls[0].body.car_plate,'กก 1234');
+ assert.equal(calls[0].body.email,'synthetic@example.com');
  assert.equal(r.status,'confirmed');
  assert.equal(r.paymentVerified,false);
  assert.equal(r.paymentStatus,'pending_verification');
