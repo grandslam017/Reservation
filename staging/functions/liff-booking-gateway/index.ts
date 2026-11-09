@@ -5,7 +5,7 @@ const PROJECT_REF = "kssxxizhpoxxlbsehymk";
 // Existing LIFF ID begins 2010398825-...; this MUST be checked with LINE Developers console
 // before customer end-to-end testing. Never accept channel id from browser.
 const EXPECTED_LINE_LOGIN_CHANNEL_ID = "2010398825";
-const ORIGINS = new Set(["https://kssxxizhpoxxlbsehymk.supabase.co","https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
+const ORIGINS = new Set(["https://kssxxizhpoxxlbsehymk.supabase.co","https://illustrious-alfajores-364eb8.netlify.app","https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
 const VALID_ACTIONS = new Set(["availability","pricing","create","confirm","release"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function respond(status,body,origin){
