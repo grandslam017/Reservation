@@ -866,11 +866,8 @@ async function confirmBatchBookingsInSupabase({
       console.error("Supabase RPC confirm_booking_batch error:", error);
       // Fallback สำหรับกรณีที่ยังไม่ได้รัน SQL Migration ใน Supabase
       if (error.code === 'PGRST202' || (error.message && error.message.includes('confirm_booking_batch'))) {
-        console.warn("RPC function confirm_booking_batch not found in Supabase. Running sequential fallback...");
-        return await fallbackSequentialSync({
-          dateStr, slotsBooked, name, phone, email, lineIdInput, lineUserId,
-          slipUrl, invoiceNumber, receiptNumber, isCoachRequired, activeHoldId, customerNotes, court
-        });
+        console.error("Required atomic booking RPC is unavailable; refusing sequential writes.");
+        return { status: "error", message: "ระบบยืนยันการจองไม่พร้อมใช้งาน กรุณาลองใหม่หรือติดต่อผู้ดูแลสนาม" };
       }
       return { status: "error", message: error.message || error.toString() };
     }
@@ -1620,6 +1617,11 @@ function renderTimeSlots() {
 
 // === 3-Minute Temporary Slot Hold Manager ===
 async function createSlotHold(dateStr, slots) {
+  // Do not create a browser-only hold when Supabase is unavailable.
+  if (!supabaseClient) {
+    console.error("Cannot create hold: Supabase connection unavailable.");
+    return false;
+  }
   const holdId = "hold_" + generateUUID();
   const expiresAt = Date.now() + (3 * 60 * 1000); // 3 minutes = 180,000 ms
 
@@ -1636,7 +1638,11 @@ async function createSlotHold(dateStr, slots) {
         .neq('status', 'cancelled')
         .in('time_slot', slots);
 
-      if (!checkError && existing && existing.length > 0) {
+      if (checkError) {
+        console.error("Supabase Hold Availability Check Error:", checkError);
+        return false;
+      }
+      if (existing && existing.length > 0) {
         const nowTs = Date.now();
         const activeCollisions = existing.filter(row => {
           if (row.status === 'pending_hold') {
@@ -1672,12 +1678,11 @@ async function createSlotHold(dateStr, slots) {
       const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
       if (error) {
         console.error("Supabase Hold Insert Error:", error);
-        if (error.code === '23505') {
-          return false; // Hold creation failed due to DB collision
-        }
+        return false; // Never report success if the database rejected the hold.
       }
     } catch (err) {
       console.error("Failed to sync hold to Supabase:", err);
+      return false;
     }
   }
 
@@ -1758,6 +1763,7 @@ async function releaseSlotHold(isExpired = false) {
         await supabaseClient
           .from('bookings')
           .delete()
+          .eq('status', 'pending_hold')
           .like('admin_notes', `%${holdId}%`);
       } catch (err) {
         console.error("Failed to delete hold from Supabase:", err);
