@@ -1,0 +1,90 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grand Slam Staging | Admin Payment Review</title>
+<style>
+body{font-family:system-ui,'Sarabun',sans-serif;background:#f4f7f5;color:#20302b;margin:24px auto;max-width:960px;padding:0 15px}
+section{background:white;border:1px solid #d0dfd6;border-radius:12px;padding:18px;margin:14px 0}
+button,input,textarea{font:inherit;border:1px solid #a8bbb1;padding:9px;border-radius:6px}
+button{background:#17614a;color:white;cursor:pointer}button:disabled{opacity:.45}
+#notice{white-space:pre-wrap;color:#2c483a} .warning{color:#97502a}
+#queue{display:grid;gap:10px}.entry{border:1px solid #c9dcd1;border-radius:8px;padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+label{display:block;margin:8px 0}.muted{color:#66776e;font-size:.85em}
+</style></head><body>
+<h1>The Grand Slam · Staging Payment Review</h1>
+<p class="warning"><strong>หน้าทดสอบเท่านั้น</strong> ไม่เชื่อมต่อ SCB จริง ไม่กระทบ Booking หรือบัญชี Production</p>
+<section><h2>เข้าสู่ระบบ Staging Admin</h2>
+<label>Email <input id="email" type="email"></label>
+<label>Password <input id="password" type="password"></label>
+<button id="login">เข้าสู่ระบบ</button>
+<button id="logout">ออกจากระบบ</button>
+<button id="refresh">รีเฟรชรายการ</button>
+</section>
+<section><h2>รายการ Booking ที่รอตรวจยอด SCB</h2><div id="queue">เข้าสู่ระบบ Admin ก่อน</div></section>
+<section><h2>ผลการทำงาน</h2><pre id="notice">ยังไม่เข้าสู่ระบบ</pre></section>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const URL="https://kssxxizhpoxxlbsehymk.supabase.co",KEY="sb_publishable_-pI8NJzZEtEivpNUQMjd4Q_te9-h9O4";
+const client=window.supabase.createClient(URL,KEY);
+const $=id=>document.getElementById(id);
+const tell=text=>$('notice').textContent=String(text);
+async function api(body){
+ const {data:{session}}=await client.auth.getSession();
+ if(!session)throw Error("กรุณาเข้าสู่ระบบ");
+ const {data,error}=await client.functions.invoke("staging-admin-payments",{body});
+ if(error)throw Error(error.message||"API request failed");
+ if(!data?.success)throw Error(data?.error||"Request rejected");
+ return data;
+}
+function input(tag,type,placeholder){
+ const n=document.createElement(tag);if(type)n.type=type;
+ if(placeholder)n.placeholder=placeholder;return n;
+}
+async function load(){
+ try{
+ const r=await api({action:"list"});const root=$('queue');root.replaceChildren();
+ if(!r.review_queue.length){root.textContent="ไม่มีรายการรอตรวจ";return;}
+ for(const b of r.review_queue){
+  const box=document.createElement('div');box.className='entry';
+  const head=document.createElement('strong');
+  head.textContent=(b.booking_date+' '+b.time_slot+' · '+b.fee+' บาท');
+  const details=document.createElement('p');
+  details.textContent=b.customer_name+' · '+(b.phone||'')+' · '+b.invoice_no+' · '+b.payment_status;
+  const action=document.createElement('div');action.className='grid';
+  const slip=input('button');slip.textContent='เปิดสลิป (ลิงก์ชั่วคราว)';
+  slip.onclick=async()=>{try{
+   const r=await api({action:'slip-link',booking_id:b.booking_id});
+   window.open(r.url,'_blank','noopener,noreferrer');
+  }catch(e){tell(e.message)}};
+  const credit=input('input','checkbox');const check=input('label');
+  check.append(credit,document.createTextNode(' ตรวจ SCB แล้วพบเงินเข้าจริง'));
+  const reference=input('input','text','รหัสอ้างอิงจาก SCB');
+  const verify=input('button');verify.textContent='ยืนยันรับเงินใน Staging';
+  verify.onclick=async()=>{if(!credit.checked){tell('กรุณาตรวจยอดเข้าจริงก่อน');return;}
+   try{
+    await api({action:'verify',booking_id:b.booking_id,
+     confirmed_bank_credit:true,reference:reference.value});
+    tell('บันทึกการยืนยันใน Staging แล้ว (ไม่ใช่ธุรกรรมธนาคารจริง)');await load();
+   }catch(e){tell(e.message)}};
+  const note=input('input','text','เหตุผลที่ต้องตรวจเพิ่มเติม');
+  const dispute=input('button');dispute.textContent='ระบุยอดผิดปกติ';
+  dispute.onclick=async()=>{try{
+   await api({action:'dispute',booking_id:b.booking_id,note:note.value});
+   tell('ทำเครื่องหมาย Disputed ใน Staging แล้ว การจองยัง Confirmed');await load();
+  }catch(e){tell(e.message)}};
+  action.append(slip,check,reference,verify,note,dispute);
+  box.append(head,details,action);root.appendChild(box);
+ }
+ }catch(e){tell(e.message)}
+}
+$('login').onclick=async()=>{try{
+ const {error}=await client.auth.signInWithPassword({email:$('email').value,password:$('password').value});
+ if(error)throw error;$('password').value='';await load();tell('เข้าสู่ระบบ Admin ทดสอบสำเร็จ');
+ }catch(e){tell('เข้าสู่ระบบไม่สำเร็จ: '+e.message)}};
+$('logout').onclick=async()=>{await client.auth.signOut();$('queue').textContent='ออกจากระบบแล้ว';tell('ออกจากระบบแล้ว')};
+$('refresh').onclick=load;
+client.auth.getSession().then(({data})=>{if(data.session)load()});
+})();
+</script></body></html>
