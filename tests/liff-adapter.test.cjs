@@ -45,3 +45,14 @@ test('different environment result refused',async()=>{
  const r=await create(liff,fetcher).hold('2026-11-12',['12:00 - 13:00']);
  assert.equal(r.error,'WRONG_ENVIRONMENT');
 });
+
+test('retrieve server-owned slot rates without sending client price',async()=>{
+ const {calls,fetcher}=mock({success:true,environment:'staging',prices:[
+  {slot:'12:00 - 13:00',fee:99},{slot:'18:00 - 19:00',fee:350}
+ ]});
+ const r=await create(liff,fetcher).pricing('2026-11-10');
+ assert.equal(r.prices[0].fee,99);
+ assert.equal(r.prices[1].fee,350);
+ assert.equal(calls[0].body.action,'pricing');
+ assert.equal(calls[0].body.price,undefined);
+});
