@@ -34,3 +34,7 @@ The GitHub Actions workflow `.github/workflows/security-staging.yml` fetches `in
 Never change production LIFF Endpoint URL, Production Supabase, Production GAS URL, Google Sheets, calendars or GitHub Pages settings to make this test work. Testing LIFF requires a separately authorized test LIFF endpoint/channel configured by the owner under the correct LINE Provider. There is no paid hosting plan upgrade authorized. If the site cannot be opened under a valid test LIFF, test only markup/static assets and keep backend booking blocked.
 
 This preview is a snapshot. When `app.js` is updated in GitHub, the Edge Function must be rebuilt from the branch files, and CI must verify asset equality before using the preview.
+
+## Staging preview routing correction
+
+The first Edge preview version returned the wrong asset for subpaths in the GitHub Actions HTTP parity check. Version 2 handles both the full `/functions/v1/...` pathname and the function-relative pathname returned by the Supabase Edge runtime. The HTTP parity check remains a required gate, not a warning. The production LIFF URL and GitHub Pages were not modified.
