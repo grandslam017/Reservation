@@ -635,6 +635,34 @@ async function stagingRefreshSelectedDate(){
   return true;
 }
 
+// In Staging, the original bank transfer panel must never invite real payment.
+function stagingMaskRealPaymentDetails() {
+  if (!GRANDSLAM_STAGING_ONLY) return;
+  const panel=document.getElementById('promptPayBox');
+  if (!panel) return;
+  const qr=panel.querySelector('img');
+  if (qr) {
+    qr.removeAttribute('src');
+    qr.alt='ทดสอบระบบ ไม่ต้องโอนเงินจริง';
+    qr.style.visibility='hidden';
+  }
+  for (const el of panel.querySelectorAll('div')) {
+    if (el.children.length > 0) continue;
+    if (/^\\d{9,13}$/.test(el.textContent.trim())) el.textContent='TEST ONLY';
+    if (/ชื่อบัญชี/.test(el.textContent)) el.textContent='บัญชีทดสอบ — ไม่รับโอนเงินจริง';
+    if (/บัญชีสำหรับโอนเงิน/.test(el.textContent)) el.textContent='โหมดทดสอบ ไม่มีการชำระเงินจริง';
+  }
+  if (!panel.querySelector('[data-staging-payment-warning]')) {
+    const warning=document.createElement('div');
+    warning.setAttribute('data-staging-payment-warning','true');
+    warning.textContent='ระบบทดสอบ: ห้ามโอนเงินจริง กรุณาใช้สลิปตัวอย่างเท่านั้น';
+    warning.style.color='#fbbf24';
+    warning.style.fontWeight='700';
+    warning.style.fontSize='0.78rem';
+    panel.prepend(warning);
+  }
+}
+
 // Helper: Calculate price for a single slot string (e.g. "08:00 - 09:00" -> 250)
 function getSlotPrice(slotString) {
   if (GRANDSLAM_STAGING_ONLY) {
@@ -5032,6 +5060,7 @@ async function checkAdminSession() {
 // Start app
 async function init() {
   loadStateFromStorage();
+  stagingMaskRealPaymentDetails();
 
   // Guarantee valid Date objects for calendar rendering
   if (!state.currentDate || isNaN(new Date(state.currentDate).getTime())) {
