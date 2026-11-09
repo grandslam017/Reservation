@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 
 const EXPECTED_STAGING_REF = "kssxxizhpoxxlbsehymk";
 const ALLOWED_ORIGINS = new Set(["https://grandslam017.github.io", "http://localhost:5173", "http://127.0.0.1:5173"]);
-const allowedActions = new Set(["availability", "create", "confirm", "release"]);
+const allowedActions = new Set(["availability", "create", "confirm", "release", "verify-payment"]);
 const uuidRx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const dateRx = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -65,8 +65,12 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await authClient.auth.getUser(match[1]);
     if (authError || !user?.id) return reply(401, { error: "INVALID_SESSION" }, origin);
 
+    // Admin status must come from protected app_metadata, not user-editable metadata.
+    if (action === "verify-payment" && user.app_metadata?.role !== "admin") {
+      return reply(403, { error: "ADMIN_ONLY" }, origin);
+    }
     const backend = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const limit = { availability: 30, create: 5, confirm: 8, release: 15 }[action as "availability" | "create" | "confirm" | "release"];
+    const limit = { availability: 30, create: 5, confirm: 8, release: 15, "verify-payment": 10 }[action as "availability" | "create" | "confirm" | "release" | "verify-payment"];
     const rate = await backend.rpc("staging_check_rate_limit", {
       p_actor: user.id, p_action: action, p_limit: limit,
     });
@@ -107,10 +111,17 @@ Deno.serve(async (req: Request) => {
         p_phone: body.phone,
         p_email: body.email ?? null,
       });
-    } else {
+    } else if (action === "release") {
       if (!uuid(body.hold_token)) return reply(400, { error: "INVALID_INPUT" }, origin);
       result = await backend.rpc("staging_release_hold_v2", {
         p_owner: user.id, p_token: body.hold_token,
+      });
+    } else {
+      if (!uuid(body.booking_id) || (body.reference != null && (typeof body.reference !== "string" || body.reference.length > 100))) {
+        return reply(400, { error: "INVALID_INPUT" }, origin);
+      }
+      result = await backend.rpc("staging_verify_booking_payment", {
+        p_booking_id: body.booking_id, p_admin_id: user.id, p_reference: body.reference ?? null,
       });
     }
 
