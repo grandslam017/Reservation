@@ -2071,6 +2071,32 @@ function showSummaryPanel() {
 
   panel.style.display = 'block';
 
+  if (GRANDSLAM_STAGING_ONLY) {
+    const fees=stagingRatesByDate.get(stagingSelectedDateKey());
+    const ready=stagingAvailabilityReady&&stagingPricingReady&&!!fees&&
+      state.selectedSlots.every(slot=>Number.isFinite(fees.get(slot)));
+    const breakdown=document.getElementById('summaryFeeBreakdown');
+    if(breakdown){
+      breakdown.replaceChildren();
+      const slots=state.selectedSlots.length?state.selectedSlots:[null];
+      for(const slot of slots){
+        const row=document.createElement('div');row.className='summary-row';
+        const name=document.createElement('span');
+        name.textContent=slot||translations[state.language].summaryCourt||'ค่าบริการสนาม';
+        const fee=document.createElement('span');fee.className='summary-value';
+        fee.textContent=slot?(Number.isFinite(fees?.get(slot))?
+          fees.get(slot).toLocaleString('th-TH')+' ฿':'—'):'0 ฿';
+        row.append(name,fee);breakdown.appendChild(row);
+      }
+    }
+    const total=ready?state.selectedSlots.reduce((sum,slot)=>sum+fees.get(slot),0):null;
+    document.getElementById('summaryTotalFee').textContent=
+      total===null?'—':total.toLocaleString('th-TH')+' ฿';
+    const btn=document.getElementById('btnBookNow');
+    if(btn)btn.disabled=!ready||state.selectedSlots.length===0;
+    return;
+  }
+
   let total = 0;
   let dayHours = 0;
   let nightHours = 0;
@@ -4962,6 +4988,8 @@ async function init() {
   renderCalendar();
   renderTimeSlots();
 
+  if (GRANDSLAM_STAGING_ONLY) await initLiff();
+
   // Fetch remote bookings asynchronously in background
   try {
     await fetchBookingsFromSupabase(true);
@@ -4975,7 +5003,7 @@ async function init() {
   renderTimeSlots();
 
   applyLanguage();
-  initLiff();
+  if (!GRANDSLAM_STAGING_ONLY) initLiff();
 
   const prevBtn = document.getElementById('prevMonthBtn');
   const nextBtn = document.getElementById('nextMonthBtn');
