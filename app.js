@@ -2459,7 +2459,9 @@ function initBookingWizard() {
       state.pendingUserNote = userNote;
 
       if (!name) {
-        showToast(translations[state.language].toastFillRequired, 'error');
+        showToast(GRANDSLAM_STAGING_ONLY ? 'กรุณากรอกชื่อลูกค้า' :
+          translations[state.language].toastFillRequired, 'error');
+        if (GRANDSLAM_STAGING_ONLY) nameInput.focus();
         return;
       }
 
