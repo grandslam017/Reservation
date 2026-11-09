@@ -1,0 +1,24 @@
+name: Security staging regression
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [security-hardening-2026-11-09]
+permissions:
+  contents: read
+jobs:
+  js-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: node --check app.js
+      - name: Static and mocked hold tests
+        run: node --test tests/*.test.cjs
+      - name: Check staging config cannot point to production
+        run: |
+          node -e "const fs=require('fs');const s=fs.readFileSync('staging/functions/booking-gateway/index.ts','utf8');if(!s.includes('EXPECTED_STAGING_REF = \"kssxxizhpoxxlbsehymk\"'))process.exit(1);if(/service[_-]?role|sb_secret_/i.test(fs.readFileSync('staging/preview/index.html','utf8')))process.exit(1);"
