@@ -5058,8 +5058,20 @@ async function checkAdminSession() {
 }
 
 // Start app
+// Staging LIFF configuration is PUBLIC (not a credential), but must never
+// silently default to the customer's Production LIFF app.
+function stagingConfigureTestLiff() {
+  if (!GRANDSLAM_STAGING_ONLY) return;
+  const requested = new URLSearchParams(window.location.search).get('testLiffId') || '';
+  // A test LIFF must belong to the known LINE Login Channel. Backend verifies
+  // issuer/audience and subject independently on every request.
+  const valid = /^2010398825-[A-Za-z0-9]{8,20}$/.test(requested);
+  state.config.liffId = valid ? requested : '';
+  if (!valid) console.info('Staging LIFF not configured: set testLiffId after creating separate test app');
+}
 async function init() {
   loadStateFromStorage();
+  stagingConfigureTestLiff();
   stagingMaskRealPaymentDetails();
 
   // Guarantee valid Date objects for calendar rendering
@@ -5081,7 +5093,10 @@ async function init() {
   renderCalendar();
   renderTimeSlots();
 
-  if (GRANDSLAM_STAGING_ONLY) await initLiff();
+  if (GRANDSLAM_STAGING_ONLY) {
+    if (state.config.liffId) await initLiff();
+    else console.info('Staging remains read-only until a separate test LIFF app is configured');
+  }
 
   // Fetch remote bookings asynchronously in background
   try {
