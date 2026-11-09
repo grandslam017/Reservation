@@ -2482,6 +2482,9 @@ function initBookingWizard() {
       // Generate Invoice
       const invoiceNumber = 'INV.' + getRunningNumber('invoice');
       const invoiceAmount = calculateTotalFee();
+      if(GRANDSLAM_STAGING_ONLY && !Number.isFinite(invoiceAmount)){
+        showToast('ไม่สามารถตรวจสอบราคาในระบบทดสอบได้','error');return;
+      }
       const invoiceDate = state.selectedDate.toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
       document.getElementById('invoiceNumber').textContent = invoiceNumber;
@@ -2584,17 +2587,28 @@ function initBookingWizard() {
             
             if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
             
-            receiptNumber = 'R.' + invoiceNumber.replace('INV.', '');
-            document.getElementById('receiptNumber').textContent = receiptNumber;
+            receiptNumber = GRANDSLAM_STAGING_ONLY ? '' : ('R.' + invoiceNumber.replace('INV.', ''));
+            document.getElementById('receiptNumber').textContent =
+              GRANDSLAM_STAGING_ONLY ? 'รอตรวจสอบ SCB' : receiptNumber;
+            if(GRANDSLAM_STAGING_ONLY){
+              const labels=document.getElementById('receiptBox')?.querySelectorAll('div');
+              if(labels?.[0])labels[0].textContent='ได้รับสลิปแล้ว — กรุณากดยืนยันการจอง';
+              if(labels?.[1])labels[1].textContent='สถานะเงิน: รอ Admin ตรวจยอด SCB';
+            }
             if (document.getElementById('promptPayBox')) document.getElementById('promptPayBox').style.display = 'none';
             if (document.getElementById('slipUploadGroup')) document.getElementById('slipUploadGroup').style.display = 'none';
             document.getElementById('receiptBox').style.display = 'block';
-            btnFinishBooking.style.display = 'block';
+            if(!GRANDSLAM_STAGING_ONLY)btnFinishBooking.style.display = 'block';
             isConfirmProcessing = false; // Unlock after image is ready
 
             // Convert canvas content to blob and save for Supabase Storage upload
             canvas.toBlob((blob) => {
-              state.currentSlipFile = new File([blob], `${receiptNumber}.jpg`, { type: 'image/jpeg' });
+              if (!blob) {
+                showToast('ไม่สามารถเตรียมรูปสลิปได้ กรุณาลองใหม่','error');
+                return;
+              }
+              state.currentSlipFile = new File([blob], (receiptNumber||'staging-slip')+'.jpg', { type: 'image/jpeg' });
+              if(GRANDSLAM_STAGING_ONLY)btnFinishBooking.style.display='block';
             }, 'image/jpeg', 0.7);
           };
           img.onerror = () => {
