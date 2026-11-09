@@ -30,6 +30,26 @@
     return {success:true,busySlots:slots,bookings:slots.map(slot=>({date,slot,
       status:"confirmed",name:"",phone:"",email:"",court:"Main Court"}))};
    },
+   uploadSlip:async({holdToken,file})=>{
+    if(!liff||!liff.isLoggedIn||!liff.isLoggedIn()||typeof liff.getIDToken!=="function")
+      return {success:false,error:"LINE_LOGIN_REQUIRED"};
+    const token=liff.getIDToken();
+    if(!token)return {success:false,error:"LINE_OPENID_SCOPE_REQUIRED"};
+    if(!(file instanceof Blob)||file.size<16||file.size>1048576)
+      return {success:false,error:"INVALID_SLIP"};
+    const form=new FormData();
+    form.set("line_id_token",token);
+    form.set("hold_token",holdToken);
+    form.set("file",file,"payment-slip");
+    let res;
+    try{res=await fetcher("https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-liff-slip-upload",{
+      method:"POST",body:form
+    })}catch{return {success:false,error:"NETWORK_ERROR"}}
+    let data;try{data=await res.json()}catch{return {success:false,error:"UPLOAD_RESPONSE_INVALID"}}
+    if(!res.ok)return {success:false,error:data?.error||"UPLOAD_REJECTED"};
+    if(data?.environment!=="staging")return {success:false,error:"WRONG_ENVIRONMENT"};
+    return data;
+   },
    pricing:async date=>{
     const r=await makeRequest(liff,"pricing",{date},fetcher);
     if(!r.success)return r;
