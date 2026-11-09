@@ -6,7 +6,7 @@ const PROJECT_REF = "kssxxizhpoxxlbsehymk";
 // before customer end-to-end testing. Never accept channel id from browser.
 const EXPECTED_LINE_LOGIN_CHANNEL_ID = "2010398825";
 const ORIGINS = new Set(["https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
-const VALID_ACTIONS = new Set(["availability","create","confirm","release"]);
+const VALID_ACTIONS = new Set(["availability","pricing","create","confirm","release"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function respond(status,body,origin){
   const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"};
@@ -44,7 +44,7 @@ Deno.serve(async (req)=>{
     if(!verified.ok)return respond(verified.error==="LINE_VERIFICATION_UNAVAILABLE"?503:401,{error:verified.error},origin);
     const owner=await actorIdFromVerifiedLineId(verified.lineUserId);
     const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
-    const quota={availability:30,create:5,confirm:8,release:15}[data.action];
+    const quota={availability:30,pricing:30,create:5,confirm:8,release:15}[data.action];
     const throttle=await db.rpc("staging_check_rate_limit",{p_actor:owner,p_action:data.action,p_limit:quota});
     if(throttle.error)return respond(503,{error:"RATE_LIMIT_UNAVAILABLE"},origin);
     if(!throttle.data?.allowed)return respond(429,{error:"TOO_MANY_REQUESTS"},origin);
@@ -52,6 +52,9 @@ Deno.serve(async (req)=>{
     if(data.action==="availability"){
       if(!validDate(data.date))return respond(400,{error:"INVALID_DATE"},origin);
       call=await db.rpc("staging_get_availability",{p_date:data.date,p_court:"Main Court"});
+    }else if(data.action==="pricing"){
+      if(!validDate(data.date))return respond(400,{error:"INVALID_DATE"},origin);
+      call=await db.rpc("staging_get_pricing",{p_date:data.date});
     }else if(data.action==="create"){
       if(!validDate(data.date)||!Array.isArray(data.slots)||data.slots.length<1||data.slots.length>8||
           !data.slots.every(x=>typeof x==="string"&&x.length<=20))
