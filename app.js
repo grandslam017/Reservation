@@ -603,6 +603,7 @@ function getRunningNumber(type) {
 const STAGING_BOOKING_API = window.GrandSlamLiffStagingAdapter.create(window.liff,(...args)=>fetch(...args));
 const stagingBusyByDate=new Map();
 const stagingRatesByDate=new Map();
+const stagingWeeklyLoading=new Set(),stagingWeeklyFailed=new Set();
 let stagingAvailabilityReady=false,stagingPricingReady=false;
 function stagingSelectedDateKey(){return formatDateString(state.selectedDate);}
 async function stagingRefreshSelectedDate(){
@@ -2487,7 +2488,8 @@ function initBookingWizard() {
       }
       const invoiceDate = state.selectedDate.toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      document.getElementById('invoiceNumber').textContent = invoiceNumber;
+      document.getElementById('invoiceNumber').textContent =
+        GRANDSLAM_STAGING_ONLY ? 'ออกเลขที่หลังยืนยันการจอง' : invoiceNumber;
       document.getElementById('invoiceCustName').textContent = name;
       document.getElementById('invoiceDate').textContent = invoiceDate;
       document.getElementById('invoiceAmount').textContent = `${invoiceAmount.toLocaleString()} ฿`;
@@ -5352,6 +5354,17 @@ function renderAvailabilityGrid() {
     }
 
     const dateStr = formatDateString(dayDate);
+    if(GRANDSLAM_STAGING_ONLY && !stagingBusyByDate.has(dateStr) &&
+       dayDate >= new Date(new Date().setHours(0,0,0,0)) &&
+       !stagingWeeklyLoading.has(dateStr) && !stagingWeeklyFailed.has(dateStr)){
+      stagingWeeklyLoading.add(dateStr);
+      STAGING_BOOKING_API.availability(dateStr).then(result=>{
+        if(result.success)stagingBusyByDate.set(dateStr,new Set(result.busySlots));
+        else stagingWeeklyFailed.add(dateStr);
+      }).catch(()=>stagingWeeklyFailed.add(dateStr)).finally(()=>{
+        stagingWeeklyLoading.delete(dateStr);renderAvailabilityGrid();
+      });
+    }
     const selectedDateStr = formatDateString(state.selectedDate);
     if (dateStr === selectedDateStr) {
       col.classList.add('highlight-column');
@@ -5375,8 +5388,13 @@ function renderAvailabilityGrid() {
       if (isPast) {
         // Render as empty/blank slot if in the past
         cell.classList.add('empty-cell');
+      } else if (GRANDSLAM_STAGING_ONLY && !stagingBusyByDate.has(dateStr)) {
+        cell.classList.add('empty-cell');
+        cell.textContent='—'; // Never display AVAILABLE before the server confirms that date.
       } else {
-        const isBooked = state.bookings.some(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
+        const isBooked = GRANDSLAM_STAGING_ONLY ?
+          stagingBusyByDate.get(dateStr).has(slot) :
+          state.bookings.some(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
         if (isBooked) {
           cell.classList.add('booked-cell');
           cell.innerHTML = `
