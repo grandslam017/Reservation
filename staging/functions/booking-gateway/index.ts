@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 
 const EXPECTED_STAGING_REF = "kssxxizhpoxxlbsehymk";
 const ALLOWED_ORIGINS = new Set(["https://grandslam017.github.io", "http://localhost:5173", "http://127.0.0.1:5173"]);
-const allowedActions = new Set(["availability", "create", "confirm", "release", "verify-payment"]);
+const allowedActions = new Set(["availability", "create", "release", "verify-payment"]);
 const uuidRx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const dateRx = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
       return reply(403, { error: "ADMIN_ONLY" }, origin);
     }
     const backend = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const limit = { availability: 30, create: 5, confirm: 8, release: 15, "verify-payment": 10 }[action as "availability" | "create" | "confirm" | "release" | "verify-payment"];
+    const limit = { availability: 30, create: 5, release: 15, "verify-payment": 10 }[action as "availability" | "create" | "release" | "verify-payment"];
     const rate = await backend.rpc("staging_check_rate_limit", {
       p_actor: user.id, p_action: action, p_limit: limit,
     });
@@ -99,22 +99,6 @@ Deno.serve(async (req: Request) => {
       }
       result = await backend.rpc("staging_create_hold_v2", {
         p_owner: user.id, p_date: body.date, p_slots: body.slots, p_court: "Main Court",
-      });
-    } else if (action === "confirm") {
-      if (!uuid(body.hold_token) || !uuid(body.request_id) ||
-          typeof body.name !== "string" || typeof body.phone !== "string" ||
-          (body.email != null && typeof body.email !== "string")) {
-        return reply(400, { error: "INVALID_INPUT" }, origin);
-      }
-      // Retired branch: the early action gate above returns 410.
-      // Kept temporarily for API shape compatibility; unreachable over HTTP.
-      result = await backend.rpc("staging_confirm_hold_v2", {
-        p_owner: user.id,
-        p_token: body.hold_token,
-        p_request_id: body.request_id,
-        p_name: body.name,
-        p_phone: body.phone,
-        p_email: body.email ?? null,
       });
     } else if (action === "release") {
       if (!uuid(body.hold_token)) return reply(400, { error: "INVALID_INPUT" }, origin);
