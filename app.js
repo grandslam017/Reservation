@@ -1,4 +1,9 @@
 // app.js - Core application logic for The Grand Slam Tennis Court Booking App
+// Staging Branch ONLY: never connect to Production or Google GAS from this branch.
+const GRANDSLAM_STAGING_ONLY = true;
+const GRANDSLAM_STAGING_URL = "https://kssxxizhpoxxlbsehymk.supabase.co";
+const GRANDSLAM_STAGING_PUBLIC_KEY = "sb_publishable_-pI8NJzZEtEivpNUQMjd4Q_te9-h9O4";
+
 
 // Language Translations Dictionary
 const translations = {
@@ -270,11 +275,11 @@ const state = {
   bookings: [],
   transactions: [],
   config: {
-    supabaseUrl: "https://eqwmodrhorcbwsshbepg.supabase.co",
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
+    supabaseUrl: GRANDSLAM_STAGING_URL,
+    supabaseKey: GRANDSLAM_STAGING_PUBLIC_KEY,
     liffId: "2010398825-4Z3Ff2Gf",
-    gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
-    webhookSecret: "GrandSlam@2026!SecureKey",
+    gasUrl: "",
+    webhookSecret: "",
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 1,    // Default 1 (อนุญาตจองล่วงหน้า 1 เดือน)
@@ -353,6 +358,10 @@ async function generateHMACSignature(message, secret) {
 
 // Secure Wrapper for sending signed requests to Google Apps Script
 async function sendGasRequest(payload) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    console.warn("GAS calls are disabled in the Staging branch.");
+    return { status: "error", message: "STAGING_GAS_DISABLED" };
+  }
   if (!state.config.gasUrl) {
     console.warn("Google Apps Script Web App URL is not configured.");
     return null;
@@ -369,7 +378,7 @@ async function sendGasRequest(payload) {
     const unsignedRaw = JSON.stringify(sortedPayload);
     
     let signature = "";
-    const effectiveSecret = state.config.webhookSecret || "GrandSlam@2026!SecureKey";
+    const effectiveSecret = state.config.webhookSecret || "";
     if (effectiveSecret) {
       signature = await generateHMACSignature(unsignedRaw, effectiveSecret);
     }
@@ -614,11 +623,11 @@ function loadStateFromStorage() {
       state.config = { ...state.config, ...parsedConfig };
     }
     // Always enforce fallback defaults if empty or undefined
-    if (!state.config.supabaseUrl) state.config.supabaseUrl = "https://eqwmodrhorcbwsshbepg.supabase.co";
-    if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
+    if (!state.config.supabaseUrl) state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    if (!state.config.supabaseKey) state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
     if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
-    if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
-    state.config.webhookSecret = "GrandSlam@2026!SecureKey";
+    if (!state.config.gasUrl) state.config.gasUrl = "";
+    state.config.webhookSecret = "";
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
@@ -631,6 +640,14 @@ function loadStateFromStorage() {
 
   // Bookings state initialized empty. Supabase is the source of truth.
   state.bookings = [];
+
+  // Enforce staging even if prior localStorage still contains Production config.
+  if (GRANDSLAM_STAGING_ONLY) {
+    state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
+    state.config.gasUrl = "";
+    state.config.webhookSecret = "";
+  }
 
   // Initialize Supabase Client
   initSupabaseClient();
@@ -795,6 +812,10 @@ function preloadMockData() {
 // Initialize Supabase Client
 let supabaseClient = null;
 function initSupabaseClient() {
+  if (GRANDSLAM_STAGING_ONLY) {
+    state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
+  }
   try {
     if (state.config.supabaseUrl && state.config.supabaseKey) {
       if (window.supabase) {
