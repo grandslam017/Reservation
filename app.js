@@ -648,7 +648,7 @@ function stagingMaskRealPaymentDetails() {
   }
   for (const el of panel.querySelectorAll('div')) {
     if (el.children.length > 0) continue;
-    if (/^\\d{9,13}$/.test(el.textContent.trim())) el.textContent='TEST ONLY';
+    if (/^\d{9,13}$/.test(el.textContent.trim())) el.textContent='TEST ONLY';
     if (/ชื่อบัญชี/.test(el.textContent)) el.textContent='บัญชีทดสอบ — ไม่รับโอนเงินจริง';
     if (/บัญชีสำหรับโอนเงิน/.test(el.textContent)) el.textContent='โหมดทดสอบ ไม่มีการชำระเงินจริง';
   }
