@@ -24,8 +24,12 @@ Deno.serve(async req=>{
  if(url!=="https://"+REF+".supabase.co"||!key)return result(503,{error:"STAGING_ONLY"},origin);
  if(Number(req.headers.get("content-length")??0)>1450000)
   return result(413,{error:"UPLOAD_TOO_LARGE"},origin);
+ if(!/^multipart\/form-data(?:;|$)/i.test(req.headers.get("content-type")||""))
+  return result(415,{error:"MULTIPART_FORM_REQUIRED"},origin);
  try{
-  const form=await req.formData();
+  let form: FormData;
+  try { form=await req.formData(); }
+  catch { return result(400,{error:"INVALID_MULTIPART_FORM"},origin); }
   const idToken=form.get("line_id_token"),holdToken=form.get("hold_token"),file=form.get("file");
   if(typeof idToken!=="string"||typeof holdToken!=="string"||!UUID.test(holdToken)||
      !(file instanceof File)||file.size<16||file.size>1048576)
