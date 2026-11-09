@@ -48,3 +48,19 @@ GitHub Actions **compares these three files byte-for-byte against `origin/main`*
 ## Existing staging restrictions
 
 **No Production changes were authorized.** Edge gateway is active only for Staging `kssxxizhpoxxlbsehymk`. The original page remains served from the `main` branch. The new API is **not yet integrated into the original app.js**. The standalone engineering preview is not a visual-equivalence test.
+
+
+## Implemented in this branch (staging only)
+
+- Added `staging/frontend/booking-api-adapter.js`, a headless adapter that calls the staging gateway for availability, hold, confirm and release. It does **not** touch the DOM, markup or CSS and is **not yet invoked by app.js**.
+- Added `tests/staging-adapter.test.cjs` with seven mocked gateway tests covering anonymized availability, unpaid confirmed bookings, gateway routing, lack of login, wrong environment, and network failures.
+- GitHub Actions security regression including exact UI file comparison reported `success` at commit `1909b2365ab01d531cd3be10e2ca3218bd46677c` on 2026-11-09.
+- Verified UI blobs on both branches remain identical for `index.html`, `style.css`, and `charts.js` at the time of audit.
+
+## Blocker to seamless LINE LIFF parity
+
+The production application uses LINE LIFF user identity; the staging gateway currently expects **Supabase Auth JWT**. These tokens are not interchangeable. Do **not** replace the existing UX with a separate login prompt or pass privileged keys to a browser. Before connecting the existing `app.js`, design a server-verified LIFF identity bridge (validate tokens with LINE using trusted server-side credentials, issue scoped sessions, and bind account identity to hold ownership). Validate the entire flow without UI redesign. This is not completed yet.
+
+## Behavioral differences requiring owner acceptance
+
+The existing summary panel adds `state.config.rateDay`/`rateNight` locally. New pricing has dynamic rules, so prices must come from the server and populate those **same DOM nodes** with no visual changes. The existing customer confirmation and notification flow must be rerouted through a secure backend after the atomic commit, while payment verification remains independently pending. A distinct message saying payment is verified is not appropriate until SCB reconciliation has actually occurred.
