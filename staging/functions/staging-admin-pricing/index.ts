@@ -40,14 +40,9 @@ Deno.serve(async(req)=>{
   if(throttle.error)return respond(503,{error:"RATE_LIMIT_UNAVAILABLE"},origin);
   if(!throttle.data?.allowed)return respond(429,{error:"TOO_MANY_REQUESTS"},origin);
   if(action==="list"){
-   const [segments,promos]=await Promise.all([
-    db.schema("booking_internal").from("price_segments").select("id,name,start_hour,end_hour,amount,active").order("start_hour"),
-    db.schema("booking_internal").from("pricing_rules").select("id,rule_code,begins_on,ends_on,start_hour,end_hour,price,priority,active,weekdays,weekday_only").order("priority",{ascending:false})
-   ]);
-   // Private schema is not necessarily exposed to the Data API. Fail closed until
-   // a backend-only listing RPC is available.
-   if(segments.error||promos.error)return respond(503,{error:"PRICE_LIST_UNAVAILABLE"},origin);
-   return respond(200,{success:true,segments:segments.data,promotions:promos.data,environment:"staging"},origin);
+   const listing=await db.rpc("staging_list_pricing_rules");
+   if(listing.error)return respond(503,{error:"PRICE_LIST_UNAVAILABLE"},origin);
+   return respond(200,{...listing.data,environment:"staging"},origin);
   }
   let dbResult;
   if(action==="set-hour"){
