@@ -24,6 +24,29 @@ for old, new in replacements.items():
     if html.count(old) != 1:
         raise SystemExit(f"Expected exactly one occurrence of safe replacement: {old[:25]!r}")
     html = html.replace(old, new)
+# Only the Staging static build makes formerly-optional fields required.
+# Main index.html stays exactly unchanged for existing customers.
+required_labels = {
+    '>ทะเบียนรถ</label>': '>ทะเบียนรถ *</label>',
+    '>เบอร์โทรศัพท์ติดต่อ (ไม่บังคับ)</label>': '>เบอร์โทรศัพท์ติดต่อ *</label>',
+    '>อีเมลสำหรับการยืนยันการจอง (ไม่บังคับ)</label>': '>อีเมลสำหรับการยืนยันการจอง *</label>',
+}
+for old, new in required_labels.items():
+    if html.count(old) != 1:
+        raise SystemExit(f"Missing mandatory label in Staging HTML: {old}")
+    html = html.replace(old, new)
+for field in ('custVehicle', 'custPhone', 'custEmail'):
+    # Add the native HTML required flag, retaining the existing form layout.
+    start = html.index('id="' + field + '"')
+    close = html.index('>', start)
+    tag = html[start:close]
+    if ' required' not in tag:
+        html = html[:close] + ' required' + html[close:]
+for field in ('custVehicle', 'custPhone', 'custEmail'):
+    start = html.index('id="' + field + '"')
+    if ' required' not in html[start:html.index('>', start)]:
+        raise SystemExit(f"Required input flag missing: {field}")
+
 html = html.replace(
     '<title>The Grand Slam Tennis Court - Booking & Admin Portal</title>',
     '<title>STAGING TEST — The Grand Slam Tennis Court</title>',
