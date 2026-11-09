@@ -63,12 +63,17 @@ Deno.serve(async (req)=>{
     }else if(data.action==="confirm"){
       if(!UUID.test(data.hold_token??"")||!UUID.test(data.request_id??"")||
          typeof data.name!=="string"||typeof data.phone!=="string"||
-         (data.email!=null&&typeof data.email!=="string"))
-        return respond(400,{error:"INVALID_INPUT"},origin);
-      call=await db.rpc("staging_confirm_hold_line_v3",{
+         typeof data.email!=="string"||typeof data.car_plate!=="string"||
+         data.name.trim().length<2||data.name.length>100||
+         !/^[0-9]{9,15}$/.test(data.phone.replace(/[\\s()-]/g,""))||
+         !/^[^ @]+@[^ @]+\\.[^ @]+$/.test(data.email.trim())||data.email.length>254||
+         data.car_plate.trim().length<2||data.car_plate.length>40)
+        return respond(400,{error:"INVALID_CUSTOMER"},origin);
+      call=await db.rpc("staging_confirm_hold_line_v4",{
         p_owner:owner,p_line_user_id:verified.lineUserId,
         p_token:data.hold_token,p_request_id:data.request_id,
-        p_name:data.name,p_phone:data.phone,p_email:data.email??null
+        p_name:data.name.trim(),p_phone:data.phone,p_email:data.email.trim(),
+        p_car_plate:data.car_plate.trim()
       });
     }else{
       if(!UUID.test(data.hold_token??""))return respond(400,{error:"INVALID_INPUT"},origin);
