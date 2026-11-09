@@ -40,6 +40,8 @@ jobs:
               exit 1
             }
           done
+      - name: Staging API security smoke tests (negative cases only)
+        run: node staging/tests/http-auth-smoke.mjs
       - name: Check staging config cannot point to production
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('staging/functions/booking-gateway/index.ts','utf8');if(!s.includes('EXPECTED_STAGING_REF = \"kssxxizhpoxxlbsehymk\"'))process.exit(1);if(/service[_-]?role|sb_secret_/i.test(fs.readFileSync('staging/preview/index.html','utf8')))process.exit(1);"
