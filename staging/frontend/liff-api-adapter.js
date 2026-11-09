@@ -59,9 +59,9 @@
     const r=await makeRequest(liff,"create",{date,slots},fetcher);
     return r.success?{success:true,holdToken:r.hold_token,expiresAt:r.expires_at}:r;
    },
-   confirm:async({holdToken,requestId,name,phone,email})=>{
+   confirm:async({holdToken,requestId,name,phone,email,carPlate})=>{
     const r=await makeRequest(liff,"confirm",{
-     hold_token:holdToken,request_id:requestId,name,phone,email
+     hold_token:holdToken,request_id:requestId,name,phone,email,car_plate:carPlate
     },fetcher);
     return r.success?{success:true,status:"confirmed",paymentStatus:"pending_verification",
       bookingIds:r.booking_ids,invoiceNo:r.invoice_no,
