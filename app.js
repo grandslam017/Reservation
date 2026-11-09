@@ -2469,12 +2469,24 @@ function initBookingWizard() {
         const phoneDigits = phone.replace(/[\s()-]/g, '');
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const platePattern = /^[0-9A-Za-zก-๙\s-]+$/u;
-        if (name.length < 2 || name.length > 100 ||
-            !/^[0-9]{9,15}$/.test(phoneDigits) ||
-            !emailPattern.test(email) || email.length > 254 ||
-            carPlate.length < 2 || carPlate.length > 40 ||
-            !platePattern.test(carPlate)) {
-          showToast('กรุณากรอกชื่อ เบอร์โทร อีเมล และทะเบียนรถให้ครบและถูกต้อง', 'error');
+        if (name.length < 1 || name.length > 100) {
+          showToast('กรุณากรอกชื่อลูกค้า (ไม่เกิน 100 ตัวอักษร)', 'error');
+          nameInput.focus();
+          return;
+        }
+        if (!/^[0-9]{9,15}$/.test(phoneDigits)) {
+          showToast('กรุณากรอกเบอร์โทรศัพท์ 9–15 หลักให้ถูกต้อง', 'error');
+          phoneInput.focus();
+          return;
+        }
+        if (!emailPattern.test(email) || email.length > 254) {
+          showToast('กรุณากรอกอีเมลที่ถูกต้อง', 'error');
+          emailInput.focus();
+          return;
+        }
+        if (carPlate.length < 2 || carPlate.length > 40 || !platePattern.test(carPlate)) {
+          showToast('กรุณากรอกทะเบียนรถให้ถูกต้อง (อย่างน้อย 2 ตัวอักษร)', 'error');
+          carPlateInput.focus();
           return;
         }
       }
