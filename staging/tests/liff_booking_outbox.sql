@@ -9,6 +9,9 @@ DECLARE d date:=((now() at time zone 'Asia/Bangkok')::date+5);
 BEGIN
  h:=public.staging_create_hold_v2(owner,d,ARRAY['09:00 - 10:00'],'Main Court');
  IF h->>'success'<>'true' THEN RAISE EXCEPTION 'Hold failed: %',h;END IF;
+ IF (public.staging_register_hold_slip(owner,(h->>'hold_token')::uuid,
+   'staging/test/'||(h->>'hold_token')||'.png',repeat('a',64))->>'success')<>'true'
+   THEN RAISE EXCEPTION 'synthetic slip registration failed'; END IF;
  c:=public.staging_confirm_hold_line_v3(owner,line_id,(h->>'hold_token')::uuid,request_id,'Synthetic LINE','0812345678',null);
  IF c->>'success'<>'true' OR c->>'line_notification'<>'queued' OR c->>'payment_verified'<>'false'
  THEN RAISE EXCEPTION 'Confirmed booking or notification not queued: %',c;END IF;
