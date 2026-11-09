@@ -1204,6 +1204,15 @@ function isSameSlot(s1, s2) {
 }
 
 async function fetchBookingsFromSupabase(silent = false) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    try { return await stagingRefreshSelectedDate(); }
+    catch (err) {
+      stagingAvailabilityReady=false;stagingPricingReady=false;
+      if(!silent) showToast('ไม่สามารถตรวจสอบเวลาว่างหรือราคาได้ กรุณาเข้า LINE LIFF', 'error');
+      renderTimeSlotsUI();showSummaryPanel();
+      return false;
+    }
+  }
   if (!supabaseClient) return;
   
   state.isFetchingBookings = true;
@@ -1744,6 +1753,26 @@ function renderTimeSlots() {
 
 // === 3-Minute Temporary Slot Hold Manager ===
 async function createSlotHold(dateStr, slots) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    if(!stagingAvailabilityReady||!stagingPricingReady||dateStr!==stagingSelectedDateKey())return false;
+    const r=await STAGING_BOOKING_API.hold(dateStr,slots);
+    if(!r.success||!r.holdToken||!r.expiresAt)return false;
+    state.currentHoldId=r.holdToken;state.holdExpiresAt=Date.parse(r.expiresAt);
+    if(!Number.isFinite(state.holdExpiresAt)||state.holdExpiresAt<=Date.now()){
+      state.currentHoldId=null;state.holdExpiresAt=null;return false;
+    }
+    state.currentRequestId=generateUUID();
+    state.stagingSlipUploadedForHold=null;
+    const occupied=stagingBusyByDate.get(dateStr)||new Set();
+    slots.forEach(slot=>occupied.add(slot));stagingBusyByDate.set(dateStr,occupied);
+    state.bookings=state.bookings.filter(b=>!(b.date===dateStr&&slots.includes(b.slot)));
+    for(const slot of slots)state.bookings.push({
+      id:'staging-hold-'+slot,date:dateStr,slot,status:'pending_hold',
+      holdId:r.holdToken,holdExpiresAt:state.holdExpiresAt,name:'',phone:'',
+      court:'Main Court',fee:getSlotPrice(slot)
+    });
+    startHoldTimer();renderTimeSlotsUI();return true;
+  }
   // Do not create a browser-only hold when Supabase is unavailable.
   if (!supabaseClient) {
     console.error("Cannot create hold: Supabase connection unavailable.");
@@ -1867,6 +1896,23 @@ function startHoldTimer() {
 }
 
 async function releaseSlotHold(isExpired = false) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    if(state.holdTimerInterval){clearInterval(state.holdTimerInterval);state.holdTimerInterval=null;}
+    const token=state.currentHoldId;
+    state.currentHoldId=null;state.holdExpiresAt=null;state.currentRequestId=null;
+    state.stagingSlipUploadedForHold=null;
+    if(token){try{await STAGING_BOOKING_API.release(token);}catch(e){console.warn('Staging release failed',e);}}
+    await fetchBookingsFromSupabase(true);
+    if(isExpired){
+      showToast('หมดเวลาทำรายการ (3 นาที)','error');
+      const invoice=document.getElementById('invoiceSlipModal');
+      if(invoice)invoice.style.display='none';
+      const booking=document.getElementById('bookingModal');
+      if(booking)booking.style.display='none';
+      state.selectedSlots=[];showSummaryPanel();
+    }
+    renderTimeSlotsUI();return;
+  }
   if (state.holdTimerInterval) {
     clearInterval(state.holdTimerInterval);
     state.holdTimerInterval = null;
@@ -1917,6 +1963,13 @@ async function releaseSlotHold(isExpired = false) {
 
 // renderTimeSlotsUI: แสดง time slots จากข้อมูล state.bookings ปัจจุบัน
 function renderTimeSlotsUI() {
+  if(GRANDSLAM_STAGING_ONLY&&(!stagingAvailabilityReady||!stagingPricingReady||
+       !stagingRatesByDate.has(stagingSelectedDateKey()))){
+    const grid=document.getElementById('slotsGrid');
+    if(grid)grid.textContent='กำลังตรวจสอบข้อมูลสนามและราคาในระบบทดสอบ...';
+    const btn=document.getElementById('btnBookNow');if(btn)btn.disabled=true;
+    return;
+  }
   const slotsGrid = document.getElementById('slotsGrid');
   const titleEl = document.getElementById('selectedDateText');
   const activeSlotsPanel = document.getElementById('activeSlotsPanel');
