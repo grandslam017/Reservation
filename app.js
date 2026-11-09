@@ -2466,9 +2466,9 @@ function initBookingWizard() {
       // The Staging booking API requires the same four customer fields as the
       // business workflow. Validate before moving to the slip/payment modal.
       if (GRANDSLAM_STAGING_ONLY) {
-        const phoneDigits = phone.replace(/[\\s()-]/g, '');
-        const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
-        const platePattern = /^[0-9A-Za-zก-๙\\s-]+$/u;
+        const phoneDigits = phone.replace(/[\s()-]/g, '');
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const platePattern = /^[0-9A-Za-zก-๙\s-]+$/u;
         if (name.length < 2 || name.length > 100 ||
             !/^[0-9]{9,15}$/.test(phoneDigits) ||
             !emailPattern.test(email) || email.length > 254 ||
