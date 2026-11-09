@@ -4,7 +4,7 @@ import { verifyLineIDToken, actorIdFromVerifiedLineId } from "./line-security.mj
 const REF="kssxxizhpoxxlbsehymk";
 const CHANNEL="2010398825"; // Verify in LINE Developers before E2E.
 const BUCKET="grandslam-staging-slips";
-const ORIGINS=new Set(["https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
+const ORIGINS=new Set(["https://kssxxizhpoxxlbsehymk.supabase.co","https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function result(status,data,origin){
  const h={"Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin"};
