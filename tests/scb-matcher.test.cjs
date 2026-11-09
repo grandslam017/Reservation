@@ -28,3 +28,20 @@ test('match window excludes unrelated days',()=>{
  {id:'c2',creditAmount:700,timestamp:'2026-11-11T14:00:00+07:00'}]);
  assert.equal(result[0].status,'unmatched');
 });
+
+test('one statement credit must not support two separate bookings',()=>{
+ const result=reconcile([
+ {bookingId:'B-A',amount:350,slipTimestamp:date},
+ {bookingId:'B-B',amount:350,slipTimestamp:date}],
+ [{id:'bank-1',creditAmount:350,timestamp:date}]);
+ assert.equal(result[0].status,'ambiguous_shared_credit');
+ assert.equal(result[1].status,'ambiguous_shared_credit');
+});
+test('same slip reference submitted for two bookings is flagged',()=>{
+ const result=reconcile([
+ {bookingId:'B-A',amount:350,slipTimestamp:date,slipReference:'TX-RPT'},
+ {bookingId:'B-B',amount:350,slipTimestamp:date,slipReference:'TX-RPT'}],
+ [{id:'bank-1',creditAmount:350,timestamp:date,reference:'TX-RPT'}]);
+ assert.equal(result[0].status,'duplicate_slip_reference');
+ assert.equal(result[1].status,'duplicate_slip_reference');
+});
