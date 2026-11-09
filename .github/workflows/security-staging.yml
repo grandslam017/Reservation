@@ -45,8 +45,8 @@ jobs:
           from pathlib import Path
           h=Path('staging/site-dist/index.html').read_text(encoding='utf-8')
           for name in ('custName','custPhone','custEmail','custVehicle'):
-              tag=re.search(r'<input\\b[^>]*\\bid="'+name+r'"[^>]*>',h)
-              assert tag is not None and re.search(r'\\brequired\\b',tag.group(0)), name
+              tag=re.search(r'<input\b[^>]*\bid="'+name+r'"[^>]*>',h)
+              assert tag is not None and re.search(r'\brequired\b',tag.group(0)), name
           assert 'ทะเบียนรถ *' in h
           assert 'ไม่บังคับ)</label>' not in h
           PY
