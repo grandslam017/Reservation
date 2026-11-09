@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>THE GRAND SLAM — STAGING ONLY</title>
+<style>
+:root{font-family:system-ui,"Noto Sans Thai",sans-serif;color:#15312b;background:#f2f6f3}
+body{max-width:820px;margin:26px auto;padding:0 16px}
+h1{margin-bottom:4px} h2{font-size:1.05rem}
+article{background:white;border:1px solid #d5e3dc;border-radius:15px;padding:18px;margin:13px 0}
+button,input{font:inherit;padding:10px 12px;border-radius:7px;border:1px solid #b0c7bb}
+button{background:#12634d;color:white;cursor:pointer}button:disabled{background:#9aaba3;cursor:not-allowed}
+label{display:block;margin-top:12px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}
+.slot{background:#e9f7ef;color:#124536}.slot.busy{background:#f4e9e9;color:#785252}.slot.selected{background:#1a7158;color:white}
+#notice{white-space:pre-wrap;word-wrap:break-word;padding:12px;background:#f4f7f5;border-radius:7px;min-height:2em}
+.warn{color:#9a4c15;font-weight:600}small{color:#50645c}
+</style></head><body>
+<h1>THE GRAND SLAM · STAGING</h1>
+<p class="warn">ระบบทดสอบเท่านั้น — ห้ามใช้ข้อมูลลูกค้าจริง ห้ามชำระเงินหรืออัปโหลดสลิปจริง</p>
+<article><h2>1. เข้าใช้บัญชีทดสอบ</h2>
+<button id="signin">เข้าสู่ระบบแบบ Anonymous (เฉพาะ Staging)</button>
+<button id="signout" disabled>ออกจากระบบ</button>
+<p><small id="authstatus">ยังไม่ได้เข้าสู่ระบบ</small></p>
+<p><small>หาก Anonymous Sign-In ยังไม่เปิดใน Staging จะต้องเปิดเฉพาะ Project ทดสอบก่อน จึงจะล็อกอินได้</small></p>
+</article>
+<article><h2>2. เลือกวันและเวลาที่ต้องการจอง</h2>
+<label>วันที่ <input id="date" type="date"></label>
+<button id="load" disabled>ตรวจสอบเวลาว่าง</button>
+<div id="slots" class="grid" style="margin-top:12px"></div>
+<p id="total">ยอดรวมประมาณการ: 0 บาท (Backend เป็นผู้ตัดสินราคาสุดท้าย)</p>
+<button id="hold" disabled>สร้าง Hold 3 นาที</button>
+</article>
+<article><h2>3. ทดสอบยืนยันจอง</h2>
+<p class="warn">การยืนยันนี้ไม่ได้ตรวจสอบการชำระเงินจริง ใช้เพื่อทดสอบฐานข้อมูลจำลองเท่านั้น</p>
+<label>ชื่อทดสอบ <input id="customer" value="Synthetic Test" autocomplete="off"></label>
+<label>เบอร์ทดสอบ <input id="phone" value="0812345678" autocomplete="off"></label>
+<label>อีเมลทดสอบ <input id="email" value="staging@example.invalid" autocomplete="off"></label>
+<button id="confirm" disabled>ยืนยันข้อมูลทดสอบ</button>
+<button id="release" disabled>ปล่อย Hold</button>
+<small id="countdown"></small>
+</article>
+<article><h2>ผลการทดสอบ</h2><div id="notice">พร้อมเริ่มต้น</div></article>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/dist/umd/supabase.min.js"></script>
+<script>
+(() => {
+"use strict";
+const URL = "https://kssxxizhpoxxlbsehymk.supabase.co";
+const KEY = "sb_publishable_-pI8NJzZEtEivpNUQMjd4Q_te9-h9O4";
+const client = window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+const $ = s=>document.getElementById(s);
+const selected = new Set();
+let busy = new Set(),holdToken=null,expiresAt=null,requestId=null;
+const show = (message)=>{$("notice").textContent=String(message)};
+const tomorrow = new Date();tomorrow.setDate(tomorrow.getDate()+1);
+$("date").value=[tomorrow.getFullYear(),String(tomorrow.getMonth()+1).padStart(2,"0"),String(tomorrow.getDate()).padStart(2,"0")].join("-");
+function render(){
+ const slots=$("slots");slots.textContent="";
+ for(let hour=8;hour<23;hour++){
+  const label=String(hour).padStart(2,"0")+":00 - "+String(hour+1).padStart(2,"0")+":00";
+  const btn=document.createElement("button");btn.type="button";btn.textContent=label;
+  const taken=busy.has(label);btn.className="slot"+(taken?" busy":"")+(selected.has(label)?" selected":"");
+  btn.disabled=taken||!!holdToken;
+  btn.addEventListener("click",()=>{selected.has(label)?selected.delete(label):selected.add(label);render()});
+  slots.appendChild(btn);
+ }
+ $("total").textContent="เลือก "+selected.size+" ชั่วโมง; ราคาจริงคำนวณจาก Server";
+ $("hold").disabled=!selected.size||!!holdToken;
+ $("confirm").disabled=!holdToken;
+ $("release").disabled=!holdToken;
+}
+async function api(action,other={}){
+ const {data:{session}}=await client.auth.getSession();
+ if(!session?.access_token)throw Error("กรุณาเข้าสู่ระบบทดสอบก่อน");
+ const {data,error}=await client.functions.invoke("staging-booking-gateway",{body:{action,...other}});
+ if(error)throw Error(error.message||"API error");
+ return data;
+}
+$("signin").onclick=async()=>{try{const {data,error}=await client.auth.signInAnonymously();if(error)throw error;$("authstatus").textContent="ทดสอบ User ID: "+data.user.id;$("load").disabled=false;show("เข้าสู่ระบบทดสอบสำเร็จ")}catch(e){show("เข้าสู่ระบบไม่ได้: "+e.message)}};
+$("signout").onclick=async()=>{if(holdToken){show("โปรดปล่อย Hold ก่อนออกจากระบบ");return} await client.auth.signOut();$("load").disabled=true;$("signout").disabled=true;show("ออกจากระบบแล้ว")};
+$("load").onclick=async()=>{try{const r=await api("availability",{date:$("date").value});if(!r.success)throw Error(r.error||"Availability failed");busy=new Set(r.busy_slots.map(x=>x.slot));selected.clear();render();show("โหลดสถานะสนามสำเร็จ (ไม่แสดงข้อมูลลูกค้า)")}catch(e){show(e.message)}};
+$("hold").onclick=async()=>{try{const r=await api("create",{date:$("date").value,slots:[...selected],court:"Main Court"});if(!r.success)throw Error(r.error||"Hold failed");holdToken=r.hold_token;expiresAt=new Date(r.expires_at).valueOf();requestId=crypto.randomUUID();render();show("Hold ทดสอบสำเร็จ; หมดอายุ "+r.expires_at)}catch(e){show(e.message)}};
+$("release").onclick=async()=>{try{const r=await api("release",{hold_token:holdToken});if(!r.success)throw Error(r.error||"Release failed");holdToken=null;expiresAt=null;selected.clear();render();show("ปล่อย Hold สำเร็จ");$("load").click()}catch(e){show(e.message)}};
+$("confirm").onclick=async()=>{try{const r=await api("confirm",{hold_token:holdToken,request_id:requestId,name:$("customer").value,phone:$("phone").value,email:$("email").value});if(!r.success)throw Error(r.error||"Confirm failed");holdToken=null;expiresAt=null;selected.clear();render();show("ยืนยันการจองทดสอบแล้ว (ไม่ใช่การรับชำระเงินจริง) เลขที่: "+r.receipt_no);$("load").click()}catch(e){show(e.message)}};
+setInterval(()=>{if(holdToken&&expiresAt){const remain=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));$("countdown").textContent="Hold เหลือ "+Math.floor(remain/60)+":"+String(remain%60).padStart(2,"0");if(!remain){holdToken=null;selected.clear();render();show("Hold หมดอายุ กรุณาตรวจสอบสนามใหม่")}}},1000);
+client.auth.getUser().then(({data})=>{if(data?.user){$("authstatus").textContent="ทดสอบ User ID: "+data.user.id;$("load").disabled=false;$("signout").disabled=false}});
+render();
+})();
+</script>
+</body></html>
