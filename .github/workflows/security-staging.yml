@@ -67,6 +67,20 @@ jobs:
           name: grand-slam-staging-static-site
           path: staging/site-dist/
           retention-days: 7
+      - name: Netlify staging domain public response diagnostics (read-only)
+        shell: bash
+        run: |
+          base='https://illustrious-alfajores-364eb8.netlify.app'
+          status=$(curl --silent --show-error --location --max-time 20 -D /tmp/netlify-response-headers "$base/" -o /tmp/netlify-response-body -w '%{http_code}')
+          echo "Netlify HTTP status: $status"
+          tr -d '\r' </tmp/netlify-response-headers | grep -iE '^(HTTP/|content-type:|location:)' || true
+          if [[ "$status" != "200" ]]; then
+            echo "::warning::Netlify site not yet publicly reachable; check Publish/Make public in the Netlify dashboard"
+          elif ! grep -q 'The Grand Slam' /tmp/netlify-response-body; then
+            echo "::warning::Netlify response is not yet the expected customer UI"
+          else
+            echo 'Netlify site responds with The Grand Slam markup'
+          fi
       - name: Staging API security smoke tests (negative cases only)
         run: node staging/tests/http-auth-smoke.mjs
       - name: Check staging config cannot point to production
