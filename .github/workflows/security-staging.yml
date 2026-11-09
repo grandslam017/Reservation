@@ -15,6 +15,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Preserve original customer-facing UI files exactly
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          for f in index.html style.css charts.js; do
+            git show origin/main:"$f" | cmp - "$f" || {
+              echo "::error file=$f::Frontend layout/markup/style changed. Owner approval required."
+              exit 1
+            }
+          done
       - name: JavaScript syntax
         run: node --check app.js
       - name: Static and mocked hold tests
