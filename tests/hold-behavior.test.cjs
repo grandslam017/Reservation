@@ -28,6 +28,7 @@ async function attemptHold({ connected = true, read = {}, inserted = {}, existin
     },
   };
   const sandbox = {
+    GRANDSLAM_STAGING_ONLY: false, // Explicitly exercise the pre-existing legacy implementation.
     supabaseClient: connected ? { from: () => query } : null,
     state,
     console: { error() {}, warn() {} },
