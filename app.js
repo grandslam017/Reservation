@@ -2629,6 +2629,46 @@ function initBookingWizard() {
         isFinishProcessing = true;
 
         try {
+          if(GRANDSLAM_STAGING_ONLY){
+            const token=state.currentHoldId;
+            if(!token||!state.holdExpiresAt||Date.now()>=state.holdExpiresAt||
+               !state.currentSlipFile||!STAGING_BOOKING_API||!state.currentRequestId){
+              showToast('Hold หมดเวลาหรือไม่มีสลิป กรุณาเริ่มรายการใหม่','error');
+              return;
+            }
+            const confirmButton=document.getElementById('btnFinishBooking');
+            confirmButton.disabled=true;
+            try{
+              if(state.stagingSlipUploadedForHold!==token){
+                const slip=await STAGING_BOOKING_API.uploadSlip({
+                  holdToken:token,file:state.currentSlipFile
+                });
+                if(!slip.success)throw Error(slip.error||'SLIP_UPLOAD_FAILED');
+                state.stagingSlipUploadedForHold=token;
+              }
+              const result=await STAGING_BOOKING_API.confirm({
+                holdToken:token,requestId:state.currentRequestId,
+                name,phone,email
+              });
+              if(!result.success||result.status!=='confirmed')
+                throw Error(result.error||'BOOKING_CONFIRMATION_FAILED');
+              if(state.holdTimerInterval){clearInterval(state.holdTimerInterval);state.holdTimerInterval=null;}
+              state.currentHoldId=null;state.holdExpiresAt=null;
+              state.currentRequestId=null;state.stagingSlipUploadedForHold=null;
+              state.currentSlipFile=null;
+              state.selectedSlots=[];state.pendingUserNote='';
+              document.getElementById('invoiceSlipModal').style.display='none';
+              if(result.invoiceNo)document.getElementById('invoiceNumber').textContent=result.invoiceNo;
+              showToast('Booking Confirmed (Staging) — รอตรวจสอบการโอน SCB','success');
+              await fetchBookingsFromSupabase(true);
+              renderCalendar();renderTimeSlots();showSummaryPanel();
+              return;
+            }catch(error){
+              console.warn('Staging booking submission not confirmed',error);
+              showToast('ยังไม่ยืนยันการจอง: '+(error.message||'กรุณาลองใหม่'),'error');
+              return;
+            }finally{confirmButton.disabled=false;}
+          }
           const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
           showToast(translations[state.language].toastGasSyncing, 'info');
 
