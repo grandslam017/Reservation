@@ -8,7 +8,9 @@ test('Supabase Auth legacy gateway cannot bypass LIFF slip requirement',()=>{
  const liff=fs.readFileSync(path.join(__dirname,'..','staging/functions/liff-booking-gateway/index.ts'),'utf8');
  assert.match(old,/LEGACY_CONFIRM_DISABLED_USE_VERIFIED_LIFF/);
  assert.doesNotMatch(old,/staging_confirm_hold_v2/);
- assert.match(liff,/staging_confirm_hold_line_v3/);
+ assert.match(liff,/staging_confirm_hold_line_v4/);
+ assert.doesNotMatch(liff,/staging_confirm_hold_line_v3/);
+ assert.match(liff,/p_car_plate:data.car_plate/);
 });
 test('staging-only external API origin and project reference are enforced',()=>{
  const old=fs.readFileSync(path.join(__dirname,'..','staging/functions/booking-gateway/index.ts'),'utf8');
