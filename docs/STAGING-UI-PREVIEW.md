@@ -42,3 +42,9 @@ The first Edge preview version returned the wrong asset for subpaths in the GitH
 ## HTTP path variant support (v3)
 
 The Staging Edge preview now resolves static assets by their final pathname segment, whether the platform passes a full function path or a function-relative path. This is isolated to the Staging preview and is subject to the same HTTP byte-parity CI gate. No Production frontend or backend deployment is changed.
+
+## Payment safety exception — preview only
+
+The layout, markup and styling remain unchanged; however, **when the Staging JavaScript starts** it masks the real PromptPay QR/number and replaces bank transfer instructions with **"ทดสอบเท่านั้น ไม่ต้องโอนเงินจริง"**. No real SCB funds should be sent to test a booking. This is an intentional and necessary exception to identical runtime text in the payment panel. Production main is unchanged.
+
+The hosted static `app.js` was refreshed in the Staging Edge preview to include this safeguard. CI verifies byte-parity of the deployed JS and tests the stage-only masking function. Real LINE Login and Messaging API end-to-end remain unverified.
