@@ -40,7 +40,7 @@ jobs:
               exit 1
             }
           done
-      - name: Staging browser media types and headers
+      - name: Confirm Supabase Edge disallows HTML hosting (use static artifact)
         shell: bash
         run: |
           set -euo pipefail
@@ -51,7 +51,8 @@ jobs:
             tr -d '\r' < "/tmp/headers-$f" | grep -iE '^(HTTP/|content-type:|content-disposition:|x-content-type-options:|content-security-policy:)' || true
           done
           ct=$(tr -d '\r' < /tmp/headers-index.html | grep -i '^content-type:' | tail -1 | tr '[:upper:]' '[:lower:]')
-          [[ "$ct" == *'text/html'* ]] || { echo '::error::Preview HTML is not served with text/html'; exit 1; }
+          [[ "$ct" == *'text/plain'* ]] || { echo '::error::Unexpected Edge HTML content type - reevaluate restrictions'; exit 1; }
+          echo 'Supabase Edge intentionally rewrites text/html to text/plain: use the separate static artifact for live browser tests.'
       - name: Build separate static HTTPS staging site (safe payment placeholder)
         shell: bash
         run: |
