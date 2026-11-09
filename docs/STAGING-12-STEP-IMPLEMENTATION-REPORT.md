@@ -56,3 +56,26 @@
 - Staging: migrations are additive; prefer restore/recreate only the dedicated staging project from versioned migration files when an isolated reset is necessary. Never run generic DROP statements against Production.
 - If a Staging Edge Function fails: redeploy prior verified version or disable the Staging test endpoint. Production still uses its existing endpoint/credentials.
 - Paid resources: none authorized. Project must stay on Supabase Free and existing LINE OA plan; do not request upgrades.
+
+
+## Additional implementation update — 2026-11-09, staging-only
+
+- Added `staging-liff-slip-upload` Edge Function. Authenticates each incoming request with LINE ID token validation against LINE server, accepts only ≤1MB PNG/JPEG with matching magic bytes, stores in private Staging bucket, binds to an unexpired hold owned by the verified LINE identity, and never marks money paid.
+- Changed `staging_confirm_hold_line_v3`: a private slip must be bound to the customer's hold before confirmation. Foreign/nonexistent hold returns generic `INVALID_HOLD`; valid hold without slip returns `SLIP_REQUIRED`. Rollback SQL tests passed for owner isolation and confirmation after synthetic slip registration.
+- Added `staging-admin-payments` Edge Function (JWT required, freshly verified protected `app_metadata.role=admin`). Only Admin can read pending review items, request 60-second signed private-slip URLs, flag a dispute without canceling court, or explicitly mark payment verified after claiming SCB bank-credit verification with a reference. **These operations are for Staging only, no actual SCB account connection.**
+- Added separate `staging/admin/payments.html` and `staging/admin/pricing.html` for isolated Admin feature testing. They **do not replace existing customer UI** and require an explicitly provisioned Staging Admin test account before manual E2E.
+- Added pure `staging/reconciliation/scb-matcher.cjs` and unit tests; flags duplicate slip references and ambiguous statement-credit reuse across bookings. **Never auto-approves any bank payment.**
+- Hardened **branch-only** original `app.js`: Staging Supabase URL/publishable key forced at client init, Production GAS and browser HMAC calls disabled even with stale local storage. No updates to `main`. Note this intentionally makes direct legacy booking calls fail under Staging RLS until the secure LIFF adapter replaces them — a **known E2E blocker**, not a successful migration.
+- The original `index.html`, `style.css` and `charts.js` were not edited. GitHub CI checks they match main byte for byte.
+
+### Remaining non-negotiable blockers
+
+1. **Customer flow not connected yet:** The original `app.js` still uses legacy direct bookings/hold/slip API handlers. The headless Staging LIFF adapter and secure upload gateway exist, but must be integrated into the existing modal flow and tested in LIFF without any visual redesign. Do not tell customers it is ready.
+2. **Admin live test account not provisioned:** requires owner-controlled Staging Auth test user with trusted Admin role. Do not reuse Production admin credentials.
+3. **LINE channel and message tests incomplete:** actual LIFF channel ID/provider/scope must be confirmed, and test LINE OA credentials + permitted test recipient must be configured. Worker source exists but was not deployed; no real LINE push performed.
+4. **SCB files not verified:** matcher expects normalized credit records; no real SCB statement format/parsing, no bank API or automatic payment confirmation. Admin still manually verifies actual credits.
+5. **GAS/Google test resources and E2E not available:** staging mock only, no Google assets modified. Need approved isolated Google resource IDs and tests without calling live deployment.
+6. **Financial policy and backup/restore:** advance payment recognition, receipt timing, invoice grouping, PDPA safeguards, reconciliation and full rollback rehearsal remain pending.
+7. **Browser screenshot and concurrent HTTP tests pending:** existing CI confirms static HTML/CSS only, not dynamic pixel-level parity or functional LIFF success.
+
+**No Staging test result constitutes authorization to deploy Production.**
