@@ -30,6 +30,11 @@
     return {success:true,busySlots:slots,bookings:slots.map(slot=>({date,slot,
       status:"confirmed",name:"",phone:"",email:"",court:"Main Court"}))};
    },
+   pricing:async date=>{
+    const r=await makeRequest(liff,"pricing",{date},fetcher);
+    if(!r.success)return r;
+    return {success:true,date,prices:r.prices};
+   },
    hold:async(date,slots)=> {
     const r=await makeRequest(liff,"create",{date,slots},fetcher);
     return r.success?{success:true,holdToken:r.hold_token,expiresAt:r.expires_at}:r;
