@@ -16,13 +16,21 @@ function reconcile(bookings,bankEntries,{windowMinutes=120}={}){
   cents:CENTS(x.creditAmount),time:x.timestamp,reference:String(x.reference||'').trim(),
   direction:x.direction||'credit'
  })).filter(x=>x.id&&Number.isFinite(x.cents)&&isTimestamp(x.time)&&x.direction==='credit');
+ const bookingReferenceCounts=new Map();
+ for(const b of bookings){
+  const id=String(b.slipReference||'').trim();
+  if(id)bookingReferenceCounts.set(id,(bookingReferenceCounts.get(id)||0)+1);
+ }
  const referenceCounts=new Map();
  for(const x of statements)if(x.reference)
   referenceCounts.set(x.reference,(referenceCounts.get(x.reference)||0)+1);
- return bookings.map(b=>{
+ const mapped=bookings.map(b=>{
   const expected=CENTS(b.amount),at=b.slipTimestamp,ref=String(b.slipReference||'').trim();
   if(!b.bookingId||!Number.isFinite(expected)||!isTimestamp(at))
     return {bookingId:b.bookingId||null,status:'invalid_booking',candidates:[],requiresAdmin:true};
+  if(ref&&bookingReferenceCounts.get(ref)>1)
+    return {bookingId:b.bookingId,status:'duplicate_slip_reference',candidates:[],
+      requiresAdmin:true,paymentVerified:false};
   const possible=statements.filter(e=>e.cents===expected&&
    minutesBetween(e.time,at)<=windowMinutes&&
    (!ref||!e.reference||ref===e.reference));
@@ -37,5 +45,13 @@ function reconcile(bookings,bankEntries,{windowMinutes=120}={}){
    // NEVER authorize payment from a matcher result alone.
    paymentVerified:false};
  });
+ const reverse=new Map();
+ for(const item of mapped)for(const id of (item.candidates||[]))
+  reverse.set(id,(reverse.get(id)||0)+1);
+ for(const item of mapped){
+  if(item.candidates?.some(id=>reverse.get(id)>1))
+    item.status='ambiguous_shared_credit';
+ }
+ return mapped;
 }
 module.exports={reconcile};
