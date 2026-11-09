@@ -38,3 +38,7 @@ This preview is a snapshot. When `app.js` is updated in GitHub, the Edge Functio
 ## Staging preview routing correction
 
 The first Edge preview version returned the wrong asset for subpaths in the GitHub Actions HTTP parity check. Version 2 handles both the full `/functions/v1/...` pathname and the function-relative pathname returned by the Supabase Edge runtime. The HTTP parity check remains a required gate, not a warning. The production LIFF URL and GitHub Pages were not modified.
+
+## HTTP path variant support (v3)
+
+The Staging Edge preview now resolves static assets by their final pathname segment, whether the platform passes a full function path or a function-relative path. This is isolated to the Staging preview and is subject to the same HTTP byte-parity CI gate. No Production frontend or backend deployment is changed.
