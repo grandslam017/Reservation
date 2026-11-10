@@ -1,0 +1,32 @@
+name: Production GAS candidate regression
+on:
+  pull_request:
+    branches: [main]
+    paths: ['production/**', 'tests/production-gas*.test.cjs', '.github/workflows/production-gas-candidate.yml']
+  push:
+    branches: [security/production-gas-auth-20261110]
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test security boundary and source transformation
+        run: node --test tests/production-gas*.test.cjs
+      - name: Ensure existing customer application is untouched
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          for f in app.js index.html style.css charts.js app_supabase.js backup_to_sheets.js; do
+            git show origin/main:"$f" | cmp - "$f" || exit 1
+          done
+      - name: Validate supporting JavaScript
+        run: |
+          node --check production/scripts/build-gas-candidate.cjs
+          node --check production/scripts/audit-release.cjs
+          node --check production/server/gas-protocol.mjs
+          node --check production/server/line-webhook-signature.mjs
