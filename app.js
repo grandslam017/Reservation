@@ -1,4 +1,85 @@
 // app.js - Core application logic for The Grand Slam Tennis Court Booking App
+// Staging-only LIFF adapter bundled without changing index.html or CSS.
+/* Staging-only LINE LIFF bridge. This module does not alter the existing DOM or CSS.
+ * The production Web App still loads the original app.js; integration is intentionally gated.
+ */
+(function (root,factory) {
+ if(typeof module==="object"&&module.exports)module.exports=factory();
+ else root.GrandSlamLiffStagingAdapter=factory();
+})(typeof globalThis!=="undefined"?globalThis:this,function(){
+ "use strict";
+ const URL="https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-liff-booking-gateway";
+ async function makeRequest(liff,action,args={},fetcher=fetch){
+  if(!liff||!liff.isLoggedIn||!liff.isLoggedIn()||typeof liff.getIDToken!=="function")
+   return {success:false,error:"LINE_LOGIN_REQUIRED"};
+  const raw=liff.getIDToken();
+  if(!raw)return {success:false,error:"LINE_OPENID_SCOPE_REQUIRED"};
+  let res;
+  try{
+   res=await fetcher(URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,line_id_token:raw,...args})});
+  }catch{return {success:false,error:"NETWORK_ERROR"}}
+  let data;try{data=await res.json()}catch{return {success:false,error:"GATEWAY_RESPONSE_INVALID"}}
+  if(!res.ok)return {success:false,error:data?.error||"GATEWAY_ERROR"};
+  if(data?.environment!=="staging")return {success:false,error:"WRONG_ENVIRONMENT"};
+  return data;
+ }
+ function create(liff,fetcher){
+  return Object.freeze({
+   availability:async date=>{
+    const r=await makeRequest(liff,"availability",{date},fetcher);
+    if(!r.success)return r;
+    const slots=(r.busy_slots||[]).map(x=>x.slot);
+    return {success:true,busySlots:slots,bookings:slots.map(slot=>({date,slot,
+      status:"confirmed",name:"",phone:"",email:"",court:"Main Court"}))};
+   },
+   uploadSlip:async({holdToken,file})=>{
+    if(!liff||!liff.isLoggedIn||!liff.isLoggedIn()||typeof liff.getIDToken!=="function")
+      return {success:false,error:"LINE_LOGIN_REQUIRED"};
+    const token=liff.getIDToken();
+    if(!token)return {success:false,error:"LINE_OPENID_SCOPE_REQUIRED"};
+    if(!(file instanceof Blob)||file.size<16||file.size>1048576)
+      return {success:false,error:"INVALID_SLIP"};
+    const form=new FormData();
+    form.set("line_id_token",token);
+    form.set("hold_token",holdToken);
+    form.set("file",file,"payment-slip");
+    let res;
+    try{res=await fetcher("https://kssxxizhpoxxlbsehymk.supabase.co/functions/v1/staging-liff-slip-upload",{
+      method:"POST",body:form
+    })}catch{return {success:false,error:"NETWORK_ERROR"}}
+    let data;try{data=await res.json()}catch{return {success:false,error:"UPLOAD_RESPONSE_INVALID"}}
+    if(!res.ok)return {success:false,error:data?.error||"UPLOAD_REJECTED"};
+    if(data?.environment!=="staging")return {success:false,error:"WRONG_ENVIRONMENT"};
+    return data;
+   },
+   pricing:async date=>{
+    const r=await makeRequest(liff,"pricing",{date},fetcher);
+    if(!r.success)return r;
+    return {success:true,date,prices:r.prices};
+   },
+   hold:async(date,slots)=> {
+    const r=await makeRequest(liff,"create",{date,slots},fetcher);
+    return r.success?{success:true,holdToken:r.hold_token,expiresAt:r.expires_at}:r;
+   },
+   confirm:async({holdToken,requestId,name,phone,email,carPlate})=>{
+    const r=await makeRequest(liff,"confirm",{
+     hold_token:holdToken,request_id:requestId,name,phone,email,car_plate:carPlate
+    },fetcher);
+    return r.success?{success:true,status:"confirmed",paymentStatus:"pending_verification",
+      bookingIds:r.booking_ids,invoiceNo:r.invoice_no,
+      notificationQueued:r.line_notification==="queued",paymentVerified:false}:r;
+   },
+   release:holdToken=>makeRequest(liff,"release",{hold_token:holdToken},fetcher),
+  });
+ }
+ return Object.freeze({create});
+});
+
+// Staging Branch ONLY: never connect to Production or Google GAS from this branch.
+const GRANDSLAM_STAGING_ONLY = true;
+const GRANDSLAM_STAGING_URL = "https://kssxxizhpoxxlbsehymk.supabase.co";
+const GRANDSLAM_STAGING_PUBLIC_KEY = "sb_publishable_-pI8NJzZEtEivpNUQMjd4Q_te9-h9O4";
+
 
 // Language Translations Dictionary
 const translations = {
@@ -270,11 +351,11 @@ const state = {
   bookings: [],
   transactions: [],
   config: {
-    supabaseUrl: "https://eqwmodrhorcbwsshbepg.supabase.co",
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY",
+    supabaseUrl: GRANDSLAM_STAGING_URL,
+    supabaseKey: GRANDSLAM_STAGING_PUBLIC_KEY,
     liffId: "2010398825-4Z3Ff2Gf",
-    gasUrl: "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec",
-    webhookSecret: "GrandSlam@2026!SecureKey",
+    gasUrl: "",
+    webhookSecret: "",
     rateDay: 250,              // 08:00 - 16:00
     rateNight: 350,            // 16:00 - 23:00 (Night rate updated to 350)
     advanceBookingMonths: 1,    // Default 1 (อนุญาตจองล่วงหน้า 1 เดือน)
@@ -353,6 +434,10 @@ async function generateHMACSignature(message, secret) {
 
 // Secure Wrapper for sending signed requests to Google Apps Script
 async function sendGasRequest(payload) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    console.warn("GAS calls are disabled in the Staging branch.");
+    return { status: "error", message: "STAGING_GAS_DISABLED" };
+  }
   if (!state.config.gasUrl) {
     console.warn("Google Apps Script Web App URL is not configured.");
     return null;
@@ -369,7 +454,7 @@ async function sendGasRequest(payload) {
     const unsignedRaw = JSON.stringify(sortedPayload);
     
     let signature = "";
-    const effectiveSecret = state.config.webhookSecret || "GrandSlam@2026!SecureKey";
+    const effectiveSecret = state.config.webhookSecret || "";
     if (effectiveSecret) {
       signature = await generateHMACSignature(unsignedRaw, effectiveSecret);
     }
@@ -514,8 +599,75 @@ function getRunningNumber(type) {
   return `${prefix}${countStr}`;
 }
 
+
+const STAGING_BOOKING_API = window.GrandSlamLiffStagingAdapter.create(window.liff,(...args)=>fetch(...args));
+const stagingBusyByDate=new Map();
+const stagingRatesByDate=new Map();
+const stagingWeeklyLoading=new Set(),stagingWeeklyFailed=new Set();
+let stagingAvailabilityReady=false,stagingPricingReady=false;
+let stagingRefreshSequence=0;
+function stagingSelectedDateKey(){return formatDateString(state.selectedDate);}
+async function stagingRefreshSelectedDate(){
+  const date=stagingSelectedDateKey();
+  const sequence=++stagingRefreshSequence;
+  stagingAvailabilityReady=false;stagingPricingReady=false;
+  const [availability,pricing]=await Promise.all([
+    STAGING_BOOKING_API.availability(date),STAGING_BOOKING_API.pricing(date)
+  ]);
+  if(sequence!==stagingRefreshSequence || date!==stagingSelectedDateKey()) return false;
+  if(!availability.success||!pricing.success)throw Error('STAGING_AVAILABILITY_OR_PRICE_UNAVAILABLE');
+  const fees=new Map(pricing.prices.map(x=>[x.slot,Number(x.fee)]));
+  if(!fees.size || [...fees.values()].some(v=>!Number.isFinite(v)||v<0))
+    throw Error('INVALID_STAGING_SERVER_PRICES');
+  stagingBusyByDate.set(date,new Set(availability.busySlots));
+  stagingRatesByDate.set(date,fees);
+  const bookings=[];
+  for(const [day,slots] of stagingBusyByDate)for(const slot of slots){
+    const own=day===date&&state.currentHoldId&&state.selectedSlots.includes(slot);
+    bookings.push({id:'staging-occupied-'+day+'-'+slot,date:day,slot,
+      status:own?'pending_hold':'confirmed',holdId:own?state.currentHoldId:null,
+      holdExpiresAt:own?state.holdExpiresAt:null,name:'',phone:'',email:'',court:'Main Court'});
+  }
+  state.bookings=bookings;
+  stagingAvailabilityReady=true;stagingPricingReady=true;
+  renderTimeSlotsUI();showSummaryPanel();
+  if(document.getElementById('availability')?.classList.contains('active'))renderAvailabilityGrid();
+  return true;
+}
+
+// In Staging, the original bank transfer panel must never invite real payment.
+function stagingMaskRealPaymentDetails() {
+  if (!GRANDSLAM_STAGING_ONLY) return;
+  const panel=document.getElementById('promptPayBox');
+  if (!panel) return;
+  const qr=panel.querySelector('img');
+  if (qr) {
+    qr.removeAttribute('src');
+    qr.alt='ทดสอบระบบ ไม่ต้องโอนเงินจริง';
+    qr.style.visibility='hidden';
+  }
+  for (const el of panel.querySelectorAll('div')) {
+    if (el.children.length > 0) continue;
+    if (/^\d{9,13}$/.test(el.textContent.trim())) el.textContent='TEST ONLY';
+    if (/ชื่อบัญชี/.test(el.textContent)) el.textContent='บัญชีทดสอบ — ไม่รับโอนเงินจริง';
+    if (/บัญชีสำหรับโอนเงิน/.test(el.textContent)) el.textContent='โหมดทดสอบ ไม่มีการชำระเงินจริง';
+  }
+  if (!panel.querySelector('[data-staging-payment-warning]')) {
+    const warning=document.createElement('div');
+    warning.setAttribute('data-staging-payment-warning','true');
+    warning.textContent='ระบบทดสอบ: ห้ามโอนเงินจริง กรุณาใช้สลิปตัวอย่างเท่านั้น';
+    warning.style.color='#fbbf24';
+    warning.style.fontWeight='700';
+    warning.style.fontSize='0.78rem';
+    panel.prepend(warning);
+  }
+}
+
 // Helper: Calculate price for a single slot string (e.g. "08:00 - 09:00" -> 250)
 function getSlotPrice(slotString) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    return stagingRatesByDate.get(stagingSelectedDateKey())?.get(slotString) ?? NaN;
+  }
   const startHourStr = slotString.split(' - ')[0]; // e.g. "08:00"
   const startHour = parseInt(startHourStr.split(':')[0], 10); // e.g. 8
 
@@ -614,11 +766,11 @@ function loadStateFromStorage() {
       state.config = { ...state.config, ...parsedConfig };
     }
     // Always enforce fallback defaults if empty or undefined
-    if (!state.config.supabaseUrl) state.config.supabaseUrl = "https://eqwmodrhorcbwsshbepg.supabase.co";
-    if (!state.config.supabaseKey) state.config.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxd21vZHJob3JjYndzc2hiZXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODUzOTQsImV4cCI6MjA5Nzg2MTM5NH0.KuvE9-4x9hHpp7D-uEyXriSC24Knzb9E9ls4K884pDY";
+    if (!state.config.supabaseUrl) state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    if (!state.config.supabaseKey) state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
     if (!state.config.liffId) state.config.liffId = "2010398825-4Z3Ff2Gf";
-    if (!state.config.gasUrl) state.config.gasUrl = "https://script.google.com/macros/s/AKfycbz8OefERQJ5pIBVLz7BF7gPbOtsBIs-gQx1dpvJlLk4trnlvQ0RAAIs7pxsXWMOCJ_Udw/exec";
-    state.config.webhookSecret = "GrandSlam@2026!SecureKey";
+    if (!state.config.gasUrl) state.config.gasUrl = "";
+    state.config.webhookSecret = "";
   } catch (err) {
     console.error("Failed to parse localConfig from localStorage:", err);
   }
@@ -631,6 +783,14 @@ function loadStateFromStorage() {
 
   // Bookings state initialized empty. Supabase is the source of truth.
   state.bookings = [];
+
+  // Enforce staging even if prior localStorage still contains Production config.
+  if (GRANDSLAM_STAGING_ONLY) {
+    state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
+    state.config.gasUrl = "";
+    state.config.webhookSecret = "";
+  }
 
   // Initialize Supabase Client
   initSupabaseClient();
@@ -795,6 +955,10 @@ function preloadMockData() {
 // Initialize Supabase Client
 let supabaseClient = null;
 function initSupabaseClient() {
+  if (GRANDSLAM_STAGING_ONLY) {
+    state.config.supabaseUrl = GRANDSLAM_STAGING_URL;
+    state.config.supabaseKey = GRANDSLAM_STAGING_PUBLIC_KEY;
+  }
   try {
     if (state.config.supabaseUrl && state.config.supabaseKey) {
       if (window.supabase) {
@@ -866,11 +1030,8 @@ async function confirmBatchBookingsInSupabase({
       console.error("Supabase RPC confirm_booking_batch error:", error);
       // Fallback สำหรับกรณีที่ยังไม่ได้รัน SQL Migration ใน Supabase
       if (error.code === 'PGRST202' || (error.message && error.message.includes('confirm_booking_batch'))) {
-        console.warn("RPC function confirm_booking_batch not found in Supabase. Running sequential fallback...");
-        return await fallbackSequentialSync({
-          dateStr, slotsBooked, name, phone, email, lineIdInput, lineUserId,
-          slipUrl, invoiceNumber, receiptNumber, isCoachRequired, activeHoldId, customerNotes, court
-        });
+        console.error("Required atomic booking RPC is unavailable; refusing sequential writes.");
+        return { status: "error", message: "ระบบยืนยันการจองไม่พร้อมใช้งาน กรุณาลองใหม่หรือติดต่อผู้ดูแลสนาม" };
       }
       return { status: "error", message: error.message || error.toString() };
     }
@@ -1080,6 +1241,15 @@ function isSameSlot(s1, s2) {
 }
 
 async function fetchBookingsFromSupabase(silent = false) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    try { return await stagingRefreshSelectedDate(); }
+    catch (err) {
+      stagingAvailabilityReady=false;stagingPricingReady=false;
+      if(!silent) showToast('ไม่สามารถตรวจสอบเวลาว่างหรือราคาได้ กรุณาเข้า LINE LIFF', 'error');
+      renderTimeSlotsUI();showSummaryPanel();
+      return false;
+    }
+  }
   if (!supabaseClient) return;
   
   state.isFetchingBookings = true;
@@ -1620,6 +1790,31 @@ function renderTimeSlots() {
 
 // === 3-Minute Temporary Slot Hold Manager ===
 async function createSlotHold(dateStr, slots) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    if(!stagingAvailabilityReady||!stagingPricingReady||dateStr!==stagingSelectedDateKey())return false;
+    const r=await STAGING_BOOKING_API.hold(dateStr,slots);
+    if(!r.success||!r.holdToken||!r.expiresAt)return false;
+    state.currentHoldId=r.holdToken;state.holdExpiresAt=Date.parse(r.expiresAt);
+    if(!Number.isFinite(state.holdExpiresAt)||state.holdExpiresAt<=Date.now()){
+      state.currentHoldId=null;state.holdExpiresAt=null;return false;
+    }
+    state.currentRequestId=generateUUID();
+    state.stagingSlipUploadedForHold=null;
+    const occupied=stagingBusyByDate.get(dateStr)||new Set();
+    slots.forEach(slot=>occupied.add(slot));stagingBusyByDate.set(dateStr,occupied);
+    state.bookings=state.bookings.filter(b=>!(b.date===dateStr&&slots.includes(b.slot)));
+    for(const slot of slots)state.bookings.push({
+      id:'staging-hold-'+slot,date:dateStr,slot,status:'pending_hold',
+      holdId:r.holdToken,holdExpiresAt:state.holdExpiresAt,name:'',phone:'',
+      court:'Main Court',fee:getSlotPrice(slot)
+    });
+    startHoldTimer();renderTimeSlotsUI();return true;
+  }
+  // Do not create a browser-only hold when Supabase is unavailable.
+  if (!supabaseClient) {
+    console.error("Cannot create hold: Supabase connection unavailable.");
+    return false;
+  }
   const holdId = "hold_" + generateUUID();
   const expiresAt = Date.now() + (3 * 60 * 1000); // 3 minutes = 180,000 ms
 
@@ -1636,7 +1831,11 @@ async function createSlotHold(dateStr, slots) {
         .neq('status', 'cancelled')
         .in('time_slot', slots);
 
-      if (!checkError && existing && existing.length > 0) {
+      if (checkError) {
+        console.error("Supabase Hold Availability Check Error:", checkError);
+        return false;
+      }
+      if (existing && existing.length > 0) {
         const nowTs = Date.now();
         const activeCollisions = existing.filter(row => {
           if (row.status === 'pending_hold') {
@@ -1672,12 +1871,11 @@ async function createSlotHold(dateStr, slots) {
       const { data, error } = await supabaseClient.from('bookings').insert(dbHolds);
       if (error) {
         console.error("Supabase Hold Insert Error:", error);
-        if (error.code === '23505') {
-          return false; // Hold creation failed due to DB collision
-        }
+        return false; // Never report success if the database rejected the hold.
       }
     } catch (err) {
       console.error("Failed to sync hold to Supabase:", err);
+      return false;
     }
   }
 
@@ -1735,6 +1933,23 @@ function startHoldTimer() {
 }
 
 async function releaseSlotHold(isExpired = false) {
+  if (GRANDSLAM_STAGING_ONLY) {
+    if(state.holdTimerInterval){clearInterval(state.holdTimerInterval);state.holdTimerInterval=null;}
+    const token=state.currentHoldId;
+    state.currentHoldId=null;state.holdExpiresAt=null;state.currentRequestId=null;
+    state.stagingSlipUploadedForHold=null;
+    if(token){try{await STAGING_BOOKING_API.release(token);}catch(e){console.warn('Staging release failed',e);}}
+    await fetchBookingsFromSupabase(true);
+    if(isExpired){
+      showToast('หมดเวลาทำรายการ (3 นาที)','error');
+      const invoice=document.getElementById('invoiceSlipModal');
+      if(invoice)invoice.style.display='none';
+      const booking=document.getElementById('bookingModal');
+      if(booking)booking.style.display='none';
+      state.selectedSlots=[];showSummaryPanel();
+    }
+    renderTimeSlotsUI();return;
+  }
   if (state.holdTimerInterval) {
     clearInterval(state.holdTimerInterval);
     state.holdTimerInterval = null;
@@ -1758,6 +1973,7 @@ async function releaseSlotHold(isExpired = false) {
         await supabaseClient
           .from('bookings')
           .delete()
+          .eq('status', 'pending_hold')
           .like('admin_notes', `%${holdId}%`);
       } catch (err) {
         console.error("Failed to delete hold from Supabase:", err);
@@ -1784,6 +2000,13 @@ async function releaseSlotHold(isExpired = false) {
 
 // renderTimeSlotsUI: แสดง time slots จากข้อมูล state.bookings ปัจจุบัน
 function renderTimeSlotsUI() {
+  if(GRANDSLAM_STAGING_ONLY&&(!stagingAvailabilityReady||!stagingPricingReady||
+       !stagingRatesByDate.has(stagingSelectedDateKey()))){
+    const grid=document.getElementById('slotsGrid');
+    if(grid)grid.textContent='กำลังตรวจสอบข้อมูลสนามและราคาในระบบทดสอบ...';
+    const btn=document.getElementById('btnBookNow');if(btn)btn.disabled=true;
+    return;
+  }
   const slotsGrid = document.getElementById('slotsGrid');
   const titleEl = document.getElementById('selectedDateText');
   const activeSlotsPanel = document.getElementById('activeSlotsPanel');
@@ -1884,6 +2107,32 @@ function showSummaryPanel() {
   if (!panel) return;
 
   panel.style.display = 'block';
+
+  if (GRANDSLAM_STAGING_ONLY) {
+    const fees=stagingRatesByDate.get(stagingSelectedDateKey());
+    const ready=stagingAvailabilityReady&&stagingPricingReady&&!!fees&&
+      state.selectedSlots.every(slot=>Number.isFinite(fees.get(slot)));
+    const breakdown=document.getElementById('summaryFeeBreakdown');
+    if(breakdown){
+      breakdown.replaceChildren();
+      const slots=state.selectedSlots.length?state.selectedSlots:[null];
+      for(const slot of slots){
+        const row=document.createElement('div');row.className='summary-row';
+        const name=document.createElement('span');
+        name.textContent=slot||translations[state.language].summaryCourt||'ค่าบริการสนาม';
+        const fee=document.createElement('span');fee.className='summary-value';
+        fee.textContent=slot?(Number.isFinite(fees?.get(slot))?
+          fees.get(slot).toLocaleString('th-TH')+' ฿':'—'):'0 ฿';
+        row.append(name,fee);breakdown.appendChild(row);
+      }
+    }
+    const total=ready?state.selectedSlots.reduce((sum,slot)=>sum+fees.get(slot),0):null;
+    document.getElementById('summaryTotalFee').textContent=
+      total===null?'—':total.toLocaleString('th-TH')+' ฿';
+    const btn=document.getElementById('btnBookNow');
+    if(btn)btn.disabled=!ready||state.selectedSlots.length===0;
+    return;
+  }
 
   let total = 0;
   let dayHours = 0;
@@ -2198,18 +2447,50 @@ function initBookingWizard() {
       const nameInput = document.getElementById('custName');
       const phoneInput = document.getElementById('custPhone');
       const emailInput = document.getElementById('custEmail');
+      const carPlateInput = document.getElementById('custVehicle');
 
-      if (!nameInput || !phoneInput || !emailInput) return;
+      if (!nameInput || !phoneInput || !emailInput || !carPlateInput) return;
 
       const name = nameInput.value.trim();
       const phone = phoneInput.value.trim();
       const email = emailInput.value.trim();
+      const carPlate = carPlateInput.value.trim();
       const userNote = document.getElementById('custCustomerNote')?.value.trim() || '';
       state.pendingUserNote = userNote;
 
       if (!name) {
-        showToast(translations[state.language].toastFillRequired, 'error');
+        showToast(GRANDSLAM_STAGING_ONLY ? 'กรุณากรอกชื่อลูกค้า' :
+          translations[state.language].toastFillRequired, 'error');
+        if (GRANDSLAM_STAGING_ONLY) nameInput.focus();
         return;
+      }
+
+      // The Staging booking API requires the same four customer fields as the
+      // business workflow. Validate before moving to the slip/payment modal.
+      if (GRANDSLAM_STAGING_ONLY) {
+        const phoneDigits = phone.replace(/[\s()-]/g, '');
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const platePattern = /^[0-9A-Za-zก-๙\s-]+$/u;
+        if (name.length < 1 || name.length > 100) {
+          showToast('กรุณากรอกชื่อลูกค้า (ไม่เกิน 100 ตัวอักษร)', 'error');
+          nameInput.focus();
+          return;
+        }
+        if (!/^[0-9]{9,15}$/.test(phoneDigits)) {
+          showToast('กรุณากรอกเบอร์โทรศัพท์ 9–15 หลักให้ถูกต้อง', 'error');
+          phoneInput.focus();
+          return;
+        }
+        if (!emailPattern.test(email) || email.length > 254) {
+          showToast('กรุณากรอกอีเมลที่ถูกต้อง', 'error');
+          emailInput.focus();
+          return;
+        }
+        if (carPlate.length < 2 || carPlate.length > 40 || !platePattern.test(carPlate)) {
+          showToast('กรุณากรอกทะเบียนรถให้ถูกต้อง (อย่างน้อย 2 ตัวอักษร)', 'error');
+          carPlateInput.focus();
+          return;
+        }
       }
 
       // Safe email pattern check (if provided)
@@ -2270,9 +2551,13 @@ function initBookingWizard() {
       // Generate Invoice
       const invoiceNumber = 'INV.' + getRunningNumber('invoice');
       const invoiceAmount = calculateTotalFee();
+      if(GRANDSLAM_STAGING_ONLY && !Number.isFinite(invoiceAmount)){
+        showToast('ไม่สามารถตรวจสอบราคาในระบบทดสอบได้','error');return;
+      }
       const invoiceDate = state.selectedDate.toLocaleDateString(state.language === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      document.getElementById('invoiceNumber').textContent = invoiceNumber;
+      document.getElementById('invoiceNumber').textContent =
+        GRANDSLAM_STAGING_ONLY ? 'ออกเลขที่หลังยืนยันการจอง' : invoiceNumber;
       document.getElementById('invoiceCustName').textContent = name;
       document.getElementById('invoiceDate').textContent = invoiceDate;
       document.getElementById('invoiceAmount').textContent = `${invoiceAmount.toLocaleString()} ฿`;
@@ -2372,17 +2657,28 @@ function initBookingWizard() {
             
             if (document.getElementById('slipValidationLoader')) document.getElementById('slipValidationLoader').style.display = 'none';
             
-            receiptNumber = 'R.' + invoiceNumber.replace('INV.', '');
-            document.getElementById('receiptNumber').textContent = receiptNumber;
+            receiptNumber = GRANDSLAM_STAGING_ONLY ? '' : ('R.' + invoiceNumber.replace('INV.', ''));
+            document.getElementById('receiptNumber').textContent =
+              GRANDSLAM_STAGING_ONLY ? 'รอตรวจสอบ SCB' : receiptNumber;
+            if(GRANDSLAM_STAGING_ONLY){
+              const labels=document.getElementById('receiptBox')?.querySelectorAll('div');
+              if(labels?.[0])labels[0].textContent='ได้รับสลิปแล้ว — กรุณากดยืนยันการจอง';
+              if(labels?.[1])labels[1].textContent='สถานะเงิน: รอ Admin ตรวจยอด SCB';
+            }
             if (document.getElementById('promptPayBox')) document.getElementById('promptPayBox').style.display = 'none';
             if (document.getElementById('slipUploadGroup')) document.getElementById('slipUploadGroup').style.display = 'none';
             document.getElementById('receiptBox').style.display = 'block';
-            btnFinishBooking.style.display = 'block';
+            if(!GRANDSLAM_STAGING_ONLY)btnFinishBooking.style.display = 'block';
             isConfirmProcessing = false; // Unlock after image is ready
 
             // Convert canvas content to blob and save for Supabase Storage upload
             canvas.toBlob((blob) => {
-              state.currentSlipFile = new File([blob], `${receiptNumber}.jpg`, { type: 'image/jpeg' });
+              if (!blob) {
+                showToast('ไม่สามารถเตรียมรูปสลิปได้ กรุณาลองใหม่','error');
+                return;
+              }
+              state.currentSlipFile = new File([blob], (receiptNumber||'staging-slip')+'.jpg', { type: 'image/jpeg' });
+              if(GRANDSLAM_STAGING_ONLY)btnFinishBooking.style.display='block';
             }, 'image/jpeg', 0.7);
           };
           img.onerror = () => {
@@ -2403,6 +2699,46 @@ function initBookingWizard() {
         isFinishProcessing = true;
 
         try {
+          if(GRANDSLAM_STAGING_ONLY){
+            const token=state.currentHoldId;
+            if(!token||!state.holdExpiresAt||Date.now()>=state.holdExpiresAt||
+               !state.currentSlipFile||!STAGING_BOOKING_API||!state.currentRequestId){
+              showToast('Hold หมดเวลาหรือไม่มีสลิป กรุณาเริ่มรายการใหม่','error');
+              return;
+            }
+            const confirmButton=document.getElementById('btnFinishBooking');
+            confirmButton.disabled=true;
+            try{
+              if(state.stagingSlipUploadedForHold!==token){
+                const slip=await STAGING_BOOKING_API.uploadSlip({
+                  holdToken:token,file:state.currentSlipFile
+                });
+                if(!slip.success)throw Error(slip.error||'SLIP_UPLOAD_FAILED');
+                state.stagingSlipUploadedForHold=token;
+              }
+              const result=await STAGING_BOOKING_API.confirm({
+                holdToken:token,requestId:state.currentRequestId,
+                name,phone,email,carPlate
+              });
+              if(!result.success||result.status!=='confirmed')
+                throw Error(result.error||'BOOKING_CONFIRMATION_FAILED');
+              if(state.holdTimerInterval){clearInterval(state.holdTimerInterval);state.holdTimerInterval=null;}
+              state.currentHoldId=null;state.holdExpiresAt=null;
+              state.currentRequestId=null;state.stagingSlipUploadedForHold=null;
+              state.currentSlipFile=null;
+              state.selectedSlots=[];state.pendingUserNote='';
+              document.getElementById('invoiceSlipModal').style.display='none';
+              if(result.invoiceNo)document.getElementById('invoiceNumber').textContent=result.invoiceNo;
+              showToast('Booking Confirmed (Staging) — รอตรวจสอบการโอน SCB','success');
+              await fetchBookingsFromSupabase(true);
+              renderCalendar();renderTimeSlots();showSummaryPanel();
+              return;
+            }catch(error){
+              console.warn('Staging booking submission not confirmed',error);
+              showToast('ยังไม่ยืนยันการจอง: '+(error.message||'กรุณาลองใหม่'),'error');
+              return;
+            }finally{confirmButton.disabled=false;}
+          }
           const slotsBooked = [...state.selectedSlots]; // Capture slots before they are cleared
           showToast(translations[state.language].toastGasSyncing, 'info');
 
@@ -4754,8 +5090,21 @@ async function checkAdminSession() {
 }
 
 // Start app
+// Staging LIFF configuration is PUBLIC (not a credential), but must never
+// silently default to the customer's Production LIFF app.
+function stagingConfigureTestLiff() {
+  if (!GRANDSLAM_STAGING_ONLY) return;
+  const requested = new URLSearchParams(window.location.search).get('testLiffId') || '';
+  // A test LIFF must belong to the known LINE Login Channel. Backend verifies
+  // issuer/audience and subject independently on every request.
+  const valid = /^2010398825-[A-Za-z0-9]{8,20}$/.test(requested);
+  state.config.liffId = valid ? requested : '';
+  if (!valid) console.info('Staging LIFF not configured: set testLiffId after creating separate test app');
+}
 async function init() {
   loadStateFromStorage();
+  stagingConfigureTestLiff();
+  stagingMaskRealPaymentDetails();
 
   // Guarantee valid Date objects for calendar rendering
   if (!state.currentDate || isNaN(new Date(state.currentDate).getTime())) {
@@ -4776,6 +5125,11 @@ async function init() {
   renderCalendar();
   renderTimeSlots();
 
+  if (GRANDSLAM_STAGING_ONLY) {
+    if (state.config.liffId) await initLiff();
+    else console.info('Staging remains read-only until a separate test LIFF app is configured');
+  }
+
   // Fetch remote bookings asynchronously in background
   try {
     await fetchBookingsFromSupabase(true);
@@ -4789,7 +5143,7 @@ async function init() {
   renderTimeSlots();
 
   applyLanguage();
-  initLiff();
+  if (!GRANDSLAM_STAGING_ONLY) initLiff();
 
   const prevBtn = document.getElementById('prevMonthBtn');
   const nextBtn = document.getElementById('nextMonthBtn');
@@ -5084,6 +5438,17 @@ function renderAvailabilityGrid() {
     }
 
     const dateStr = formatDateString(dayDate);
+    if(GRANDSLAM_STAGING_ONLY && !stagingBusyByDate.has(dateStr) &&
+       dayDate >= new Date(new Date().setHours(0,0,0,0)) &&
+       !stagingWeeklyLoading.has(dateStr) && !stagingWeeklyFailed.has(dateStr)){
+      stagingWeeklyLoading.add(dateStr);
+      STAGING_BOOKING_API.availability(dateStr).then(result=>{
+        if(result.success)stagingBusyByDate.set(dateStr,new Set(result.busySlots));
+        else stagingWeeklyFailed.add(dateStr);
+      }).catch(()=>stagingWeeklyFailed.add(dateStr)).finally(()=>{
+        stagingWeeklyLoading.delete(dateStr);renderAvailabilityGrid();
+      });
+    }
     const selectedDateStr = formatDateString(state.selectedDate);
     if (dateStr === selectedDateStr) {
       col.classList.add('highlight-column');
@@ -5107,8 +5472,13 @@ function renderAvailabilityGrid() {
       if (isPast) {
         // Render as empty/blank slot if in the past
         cell.classList.add('empty-cell');
+      } else if (GRANDSLAM_STAGING_ONLY && !stagingBusyByDate.has(dateStr)) {
+        cell.classList.add('empty-cell');
+        cell.textContent='—'; // Never display AVAILABLE before the server confirms that date.
       } else {
-        const isBooked = state.bookings.some(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
+        const isBooked = GRANDSLAM_STAGING_ONLY ?
+          stagingBusyByDate.get(dateStr).has(slot) :
+          state.bookings.some(b => isSameDate(b.date, dateStr) && isSameSlot(b.slot, slot));
         if (isBooked) {
           cell.classList.add('booked-cell');
           cell.innerHTML = `

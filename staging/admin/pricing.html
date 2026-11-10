@@ -1,0 +1,100 @@
+<!doctype html><html lang="th"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Grand Slam · Staging Admin Pricing</title>
+<style>
+body{font-family:system-ui,'Sarabun',sans-serif;margin:24px auto;max-width:900px;padding:0 16px;background:#f5f6f3;color:#192a24}
+section{background:white;padding:20px;border:1px solid #d7e1dd;margin:14px 0;border-radius:12px}
+label{display:block;margin:8px 0 4px}input,button,select{font:inherit;padding:8px;border-radius:6px;border:1px solid #b5c8be}
+input[type=number]{width:110px}button{background:#125640;color:white;cursor:pointer}button:disabled{opacity:.5}
+table{border-collapse:collapse;width:100%}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+#status{white-space:pre-wrap;background:#eef4ef;padding:12px;border-radius:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.warn{color:#945312;font-weight:700}
+</style></head><body>
+<h1>The Grand Slam — Admin Pricing (Staging)</h1>
+<p class="warn">เฉพาะทดสอบ ไม่เกี่ยวข้องกับฐานข้อมูลจริงหรือราคาหน้าเว็บ Production</p>
+<section><h2>เข้าสู่ระบบ Admin ทดสอบ</h2>
+<label>Staging Admin Email <input id="email" type="email" autocomplete="username"></label>
+<label>Password <input id="password" type="password" autocomplete="current-password"></label>
+<button id="login">เข้าสู่ระบบ</button> <button id="logout">ออกจากระบบ</button>
+<p>กรุณาสร้างผู้ใช้ Admin ใน Supabase Staging และกำหนด app_metadata.role = admin โดยผู้มีสิทธิ์เท่านั้น</p>
+</section>
+<section><h2>ราคาทุกช่วงเวลา (รายชั่วโมง)</h2>
+<div id="hours">เข้าสู่ระบบก่อน</div>
+</section>
+<section><h2>สร้างหรือแก้ไขโปรโมชั่น</h2>
+<div class="grid">
+<div><label>รหัสโปรโมชั่น</label><input id="code" value="weekday_special_2026"></div>
+<div><label>ราคา (บาท/ชม.)</label><input id="promo-price" type="number" value="199" min="0"></div>
+<div><label>เริ่มวันที่</label><input id="start" type="date" value="2026-11-10"></div>
+<div><label>สิ้นสุดวันที่</label><input id="end" type="date" value="2026-12-10"></div>
+<div><label>เริ่มเวลา (ชั่วโมง)</label><input id="start-hour" type="number" value="12" min="8" max="22"></div>
+<div><label>สิ้นสุดเวลา (ชั่วโมง)</label><input id="end-hour" type="number" value="14" min="9" max="23"></div>
+<div><label>วันในสัปดาห์ 1=จันทร์..7=อาทิตย์</label><input id="weekdays" value="1,2,3,4,5"></div>
+<div><label>Priority</label><input id="priority" type="number" value="200" min="0" max="1000"></div>
+</div>
+<label><input type="checkbox" id="active" checked> เปิดใช้งาน</label>
+<button id="save-promo" disabled>บันทึกโปรโมชั่นใน Staging</button>
+</section>
+<section><h2>กฎราคาที่มีอยู่</h2><div id="promos"></div></section>
+<section><h2>สถานะ</h2><div id="status">ยังไม่ได้เข้าสู่ระบบ</div></section>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{
+'use strict';
+const URL="https://kssxxizhpoxxlbsehymk.supabase.co", KEY="sb_publishable_-pI8NJzZEtEivpNUQMjd4Q_te9-h9O4";
+const api=window.supabase.createClient(URL,KEY);
+const $=id=>document.getElementById(id);
+const msg=t=>$("status").textContent=String(t);
+async function send(body){
+ const {data:{session}}=await api.auth.getSession();
+ if(!session)throw Error('กรุณาเข้าสู่ระบบ Staging Admin');
+ const {data,error}=await api.functions.invoke('staging-admin-pricing',{body});
+ if(error)throw Error(error.message);
+ if(!data?.success)throw Error(data?.error||'API error');
+ return data;
+}
+async function load(){
+ try{
+  const r=await send({action:'list'});
+  const tbody=document.createElement('tbody');
+  for(let hour=8;hour<23;hour++){
+   const segment=r.segments.find(x=>hour>=x.start_hour&&hour<x.end_hour);
+   const tr=document.createElement('tr');
+   const td=document.createElement('td');
+   td.textContent=String(hour).padStart(2,'0')+':00 - '+String(hour+1).padStart(2,'0')+':00';
+   const val=document.createElement('input');val.type='number';val.min='0';val.max='100000';val.value=segment?.amount??'';
+   const field=document.createElement('td');field.appendChild(val);
+   const btn=document.createElement('button');btn.textContent='บันทึก';btn.onclick=async()=>{try{
+    await send({action:'set-hour',hour,price:Number(val.value)});msg('บันทึกราคาชั่วโมง '+hour+' สำเร็จ (เฉพาะ Staging)');await load();
+   }catch(e){msg(e.message)}};
+   const action=document.createElement('td');action.appendChild(btn);
+   tr.append(td,field,action);tbody.appendChild(tr);
+  }
+  const table=document.createElement('table');table.appendChild(tbody);$('hours').replaceChildren(table);
+  const list=document.createElement('ul');
+  for(const p of r.promotions){
+   const li=document.createElement('li');li.textContent=p.rule_code+' — '+p.price+' บาท ช่วง '+p.start_hour+':00-'+p.end_hour+':00 วันที่ '+p.begins_on+' ถึง '+p.ends_on+(p.active?' (เปิด)':' (ปิด)');
+   list.appendChild(li);
+  }
+  $('promos').replaceChildren(list);$('save-promo').disabled=false;
+ }catch(e){msg(e.message)}
+}
+$('login').onclick=async()=>{try{
+ const {error}=await api.auth.signInWithPassword({email:$('email').value,password:$('password').value});
+ if(error)throw error;$('password').value='';await load();msg('เข้าสู่ระบบสำเร็จ');
+ }catch(e){msg('เข้าสู่ระบบไม่สำเร็จ: '+e.message)}};
+$('logout').onclick=async()=>{await api.auth.signOut();$('hours').textContent='ออกจากระบบแล้ว';$('promos').textContent='';$('save-promo').disabled=true;msg('ออกจากระบบแล้ว')};
+$('save-promo').onclick=async()=>{
+ try{
+  const days=$('weekdays').value.split(',').map(v=>Number(v.trim()));
+  await send({action:'save-promo',code:$('code').value,start:$('start').value,
+   end:$('end').value,weekdays:days,start_hour:Number($('start-hour').value),
+   end_hour:Number($('end-hour').value),price:Number($('promo-price').value),
+   priority:Number($('priority').value),active:$('active').checked});
+  msg('บันทึกโปรโมชั่น Staging สำเร็จ');await load();
+ }catch(e){msg(e.message)}
+};
+api.auth.getSession().then(({data})=>{if(data.session)load()});
+})();
+</script></body></html>
