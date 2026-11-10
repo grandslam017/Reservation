@@ -66,7 +66,14 @@ for forbidden in ("eqwmodrhorcbwsshbepg", "script.google.com/macros/s/", "sb_sec
     if forbidden in app:
         raise SystemExit(f"Production or sensitive reference present in app.js: {forbidden}")
 
+# Package Staging Admin portal for standalone Netlify hosting.
+admin_target = target / "admin"
+admin_target.mkdir(exist_ok=True)
+admin_html = (root / "staging" / "admin" / "payments.html").read_text(encoding="utf-8")
+if "kssxxizhpoxxlbsehymk" not in admin_html or "eqwmodrhorcbwsshbepg" in admin_html:
+    raise SystemExit("Admin preview must connect exclusively to Staging")
+(admin_target / "payments.html").write_text(admin_html, encoding="utf-8")
 assert sorted(x.name for x in target.iterdir()) == [
-    "app.js", "charts.js", "index.html", "style.css"
+    "admin", "app.js", "charts.js", "index.html", "style.css"
 ]
 print("Static test site built under staging/site-dist (Production files unchanged).")
