@@ -14,6 +14,8 @@ const requests=[
   body:{action:'confirm'},allowed:[401,403,410]},
  {name:'Admin payment unauthenticated rejected',path:'/staging-admin-payments',method:'POST',
   body:{action:'list'},allowed:[401,403]},
+ {name:'GAS bridge unauthenticated rejected',path:'/staging-gas-gateway',method:'POST',
+  body:{action:'health',request_id:'00000000-0000-4000-8000-000000000002'},allowed:[401,403]},
  {name:'Cross-origin browser writes rejected',path:'/staging-liff-booking-gateway',method:'POST',
   body:{action:'availability',date:'2026-11-12'},origin:'https://not-authorized.example',allowed:[403]}
 ];
