@@ -2,7 +2,7 @@ name: Production GAS candidate regression
 on:
   pull_request:
     branches: [main]
-    paths: ['production/**', 'tests/production-gas-security.test.cjs', '.github/workflows/production-gas-candidate.yml']
+    paths: ['production/**', 'tests/production-gas*.test.cjs', '.github/workflows/production-gas-candidate.yml']
   push:
     branches: [security/production-gas-auth-20261110]
 permissions:
@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '22'
       - name: Test security boundary and source transformation
-        run: node --test tests/production-gas-security.test.cjs
+        run: node --test tests/production-gas*.test.cjs
       - name: Ensure existing customer application is untouched
         run: |
           git fetch --no-tags --depth=1 origin main
