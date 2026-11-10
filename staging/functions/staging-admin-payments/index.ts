@@ -28,7 +28,7 @@ Deno.serve(async req=>{
   const raw=await req.text();
   if(raw.length>4096)return respond(413,{error:"REQUEST_TOO_LARGE"},origin);
   let data;try{data=JSON.parse(raw)}catch{return respond(400,{error:"INVALID_JSON"},origin)}
-  if(!["list","verify","dispute","slip-link"].includes(data?.action))
+  if(!["list","preview-verify","verify","dispute","slip-link"].includes(data?.action))
     return respond(400,{error:"INVALID_ACTION"},origin);
   const db=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
   const rate=await db.rpc("staging_check_rate_limit",{
@@ -43,6 +43,14 @@ Deno.serve(async req=>{
   }
   if(!UUID.test(data.booking_id??""))return respond(400,{error:"INVALID_BOOKING_ID"},origin);
   let result;
+  if(data.action==="preview-verify"){
+   // Simulation only: inspect the booking, slip and existing income, never write.
+   const preview=await db.rpc("staging_preview_booking_payment_verification",{
+    p_booking_id:data.booking_id
+   });
+   if(preview.error)return respond(503,{error:"PAYMENT_PREFLIGHT_UNAVAILABLE"},origin);
+   return respond(200,{...preview.data,environment:"staging"},origin);
+  }
   if(data.action==="verify"){
    // Admin must have independently checked SCB; do not auto-trust a slip.
    if(data.confirmed_bank_credit!==true)return respond(400,{error:"SCB_CHECK_REQUIRED"},origin);
