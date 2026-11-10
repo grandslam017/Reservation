@@ -23,3 +23,15 @@
 - ยังต้องอัปโหลด Netlify ด้วยบัญชีเจ้าของเว็บไซต์ การเปลี่ยนไฟล์ใน GitHub ไม่ได้แปลว่า Netlify manual deploy อัปเดตแล้ว
 - ทดสอบ UI handler ด้วย session จำลอง: ไม่ login, success, controlled error, wrong environment/business effects และ double-click
 - เป็นการเพิ่มปุ่มเรียก endpoint ที่มีอยู่ ไม่เพิ่มสิทธิ์และไม่เลี่ยงการตรวจ JWT/Admin/HMAC
+
+## ขั้นถัดไป: จำลองรายการจองผ่าน GAS
+
+หลัง health สำเร็จ มีปุ่ม `จำลองส่งยืนยันผ่าน GAS (ไม่ส่งจริง)` ใต้แต่ละรายการ Booking ในคิว Admin ให้เลือกหนึ่งรายการและกดปุ่มนี้
+
+ผลสำเร็จแสดงวัน เวลา และราคาที่ Edge Function อ่านจาก DB พร้อมยืนยันว่า GAS ตอบกลับ request ID และ Booking ID เดียวกัน และรายงาน effects ทั้งสี่รายการเป็นเลขศูนย์ (Sheet, Calendar, LINE, Email)
+
+UI และ Edge ตรวจว่าผลเป็น simulation-only และไม่มี business effects หากเลข Booking ไม่ตรง ไม่มีผลตอบกลับ หรือ effects ไม่ใช่เลขศูนย์ จะไม่แสดงว่าสำเร็จ
+
+การทดสอบนี้ไม่ใช่การยืนยันรับเงิน ไม่มีการสร้างธุรกรรมการเงิน/การจองใหม่ และไม่เรียก API ของงานรับเงินจริง ผลที่แสดงเป็นการรับรองจากโค้ดจำลอง GAS ที่ไม่มี implementation ของ side effects จริง ยังไม่ใช่การทดสอบส่งแจ้งเตือนจริง
+
+เวอร์ชันนี้ผ่าน 85 local regression tests โดย 8 ข้อทดสอบ UI ของ GAS; การทดสอบ Google runtime แบบ authenticated ต้องให้เจ้าของล็อกอิน Admin แล้วกดจาก Netlify ที่อัปโหลดเวอร์ชันนี้แล้ว
