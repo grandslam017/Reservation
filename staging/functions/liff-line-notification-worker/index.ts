@@ -18,8 +18,16 @@ Deno.serve(async(req)=>{
     !/^U[0-9a-fA-F]{32}$/.test(testUser)||workerKey.length<32)
   return new Response(JSON.stringify({error:"STAGING_WORKER_NOT_CONFIGURED"}),{status:503});
  if(req.headers.get("x-worker-secret")!==workerKey)return new Response("forbidden",{status:403});
+ // Require a deliberate single-event request. No default queue draining.
+ let requestBody;
+ try { requestBody=await req.json(); } catch { return Response.json({error:"INVALID_JSON"},{status:400}); }
+ const eventKey=requestBody?.event_key;
+ if(typeof eventKey!=="string"||!/^booking_confirmed:[0-9a-fA-F-]{36}$/.test(eventKey))
+  return Response.json({error:"SPECIFIC_EVENT_REQUIRED"},{status:400});
  const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
- const {data:job,error}=await db.rpc("staging_claim_line_notification");
+ const {data:job,error}=await db.rpc("staging_claim_specific_line_notification",{
+  p_event_key:eventKey,p_recipient:testUser
+ });
  if(error)return new Response(JSON.stringify({error:"CLAIM_FAILED"}),{status:503});
  if(!job?.found)return Response.json({state:"empty"});
  const id=job.id,attempt=job.attempt;
