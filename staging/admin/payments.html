@@ -53,11 +53,28 @@ async function load(){
   const details=document.createElement('p');
   details.textContent=b.customer_name+' · '+(b.phone||'')+' · '+b.invoice_no+' · '+b.payment_status;
   const action=document.createElement('div');action.className='grid';
-  const slip=input('button');slip.textContent='เปิดสลิป (ลิงก์ชั่วคราว)';
-  slip.onclick=async()=>{try{
-   const r=await api({action:'slip-link',booking_id:b.booking_id});
-   window.open(r.url,'_blank','noopener,noreferrer');
-  }catch(e){tell(e.message)}};
+  const slip=input('button');
+  const hasSlip=typeof b.slip_path==='string'&&b.slip_path.startsWith('staging/');
+  slip.textContent=hasSlip?'เปิดสลิป (ลิงก์ชั่วคราว)':'ไม่มีสลิปแนบในรายการนี้';
+  slip.disabled=!hasSlip;
+  slip.onclick=async()=>{
+   // Open on the original user click: opening after awaiting API is often popup-blocked.
+   const popup=window.open('about:blank','_blank');
+   if(popup){
+    popup.document.title='กำลังโหลดสลิป Staging';
+    popup.document.body.textContent='กำลังขอลิงก์สลิปที่ปลอดภัย...';
+   }
+   try{
+    const r=await api({action:'slip-link',booking_id:b.booking_id});
+    if(popup&&!popup.closed)popup.location.replace(r.url);
+    else {
+     tell('เบราว์เซอร์บล็อกหน้าต่างสลิป โปรดอนุญาต Pop-ups สำหรับเว็บไซต์ Staging แล้วลองใหม่');
+    }
+   }catch(e){
+    if(popup&&!popup.closed)popup.close();
+    tell('เปิดสลิปไม่สำเร็จ: '+e.message);
+   }
+  };
   const credit=input('input','checkbox');const check=input('label');
   check.append(credit,document.createTextNode(' ตรวจ SCB แล้วพบเงินเข้าจริง'));
   const reference=input('input','text','รหัสอ้างอิงจาก SCB');
