@@ -75,6 +75,17 @@ async function load(){
     tell('เปิดสลิปไม่สำเร็จ: '+e.message);
    }
   };
+  const preview=input('button');preview.textContent='ตรวจความพร้อม (ไม่บันทึก)';
+  preview.onclick=async()=>{
+   try{
+    const r=await api({action:'preview-verify',booking_id:b.booking_id});
+    if(r.eligible_for_manual_review){
+     tell('การตรวจความพร้อมผ่าน: มีสลิปและไม่มีรายได้ซ้ำ\\nเป็นเพียงการจำลองเท่านั้น ยังไม่ได้ตรวจยอด SCB หรือเปลี่ยนสถานะชำระเงิน');
+    }else{
+     tell('ยังไม่พร้อมยืนยัน: '+(r.blocker||'UNKNOWN')+'\\nยังไม่ได้บันทึกรายได้หรือเปลี่ยนสถานะ');
+    }
+   }catch(e){tell('ตรวจความพร้อมไม่สำเร็จ: '+e.message)}
+  };
   const credit=input('input','checkbox');const check=input('label');
   check.append(credit,document.createTextNode(' ตรวจ SCB แล้วพบเงินเข้าจริง'));
   const reference=input('input','text','รหัสอ้างอิงจาก SCB');
@@ -91,7 +102,7 @@ async function load(){
    await api({action:'dispute',booking_id:b.booking_id,note:note.value});
    tell('ทำเครื่องหมาย Disputed ใน Staging แล้ว การจองยัง Confirmed');await load();
   }catch(e){tell(e.message)}};
-  action.append(slip,check,reference,verify,note,dispute);
+  action.append(slip,preview,check,reference,verify,note,dispute);
   box.append(head,details,action);root.appendChild(box);
  }
  }catch(e){tell(e.message)}
