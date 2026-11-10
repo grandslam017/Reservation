@@ -127,7 +127,8 @@ test('Edge rejects production Supabase, arbitrary GAS hosts, query strings and d
 test('browser-injected amounts, recipients, signatures and URLs never enter signed booking',async()=>{
   const f=await edgeFixture();
   // Align the mocked GAS clock with the real Edge clock for this protocol test.
-  f.deps.forward=async(target,e)=>{f.received.push({target,e});return {status:'success',environment:'staging',mode:'simulation-only'};};
+  f.deps.forward=async(target,e)=>{f.received.push({target,e});
+    const gas=receiver();gas.ctx.Date.now=()=>Date.now();return gas.send(e);};
   const r=await f.send({action:'simulate-confirmation',request_id:ID,booking_id:BOOKING,
     fee:0,lineUserId:'attacker',gasUrl:'https://attacker.test',signature:'forged'});
   assert.equal(r.status,200);
@@ -160,6 +161,9 @@ test('authenticated Edge request completes through the actual GAS receiver with 
   const result=await f.send({action:'simulate-confirmation',request_id:ID,booking_id:BOOKING});
   assert.equal(result.status,200);assert.equal(result.body.gas_reachable,true);
   assert.equal(result.body.business_effects_performed,false);
+  assert.equal(result.body.simulation.booking_id,BOOKING);
+  assert.equal(result.body.simulation.gas_confirmed,true);
+  assert.ok(Object.values(result.body.simulation.effects).every(x=>x===0));
 });
 test('Edge blocks untrusted origins, bad references and oversize bodies',async()=>{
   const f=await edgeFixture();
@@ -167,4 +171,15 @@ test('Edge blocks untrusted origins, bad references and oversize bodies',async()
   assert.equal((await f.send({action:'health',request_id:'guessable'})).status,400);
   assert.equal((await f.send({action:'health',request_id:ID,padding:'x'.repeat(5000)})).status,413);
   assert.equal(f.received.length,0);
+});
+test('simulation rejects wrong booking/request IDs, missing effects and nonzero effects',async()=>{
+  const zero={sheetsRowsWritten:0,calendarEventsCreated:0,lineMessagesSent:0,emailsSent:0};
+  const good={status:'success',environment:'staging',mode:'simulation-only',requestId:ID,bookingId:BOOKING,effects:zero};
+  for(const bad of [{...good,requestId:BOOKING},{...good,bookingId:ID},
+    {...good,effects:undefined},{...good,effects:{...zero,lineMessagesSent:1}},
+    {...good,effects:{...zero,emailsSent:'0'}}]){
+    const f=await edgeFixture({forward:async()=>bad});
+    const r=await f.send({action:'simulate-confirmation',request_id:ID,booking_id:BOOKING});
+    assert.equal(r.status,502);assert.equal(r.body.error,'GAS_SIMULATION_NOT_CONFIRMED');
+  }
 });
