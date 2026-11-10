@@ -20,6 +20,12 @@
 - ยังไม่ได้ทดสอบเส้นทาง Admin → Google runtime จริง ต้องทำขั้นตอนตั้งค่าด้านล่างก่อน
 - ไม่มีการเปลี่ยน GAS version 78, Head, Triggers, Gemini key หรือ Supabase Production
 
+### การจำลอง Booking หลัง health ผ่าน
+
+Edge ตรวจ requestId และ bookingId จาก GAS ให้ตรงกับคำขอและแถวที่โหลดจากฐานข้อมูล พร้อมตรวจ effects สี่รายการว่ามีครบและเป็นเลข 0 เท่านั้น ก่อนคืน simulation metadata ให้ Admin แสดงผล ไม่คืน payload/signature หรือข้อมูลผู้ติดต่อ
+
+เพิ่ม regression cases สำหรับ Booking/Request คนละรายการ, ไม่มี effects และจำนวน effects ที่ไม่เป็นศูนย์ ผ่านครบ 95 local regression tests (20 ข้อของ signed gateway) ไม่ได้เพิ่ม business writes หรือเปลี่ยนสิทธิ์ใด ๆ
+
 ## ขั้นตอนผู้ใช้: สร้าง GAS แยก
 
 1. เปิด https://script.google.com/ และสร้าง New project ชื่อ `Grand Slam GAS Gateway Staging`
