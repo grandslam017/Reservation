@@ -48,9 +48,20 @@ export function createHandler(deps) {
       const result = await deps.forward(target.href, envelope);
       if (result?.status !== 'success' || result.environment !== 'staging' || result.mode !== 'simulation-only')
         return reply(502,{error:'GAS_STAGING_REQUEST_REJECTED'});
+      let simulation;
+      if (input.action === 'simulate-confirmation') {
+        const keys=['sheetsRowsWritten','calendarEventsCreated','lineMessagesSent','emailsSent'];
+        if (result.requestId !== input.request_id || result.bookingId !== payload.booking.id ||
+            !result.effects || keys.some(key => result.effects[key] !== 0))
+          return reply(502,{error:'GAS_SIMULATION_NOT_CONFIRMED'});
+        simulation={booking_id:payload.booking.id,date:payload.booking.date,
+          slot:payload.booking.slot,fee:payload.booking.fee,gas_confirmed:true,
+          effects:Object.fromEntries(keys.map(key=>[key,0]))};
+      }
       // Deliberately do not relay arbitrary upstream fields or the signed envelope.
       return reply(200,{success:true,environment:'staging',mode:'simulation-only',
-        request_id:input.request_id,gas_reachable:true,business_effects_performed:false});
+        request_id:input.request_id,gas_reachable:true,business_effects_performed:false,
+        ...(simulation ? {simulation} : {})});
     } catch { return reply(503,{error:'GATEWAY_UNAVAILABLE'}); }
   };
 }
