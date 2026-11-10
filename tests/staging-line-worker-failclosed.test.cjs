@@ -22,3 +22,10 @@ test('worker uses idempotent LINE retry key and state-transition RPC',()=>{
  assert.match(src,/staging_claim_line_notification/);
  assert.match(src,/staging_complete_line_notification/);
 });
+
+test('worker cannot drain the old queue without an explicitly selected event key',()=>{
+ assert.match(src,/SPECIFIC_EVENT_REQUIRED/);
+ assert.match(src,/staging_claim_specific_line_notification/);
+ assert.doesNotMatch(src,/db\.rpc\("staging_claim_line_notification"/);
+ assert.match(src,/p_event_key:eventKey,p_recipient:testUser/);
+});
