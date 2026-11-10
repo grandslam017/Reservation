@@ -28,9 +28,24 @@ allow 120 seconds clock skew. Payloads are limited to 131072 JS code units. Larg
 backups/uploads and real-traffic capacity need separate compatibility testing.
 Transport replay defense does not provide exactly-once business effects.
 
-Run `node --test tests/production-gas-security.test.cjs`. These are synthetic
+Run `node --test tests/production-gas*.test.cjs`. These are synthetic
 regressions, not evidence of a production cutover or a live LINE webhook test.
 The source builder refuses unsupported entrypoint syntax and must operate on a
 fresh reviewed source export. Retain a verified backup and coordinated rollback.
 
 Reference: https://developers.line.biz/en/docs/messaging-api/verify-webhook-signature/
+
+## Google runtime compatibility harness
+
+`scripts/build-gas-runtime-tests.cjs` embeds the exact verifier source and its SHA-256
+into a separate editor-only test file. Run it only in an isolated Staging project;
+do not replace existing entrypoints or deploy the harness as a web application.
+The generated runGatewayCandidateSelfTest function checks 21 cases with native
+Google Utilities HMAC and in-memory Properties/Lock substitutes and stub handlers.
+It reads no real keys and performs no external business operations. The generator
+refuses business-service references in the verifier, and the generated file omits
+unused service names to avoid requesting data-access scopes for test substitutes.
+
+This is runtime compatibility and verifier logic coverage. It does not test real
+Sheets/Calendar/LINE effects, real Properties persistence, Lock contention, a complete
+frontend/backend production route, or production deployment readiness.
