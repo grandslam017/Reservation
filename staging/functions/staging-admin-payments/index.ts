@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 // STAGING ONLY: manual SCB verification; booking remains confirmed even when disputed.
 const REF="kssxxizhpoxxlbsehymk";
-const ORIGINS=new Set(["https://grandslam017.github.io","http://localhost:5173","http://127.0.0.1:5173"]);
+const ORIGINS=new Set(["https://illustrious-alfajores-364eb8.netlify.app","http://localhost:5173","http://127.0.0.1:5173"]);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const respond=(status,value,origin)=>new Response(status===204?null:JSON.stringify(value),
  {status,headers:{"Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin",
