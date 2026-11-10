@@ -1,7 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { formatBookingConfirmedMessage } from "./message.mjs";
-// Do NOT deploy without the test recipient and separate worker secrets.
-// Verify JWT must remain enabled; additionally require a server-only runner secret.
+// STAGING ONLY. Safe to deploy with delivery disabled; DO NOT enable until the
+// owner-configured LINE recipient, channel token and runner secret are verified.
+// JWT verification MUST stay on, plus a server-only worker secret.
 const STAGING_REF="kssxxizhpoxxlbsehymk";
 Deno.serve(async(req)=>{
  if(req.method!=="POST")return new Response("method not allowed",{status:405});
@@ -10,6 +11,9 @@ Deno.serve(async(req)=>{
  const lineKey=Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")||"";
  const testUser=Deno.env.get("LINE_STAGING_TEST_USER_ID")||"";
  const workerKey=Deno.env.get("STAGING_LINE_WORKER_SECRET")||"";
+ // Explicit opt-in is separate from configuring secrets. No push traffic unless enabled.
+ if(Deno.env.get("STAGING_LINE_SEND_ENABLED")!=="YES_ONE_TEST_RECIPIENT")
+  return new Response(JSON.stringify({error:"STAGING_LINE_SENDING_DISABLED"}),{status:503});
  if(url!=="https://"+STAGING_REF+".supabase.co"||!key||!lineKey||
     !/^U[0-9a-fA-F]{32}$/.test(testUser)||workerKey.length<32)
   return new Response(JSON.stringify({error:"STAGING_WORKER_NOT_CONFIGURED"}),{status:503});
