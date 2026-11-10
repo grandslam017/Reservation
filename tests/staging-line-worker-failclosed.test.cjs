@@ -19,7 +19,7 @@ test('notification worker is locked to one LINE user and same Staging project',(
 });
 test('worker uses idempotent LINE retry key and state-transition RPC',()=>{
  assert.match(src,/X-Line-Retry-Key/);
- assert.match(src,/staging_claim_line_notification/);
+ assert.match(src,/staging_claim_specific_line_notification/);
  assert.match(src,/staging_complete_line_notification/);
 });
 
