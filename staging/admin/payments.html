@@ -7,7 +7,7 @@ section{background:white;border:1px solid #d0dfd6;border-radius:12px;padding:18p
 button,input,textarea{font:inherit;border:1px solid #a8bbb1;padding:9px;border-radius:6px}
 button{background:#17614a;color:white;cursor:pointer}button:disabled{opacity:.45}
 #notice{white-space:pre-wrap;color:#2c483a} .warning{color:#97502a}
-#queue{display:grid;gap:10px}.entry{border:1px solid #c9dcd1;border-radius:8px;padding:12px}
+#queue{display:grid;gap:10px}.entry{border:1px solid #c9dcd1;border-radius:8px;padding:12px}.simulation-result{white-space:pre-wrap;margin-top:12px;padding:12px;border:1px solid #8bba9b;background:#ecf9ef;border-radius:8px;font-weight:500}.simulation-result[hidden]{display:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 label{display:block;margin:8px 0}.muted{color:#66776e;font-size:.85em}
 </style></head><body>
@@ -87,21 +87,38 @@ async function load(){
    }catch(e){tell('ตรวจความพร้อมไม่สำเร็จ: '+e.message)}
   };
   const simulate=input('button');simulate.textContent='จำลองยืนยันรับเงิน (ไม่บันทึก)';
+  const simulateResult=document.createElement('div');
+  simulateResult.className='simulation-result';
+  simulateResult.setAttribute('role','status');
+  simulateResult.setAttribute('aria-live','polite');
+  simulateResult.hidden=true;
   simulate.onclick=async()=>{
+   if(simulate.disabled)return;
+   simulate.disabled=true;
+   simulate.textContent='กำลังจำลอง...';
+   simulateResult.hidden=false;
+   simulateResult.textContent='กำลังตรวจข้อมูลของ Booking นี้... (ไม่มีการบันทึก)';
    try{
     const r=await api({action:'simulate-verify',booking_id:b.booking_id});
     if(!r.is_simulation||r.writes_performed!==false)throw Error('ผลการจำลองไม่ปลอดภัย');
     if(!r.eligible_for_manual_review){
-     tell('จำลองไม่ผ่าน: '+(r.blocker||'UNKNOWN')+' | ไม่ได้เปลี่ยนข้อมูลใด ๆ');
-     return;
+     simulateResult.textContent='ไม่ผ่านการจำลอง: '+(r.blocker||'UNKNOWN')+' — ไม่ได้เปลี่ยนข้อมูลใด ๆ';
+    }else{
+     simulateResult.textContent=['ผลจำลองเท่านั้น — ไม่ได้ตรวจ SCB หรือบันทึกข้อมูล',
+      'สถานะปัจจุบัน: '+r.current_payment_status,
+      'สถานะที่จะเปลี่ยนหากตรวจเงินจริง: '+r.would_change_payment_status_to,
+      'เลขใบเสร็จที่จะสร้าง: '+r.would_create_receipt_no,
+      'รายได้ที่จะบันทึก: '+r.would_record_income_thb+' บาท',
+      'ยืนยัน: ไม่เปลี่ยน Booking และไม่สร้างรายการรายได้'].join('\n');
     }
-    tell(['ผลจำลองเท่านั้น — ไม่มีการตรวจยอด SCB หรือบันทึกข้อมูล',
-     'สถานะปัจจุบัน: '+r.current_payment_status,
-     'หากยืนยันเงินเข้าจริง สถานะจะเป็น: '+r.would_change_payment_status_to,
-     'เลขใบเสร็จที่จะสร้าง: '+r.would_create_receipt_no,
-     'รายได้ที่จะบันทึก: '+r.would_record_income_thb+' บาท',
-     'จำลองเสร็จ ไม่ได้บันทึกรายได้ ไม่ได้เปลี่ยน Booking'].join('\\n'));
-   }catch(e){tell('จำลองยืนยันรับเงินไม่สำเร็จ: '+e.message)}
+    tell('ผลจำลองแสดงใต้ Booking ที่เลือกแล้ว (ไม่ได้บันทึกข้อมูล)');
+   }catch(e){
+    simulateResult.textContent='จำลองไม่สำเร็จ: '+e.message;
+    tell('จำลองยืนยันรับเงินไม่สำเร็จ: '+e.message);
+   }finally{
+    simulate.disabled=false;
+    simulate.textContent='จำลองยืนยันรับเงิน (ไม่บันทึก)';
+   }
   };
   const credit=input('input','checkbox');const check=input('label');
   check.append(credit,document.createTextNode(' ตรวจ SCB แล้วพบเงินเข้าจริง'));
@@ -120,7 +137,7 @@ async function load(){
    tell('ทำเครื่องหมาย Disputed ใน Staging แล้ว การจองยัง Confirmed');await load();
   }catch(e){tell(e.message)}};
   action.append(slip,preview,simulate,check,reference,verify,note,dispute);
-  box.append(head,details,action);root.appendChild(box);
+  box.append(head,details,action,simulateResult);root.appendChild(box);
  }
  }catch(e){tell(e.message)}
 }
