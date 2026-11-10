@@ -20,6 +20,11 @@ label{display:block;margin:8px 0}.muted{color:#66776e;font-size:.85em}
 <button id="logout">ออกจากระบบ</button>
 <button id="refresh">รีเฟรชรายการ</button>
 </section>
+<section><h2>ทดสอบการเชื่อมต่อ GAS</h2>
+<p>เข้าสู่ระบบ Admin แล้วกดทดสอบได้เลย ระบบตรวจการเชื่อมต่อเท่านั้น ไม่ส่ง LINE ไม่สร้าง Calendar และไม่แก้รายการจอง</p>
+<button id="gasHealth" type="button">ทดสอบเชื่อมต่อ GAS</button>
+<pre id="gasHealthResult" role="status" aria-live="polite">ยังไม่ได้ทดสอบ</pre>
+</section>
 <section><h2>รายการ Booking ที่รอตรวจยอด SCB</h2><div id="queue">เข้าสู่ระบบ Admin ก่อน</div></section>
 <section><h2>ผลการทำงาน</h2><pre id="notice">ยังไม่เข้าสู่ระบบ</pre></section>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/dist/umd/supabase.min.js"></script>
@@ -30,6 +35,47 @@ const URL="https://kssxxizhpoxxlbsehymk.supabase.co",KEY="sb_publishable_-pI8NJz
 const client=window.supabase.createClient(URL,KEY);
 const $=id=>document.getElementById(id);
 const tell=text=>$('notice').textContent=String(text);
+// Use the existing Admin session; never ask users to paste into DevTools.
+$('gasHealth').onclick=async()=>{
+ const button=$('gasHealth'),output=$('gasHealthResult');
+ if(button.disabled)return;
+ button.disabled=true;
+ output.textContent='กำลังตรวจการเชื่อมต่อ GAS...';
+ let timeout;
+ try{
+  const {data:{session},error:sessionError}=await client.auth.getSession();
+  if(sessionError||!session){output.textContent='กรุณาเข้าสู่ระบบ Staging Admin ก่อน แล้วกดทดสอบอีกครั้ง';return;}
+  const call=client.functions.invoke('staging-gas-gateway',{
+   body:{action:'health',request_id:crypto.randomUUID()}
+  });
+  const deadline=new Promise((_,reject)=>{
+   timeout=setTimeout(()=>reject(Error('GAS_TEST_TIMEOUT')),25000);
+  });
+  const {data,error}=await Promise.race([call,deadline]);
+  if(error){
+   let code='GAS_REQUEST_FAILED';
+   if(error.context){
+    try{
+     const detail=await error.context.json();
+     const candidate=detail.error||detail.code;
+     if(typeof candidate==='string'&&/^[A-Z_]{1,80}$/.test(candidate))code=candidate;
+    }catch{}
+   }
+   output.textContent='เชื่อมต่อไม่สำเร็จ รหัส: '+code+'\nส่งเฉพาะรหัสนี้ให้ผู้ดูแลตรวจสอบได้ ไม่ต้องส่งรหัสผ่านหรือ secret';
+   return;
+  }
+  if(data?.success!==true||data.environment!=='staging'||data.mode!=='simulation-only'||
+     data.gas_reachable!==true||data.business_effects_performed!==false)
+    throw Error('UNEXPECTED_GAS_RESULT');
+  output.textContent='เชื่อมต่อ GAS สำเร็จ ✓\nSupabase Staging ส่งคำขอพร้อมลายเซ็นและ GAS ยอมรับแล้ว\nทดสอบเท่านั้น: ไม่ส่งข้อความ ไม่สร้าง Calendar และไม่แก้รายการจอง';
+ }catch(e){
+  output.textContent=e?.message==='GAS_TEST_TIMEOUT'
+   ?'การทดสอบใช้เวลานานเกินไป กรุณาลองอีกครั้ง (GAS_TEST_TIMEOUT)'
+   :'ทดสอบไม่สำเร็จ กรุณาลองอีกครั้ง (GAS_TEST_FAILED)';
+ }finally{
+  clearTimeout(timeout);button.disabled=false;
+ }
+};
 async function api(body){
  const {data:{session}}=await client.auth.getSession();
  if(!session)throw Error("กรุณาเข้าสู่ระบบ");
