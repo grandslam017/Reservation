@@ -14,16 +14,15 @@ target = root / "staging" / "site-dist"
 target.mkdir(parents=True, exist_ok=True)
 
 html = (root / "index.html").read_text(encoding="utf-8")
-replacements = {
-    "0894932242": "TEST ONLY",
-    "ชื่อบัญชี: ณฐกร เอียสกุล": "บัญชีทดสอบ — ห้ามโอนเงินจริง",
-    'src="promptpay_qr.png"': 'alt="ระบบทดลอง ไม่ต้องโอนเงินจริง"',
-    'href="accounting.html"': 'href="#"',
-}
-for old, new in replacements.items():
-    if html.count(old) != 1:
-        raise SystemExit(f"Expected exactly one occurrence of safe replacement: {old[:25]!r}")
-    html = html.replace(old, new)
+# Mask payment content by markup patterns, without embedding account details.
+html, count = re.subn(r'(<div[^>]*letter-spacing: 1px[^>]*>)\s*\d{10}\s*(</div>)', r'\g<1>TEST ONLY\g<2>', html)
+if count != 1:
+    raise SystemExit("Expected one payment account number block")
+html, count = re.subn(r'ชื่อบัญชี:[^<]*', 'บัญชีทดสอบ — ห้ามโอนเงินจริง', html)
+if count != 1:
+    raise SystemExit("Expected one payment account label")
+html = html.replace('src="promptpay_qr.png"', 'alt="ระบบทดลอง ไม่ต้องโอนเงินจริง"')
+html = html.replace('href="accounting.html"', 'href="#"')
 # Only the Staging static build makes formerly-optional fields required.
 # Main index.html stays exactly unchanged for existing customers.
 required_labels = {
@@ -51,7 +50,7 @@ html = html.replace(
     '<title>The Grand Slam Tennis Court - Booking & Admin Portal</title>',
     '<title>STAGING TEST — The Grand Slam Tennis Court</title>',
 )
-if "promptpay_qr.png" in html or "0894932242" in html:
+if "promptpay_qr.png" in html or re.search(r">\s*\d{10}\s*</div>", html):
     raise SystemExit("Payment detail redaction failed")
 (target / "index.html").write_text(html, encoding="utf-8")
 
@@ -73,6 +72,11 @@ admin_html = (root / "staging" / "admin" / "payments.html").read_text(encoding="
 if "kssxxizhpoxxlbsehymk" not in admin_html or "eqwmodrhorcbwsshbepg" in admin_html:
     raise SystemExit("Admin preview must connect exclusively to Staging")
 (admin_target / "payments.html").write_text(admin_html, encoding="utf-8")
+for name in ("admin-booking-api.mjs", "admin-booking-editor.mjs"):
+    module = (root / "staging" / "frontend" / name).read_text(encoding="utf-8")
+    if any(value in module for value in ("eqwmodrhorcbwsshbepg", "sb_secret_", "SUPABASE_SERVICE_ROLE_KEY")):
+        raise SystemExit("Admin module contains a forbidden reference")
+    (admin_target / name).write_text(module, encoding="utf-8")
 assert sorted(x.name for x in target.iterdir()) == [
     "admin", "app.js", "charts.js", "index.html", "style.css"
 ]

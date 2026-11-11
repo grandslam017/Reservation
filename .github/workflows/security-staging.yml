@@ -1,9 +1,9 @@
 name: Security staging regression
 on:
   pull_request:
-    branches: [main, security-hardening-2026-11-09, security/gas-gateway-20261110]
+    branches: [main, security-hardening-2026-11-09, security/gas-gateway-20261110, security/staging-admin-commands-20261110]
   push:
-    branches: [security-hardening-2026-11-09, security/gas-gateway-20261110, security/staging-admin-commands-20261110]
+    branches: [security-hardening-2026-11-09, security/gas-gateway-20261110, security/staging-admin-commands-20261110, security/staging-admin-ui-20261111]
 permissions:
   contents: read
 jobs:

@@ -4,12 +4,17 @@ const HASH=/^[0-9a-f]{64}$/;
 const MUTATIONS=new Set(['notes','customer-details','coach','cancel','reschedule']);
 const ERRORS=new Set(['NOT_FOUND','STALE_BOOKING','NOT_CONFIRMED','INVALID_COMMAND','IDEMPOTENCY_CONFLICT',
  'INVALID_PATCH','INVALID_RESCHEDULE','PAYMENT_REVIEW_REQUIRED','COLLISION','ADMIN_REQUIRED','INVALID_SESSION','RATE_LIMIT_REJECTED']);
-export function createAdminBookingAPI(client){
+export function createAdminBookingAPI(client,{timeoutMs=25000}={}){
  if(client?.supabaseUrl!==URL)throw Error('STAGING_CLIENT_REQUIRED');
  async function call(body){
   const session=await client.auth.getSession();
   if(session.error||!session.data?.session)throw Error('ADMIN_LOGIN_REQUIRED');
-  const {data,error}=await client.functions.invoke('staging-admin-bookings',{body});
+  let timer,response;
+  try{
+   response=await Promise.race([client.functions.invoke('staging-admin-bookings',{body}),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('ADMIN_BOOKING_UNAVAILABLE')),timeoutMs);})]);
+  }finally{clearTimeout(timer);}
+  const {data,error}=response;
   if(error){
    let code;try{code=(await error.context.clone().json())?.error;}catch{}
    throw Error(ERRORS.has(code)?code:'ADMIN_BOOKING_UNAVAILABLE');

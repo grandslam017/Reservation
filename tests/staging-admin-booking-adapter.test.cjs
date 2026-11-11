@@ -32,3 +32,10 @@ test('stale edit is surfaced as a conflict and never silently retried with a fre
  const f=await fixture();f.client.functions.invoke=async()=>({error:{context:new Response(JSON.stringify({error:'STALE_BOOKING'}),{status:409})}});
  await assert.rejects(f.api.prepare(snapshot,'coach',{require_coach:true}).execute(),/STALE_BOOKING/);
 });
+test('deadline preserves prepared request identity for checking an uncertain commit',async()=>{
+ const f=await fixture();const {createAdminBookingAPI}=await import('../staging/frontend/admin-booking-api.mjs');
+ const api=createAdminBookingAPI(f.client,{timeoutMs:10});const invoke=f.client.functions.invoke;let first=true;
+ f.client.functions.invoke=async(...args)=>{if(first){first=false;await invoke(...args);return new Promise(()=>{});}return invoke(...args);};
+ const intent=api.prepare(snapshot,'notes',{admin_notes:'timeout'});await assert.rejects(intent.execute(),/ADMIN_BOOKING_UNAVAILABLE/);
+ await intent.execute();assert.deepEqual(f.calls[0],f.calls[1]);
+});
