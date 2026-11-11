@@ -4,10 +4,10 @@
 <style>
 body{font-family:system-ui,'Sarabun',sans-serif;background:#f4f7f5;color:#20302b;margin:24px auto;max-width:960px;padding:0 15px}
 section{background:white;border:1px solid #d0dfd6;border-radius:12px;padding:18px;margin:14px 0}
-button,input,textarea{font:inherit;border:1px solid #a8bbb1;padding:9px;border-radius:6px}
+button,input,textarea,select{font:inherit;border:1px solid #a8bbb1;padding:9px;border-radius:6px;max-width:100%;box-sizing:border-box}textarea{display:block;width:100%;min-height:100px}.booking-editor[hidden]{display:none}
 button{background:#17614a;color:white;cursor:pointer}button:disabled{opacity:.45}
 #notice{white-space:pre-wrap;color:#2c483a} .warning{color:#97502a}
-#queue{display:grid;gap:10px}.entry{border:1px solid #c9dcd1;border-radius:8px;padding:12px}
+#queue{display:grid;gap:10px}.entry{border:1px solid #c9dcd1;border-radius:8px;padding:12px}.simulation-result{white-space:pre-wrap;margin-top:12px;padding:12px;border:1px solid #8bba9b;background:#ecf9ef;border-radius:8px;font-weight:500}.simulation-result[hidden]{display:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 label{display:block;margin:8px 0}.muted{color:#66776e;font-size:.85em}
 </style></head><body>
@@ -20,6 +20,11 @@ label{display:block;margin:8px 0}.muted{color:#66776e;font-size:.85em}
 <button id="logout">ออกจากระบบ</button>
 <button id="refresh">รีเฟรชรายการ</button>
 </section>
+<section><h2>ทดสอบการเชื่อมต่อ GAS</h2>
+<p>เข้าสู่ระบบ Admin แล้วกดทดสอบได้เลย ระบบตรวจการเชื่อมต่อเท่านั้น ไม่ส่ง LINE ไม่สร้าง Calendar และไม่แก้รายการจอง</p>
+<button id="gasHealth" type="button">ทดสอบเชื่อมต่อ GAS</button>
+<pre id="gasHealthResult" role="status" aria-live="polite">ยังไม่ได้ทดสอบ</pre>
+</section>
 <section><h2>รายการ Booking ที่รอตรวจยอด SCB</h2><div id="queue">เข้าสู่ระบบ Admin ก่อน</div></section>
 <section><h2>ผลการทำงาน</h2><pre id="notice">ยังไม่เข้าสู่ระบบ</pre></section>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.95.0/dist/umd/supabase.min.js"></script>
@@ -30,6 +35,76 @@ const URL="https://kssxxizhpoxxlbsehymk.supabase.co",KEY="sb_publishable_-pI8NJz
 const client=window.supabase.createClient(URL,KEY);
 const $=id=>document.getElementById(id);
 const tell=text=>$('notice').textContent=String(text);
+let authEpoch=0,loadSequence=0;
+const editors=new Set(),pendingEditors=new Set();
+function clearEditors(){for(const editor of editors)editor.destroy();editors.clear();pendingEditors.clear();$('refresh').disabled=false;}
+function clearSessionUI(){authEpoch++;loadSequence++;clearEditors();$('queue').textContent='เข้าสู่ระบบ Admin ก่อน';$('gasHealthResult').textContent='ยังไม่ได้ทดสอบ';}
+function bookingEditorButton(booking,box,epoch){
+ const button=input('button');button.type='button';button.textContent='จัดการการจอง';let editor;
+ button.onclick=async()=>{
+  if(button.disabled||epoch!==authEpoch)return;button.disabled=true;
+  try{
+   if(!editor){
+    const {mountBookingEditor}=await import('./admin-booking-editor.mjs');
+    if(epoch!==authEpoch||!box.isConnected)return;
+    editor=mountBookingEditor({document,client,bookingId:booking.booking_id,
+     isCurrent:()=>epoch===authEpoch&&box.isConnected,
+     onPendingChange:pending=>{if(pending)pendingEditors.add(editor);else pendingEditors.delete(editor);$('refresh').disabled=pendingEditors.size>0;},
+     onSaved:async()=>{tell('บันทึกใน Staging แล้ว · รอคิวซิงก์ Google');await load();}});
+    editors.add(editor);box.append(editor.element);
+   }
+   await editor.open();
+  }catch{if(epoch===authEpoch)tell('เปิดแบบแก้ไขไม่สำเร็จ กรุณาลองใหม่');}
+  finally{button.disabled=false;}
+ };
+ return button;
+}
+// Existing Admin session only; credentials and signatures never enter UI results.
+async function callGasGateway(body){
+ const {data:{session},error:sessionError}=await client.auth.getSession();
+ if(sessionError||!session)throw Error('LOGIN_REQUIRED');
+ const requestId=crypto.randomUUID();
+ let timeout;
+ try{
+  const call=client.functions.invoke('staging-gas-gateway',{
+   body:{...body,request_id:requestId}
+  });
+  const deadline=new Promise((_,reject)=>{
+   timeout=setTimeout(()=>reject(Error('GAS_TEST_TIMEOUT')),25000);
+  });
+  const {data,error}=await Promise.race([call,deadline]);
+  if(error){
+   let code='GAS_REQUEST_FAILED';
+   if(error.context){
+    try{
+     const detail=await error.context.json();
+     const candidate=detail.error||detail.code;
+     if(typeof candidate==='string'&&/^[A-Z_]{1,80}$/.test(candidate))code=candidate;
+    }catch{}
+   }
+   throw Error(code);
+  }
+  if(data?.success!==true||data.environment!=='staging'||data.mode!=='simulation-only'||
+     data.request_id!==requestId||data.gas_reachable!==true||data.business_effects_performed!==false)
+    throw Error('UNEXPECTED_GAS_RESULT');
+  return data;
+ }finally{clearTimeout(timeout);}
+}
+function gasFailure(e){
+ if(e?.message==='LOGIN_REQUIRED')return 'กรุณาเข้าสู่ระบบ Staging Admin ก่อน แล้วกดทดสอบอีกครั้ง';
+ const code=/^[A-Z_]{1,80}$/.test(e?.message||'')?e.message:'GAS_TEST_FAILED';
+ return 'ทดสอบไม่สำเร็จ รหัส: '+code+'\nส่งเฉพาะรหัสนี้ให้ผู้ดูแลได้ ไม่ต้องส่งรหัสผ่านหรือ secret';
+}
+$('gasHealth').onclick=async()=>{
+ const button=$('gasHealth'),output=$('gasHealthResult');
+ if(button.disabled)return;
+ button.disabled=true;output.textContent='กำลังตรวจการเชื่อมต่อ GAS...';
+ try{
+  await callGasGateway({action:'health'});
+  output.textContent='เชื่อมต่อ GAS สำเร็จ ✓\nSupabase Staging ส่งคำขอพร้อมลายเซ็นและ GAS ยอมรับแล้ว\nทดสอบเท่านั้น: ไม่ส่งข้อความ ไม่สร้าง Calendar และไม่แก้รายการจอง';
+ }catch(e){output.textContent=gasFailure(e);}
+ finally{button.disabled=false;}
+};
 async function api(body){
  const {data:{session}}=await client.auth.getSession();
  if(!session)throw Error("กรุณาเข้าสู่ระบบ");
@@ -42,9 +117,40 @@ function input(tag,type,placeholder){
  const n=document.createElement(tag);if(type)n.type=type;
  if(placeholder)n.placeholder=placeholder;return n;
 }
+function createGasBookingSimulation(booking){
+ const button=input('button');button.type='button';
+ button.textContent='จำลองส่งยืนยันผ่าน GAS (ไม่ส่งจริง)';
+ const result=document.createElement('div');
+ result.className='simulation-result';result.hidden=true;
+ result.setAttribute('role','status');result.setAttribute('aria-live','polite');
+ button.onclick=async()=>{
+  if(button.disabled)return;
+  button.disabled=true;result.hidden=false;
+  result.textContent='กำลังจำลองการยืนยันรายการนี้ผ่าน GAS...';
+  try{
+   const response=await callGasGateway({action:'simulate-confirmation',booking_id:booking.booking_id});
+   const simulation=response.simulation;
+   const effectKeys=['sheetsRowsWritten','calendarEventsCreated','lineMessagesSent','emailsSent'];
+   if(!simulation||simulation.booking_id!==booking.booking_id||simulation.gas_confirmed!==true||
+      !simulation.effects||effectKeys.some(key=>simulation.effects[key]!==0))
+     throw Error('UNEXPECTED_GAS_SIMULATION');
+   result.textContent=['จำลองส่งยืนยันผ่าน GAS สำเร็จ ✓',
+    'รายการ: '+simulation.date+' '+simulation.slot+' · '+simulation.fee+' บาท',
+    'GAS ยอมรับลายเซ็นและยืนยัน Booking ตรงกัน',
+    'เขียน Google Sheet: 0 · สร้าง Calendar: 0',
+    'ส่ง LINE: 0 · ส่งอีเมล: 0',
+    'การจองและสถานะชำระเงินยังเหมือนเดิม'].join('\n');
+  }catch(e){result.textContent=gasFailure(e);}
+  finally{button.disabled=false;}
+ };
+ return {button,result};
+}
 async function load(){
+ if(pendingEditors.size){tell('กรุณาตรวจสอบผลการบันทึกที่ค้างอยู่ก่อนรีเฟรชรายการ');return;}
+ const epoch=authEpoch,sequence=++loadSequence;
  try{
- const r=await api({action:"list"});const root=$('queue');root.replaceChildren();
+ const r=await api({action:"list"});if(epoch!==authEpoch||sequence!==loadSequence||pendingEditors.size)return;
+ clearEditors();const root=$('queue');root.replaceChildren();
  if(!r.review_queue.length){root.textContent="ไม่มีรายการรอตรวจ";return;}
  for(const b of r.review_queue){
   const box=document.createElement('div');box.className='entry';
@@ -87,21 +193,38 @@ async function load(){
    }catch(e){tell('ตรวจความพร้อมไม่สำเร็จ: '+e.message)}
   };
   const simulate=input('button');simulate.textContent='จำลองยืนยันรับเงิน (ไม่บันทึก)';
+  const simulateResult=document.createElement('div');
+  simulateResult.className='simulation-result';
+  simulateResult.setAttribute('role','status');
+  simulateResult.setAttribute('aria-live','polite');
+  simulateResult.hidden=true;
   simulate.onclick=async()=>{
+   if(simulate.disabled)return;
+   simulate.disabled=true;
+   simulate.textContent='กำลังจำลอง...';
+   simulateResult.hidden=false;
+   simulateResult.textContent='กำลังตรวจข้อมูลของ Booking นี้... (ไม่มีการบันทึก)';
    try{
     const r=await api({action:'simulate-verify',booking_id:b.booking_id});
     if(!r.is_simulation||r.writes_performed!==false)throw Error('ผลการจำลองไม่ปลอดภัย');
     if(!r.eligible_for_manual_review){
-     tell('จำลองไม่ผ่าน: '+(r.blocker||'UNKNOWN')+' | ไม่ได้เปลี่ยนข้อมูลใด ๆ');
-     return;
+     simulateResult.textContent='ไม่ผ่านการจำลอง: '+(r.blocker||'UNKNOWN')+' — ไม่ได้เปลี่ยนข้อมูลใด ๆ';
+    }else{
+     simulateResult.textContent=['ผลจำลองเท่านั้น — ไม่ได้ตรวจ SCB หรือบันทึกข้อมูล',
+      'สถานะปัจจุบัน: '+r.current_payment_status,
+      'สถานะที่จะเปลี่ยนหากตรวจเงินจริง: '+r.would_change_payment_status_to,
+      'เลขใบเสร็จที่จะสร้าง: '+r.would_create_receipt_no,
+      'รายได้ที่จะบันทึก: '+r.would_record_income_thb+' บาท',
+      'ยืนยัน: ไม่เปลี่ยน Booking และไม่สร้างรายการรายได้'].join('\n');
     }
-    tell(['ผลจำลองเท่านั้น — ไม่มีการตรวจยอด SCB หรือบันทึกข้อมูล',
-     'สถานะปัจจุบัน: '+r.current_payment_status,
-     'หากยืนยันเงินเข้าจริง สถานะจะเป็น: '+r.would_change_payment_status_to,
-     'เลขใบเสร็จที่จะสร้าง: '+r.would_create_receipt_no,
-     'รายได้ที่จะบันทึก: '+r.would_record_income_thb+' บาท',
-     'จำลองเสร็จ ไม่ได้บันทึกรายได้ ไม่ได้เปลี่ยน Booking'].join('\\n'));
-   }catch(e){tell('จำลองยืนยันรับเงินไม่สำเร็จ: '+e.message)}
+    tell('ผลจำลองแสดงใต้ Booking ที่เลือกแล้ว (ไม่ได้บันทึกข้อมูล)');
+   }catch(e){
+    simulateResult.textContent='จำลองไม่สำเร็จ: '+e.message;
+    tell('จำลองยืนยันรับเงินไม่สำเร็จ: '+e.message);
+   }finally{
+    simulate.disabled=false;
+    simulate.textContent='จำลองยืนยันรับเงิน (ไม่บันทึก)';
+   }
   };
   const credit=input('input','checkbox');const check=input('label');
   check.append(credit,document.createTextNode(' ตรวจ SCB แล้วพบเงินเข้าจริง'));
@@ -119,17 +242,22 @@ async function load(){
    await api({action:'dispute',booking_id:b.booking_id,note:note.value});
    tell('ทำเครื่องหมาย Disputed ใน Staging แล้ว การจองยัง Confirmed');await load();
   }catch(e){tell(e.message)}};
-  action.append(slip,preview,simulate,check,reference,verify,note,dispute);
-  box.append(head,details,action);root.appendChild(box);
+  const gasSimulation=createGasBookingSimulation(b);
+  const editBooking=bookingEditorButton(b,box,epoch);
+  action.append(slip,preview,simulate,gasSimulation.button,check,reference,verify,note,dispute,editBooking);
+  box.append(head,details,action,simulateResult);
+  box.append(gasSimulation.result);root.appendChild(box);
  }
- }catch(e){tell(e.message)}
+ }catch(e){if(epoch===authEpoch&&sequence===loadSequence)tell(e.message)}
 }
 $('login').onclick=async()=>{try{
+ clearSessionUI();
  const {error}=await client.auth.signInWithPassword({email:$('email').value,password:$('password').value});
  if(error)throw error;$('password').value='';await load();tell('เข้าสู่ระบบ Admin ทดสอบสำเร็จ');
  }catch(e){tell('เข้าสู่ระบบไม่สำเร็จ: '+e.message)}};
-$('logout').onclick=async()=>{await client.auth.signOut();$('queue').textContent='ออกจากระบบแล้ว';tell('ออกจากระบบแล้ว')};
+$('logout').onclick=async()=>{clearSessionUI();await client.auth.signOut();tell('ออกจากระบบแล้ว')};
 $('refresh').onclick=load;
+if(client.auth.onAuthStateChange)client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT')clearSessionUI();});
 client.auth.getSession().then(({data})=>{if(data.session)load()});
 })();
 </script></body></html>
