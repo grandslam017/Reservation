@@ -1341,6 +1341,14 @@ async function addTransactionToSupabase(tx) {
     }
     state.transactions.push(txObj);
     saveStateToStorage();
+
+    if (state.config.gasUrl) {
+      sendGasRequest({
+        action: "syncTransaction",
+        transaction: txObj
+      }).catch(err => console.warn("Background GAS transaction sync error:", err));
+    }
+
     return txObj;
   } catch (error) {
     console.error("Failed to save transaction to Supabase:", error);
@@ -3666,7 +3674,14 @@ function renderBookingsTable() {
           ${coachBadgeText}
         </span>
       </td>
-      <td style="font-weight: 600;">${booking.fee.toLocaleString()} ฿</td>
+      <td style="font-weight: 600; white-space: nowrap;">
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span>${(parseFloat(booking.fee) || 0).toLocaleString()} ฿</span>
+          <button class="btn-edit-fee" data-booking-id="${booking.id}" style="background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 2px 4px; font-size: 0.85rem; display: inline-flex; align-items: center; transition: transform 0.2s;" title="${state.language === 'th' ? 'แก้ไขราคาค่าบริการ (Edit Fee)' : 'Edit Booking Fee'}">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+        </div>
+      </td>
       <td>
         <input type="text" class="form-control customer-booking-note text-accent" 
                data-booking-id="${booking.id}" 
@@ -3725,6 +3740,13 @@ function renderBookingsTable() {
       });
     }
 
+    const editFeeBtn = row.querySelector('.btn-edit-fee');
+    if (editFeeBtn) {
+      editFeeBtn.addEventListener('click', () => {
+        openEditFeeModal(booking);
+      });
+    }
+
     const coachBadge = row.querySelector('.clickable-coach-badge');
     if (coachBadge) {
       coachBadge.addEventListener('click', () => {
@@ -3773,15 +3795,90 @@ function formatDescriptionWithLinks(desc) {
   });
 }
 
+let currentFilteredLedgerTxs = [];
+
+function populateTxYearFilter() {
+  const select = document.getElementById('txYearFilter');
+  if (!select || select.children.length > 1) return;
+  const years = new Set();
+  state.transactions.forEach(tx => {
+    if (tx.date) {
+      const y = tx.date.split('-')[0];
+      if (y && y.length === 4) years.add(y);
+    }
+  });
+  years.add(String(new Date().getFullYear()));
+  const sortedYears = Array.from(years).sort().reverse();
+  sortedYears.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = `${y} (พ.ศ. ${parseInt(y, 10) + 543})`;
+    opt.style.background = '#1e293b';
+    select.appendChild(opt);
+  });
+}
+
+function getCombinedTransactions() {
+  const nonCourtTransactions = state.transactions.filter(tx => tx.category !== 'Court Rental');
+  const activeCourtTransactions = state.bookings
+    .filter(b => b.status !== 'pending_hold' && b.status !== 'cancelled')
+    .filter(b => !(b.isRainout || (b.adminNotes || '').includes('[ฝนตก]') || (b.adminNotes || '').includes('[🌧️]')))
+    .map(b => ({
+      id: 'tx_b_' + b.id,
+      date: b.date,
+      type: 'income',
+      category: 'Court Rental',
+      amount: parseFloat(b.fee) || 0,
+      description: `ค่าเช่าสนาม: คุณ ${b.name || ''} (${b.slot || ''})`,
+      bookingId: b.id
+    }));
+  return [...nonCourtTransactions, ...activeCourtTransactions];
+}
+
 function renderLedgerTable(filteredTxs) {
   const tbody = document.getElementById('ledgerTableBody');
   if (!tbody) return;
 
+  populateTxYearFilter();
+
   tbody.innerHTML = '';
 
-  const txsSource = filteredTxs || state.transactions;
+  let txsSource = filteredTxs || getCombinedTransactions();
+
+  // Local table filters (Search, Year, Month)
+  const searchVal = (document.getElementById('txSearchInput')?.value || '').toLowerCase().trim();
+  const yearVal = document.getElementById('txYearFilter')?.value || '';
+  const monthVal = document.getElementById('txMonthFilter')?.value || '';
+
+  if (searchVal || yearVal || monthVal) {
+    txsSource = txsSource.filter(tx => {
+      if (yearVal && !tx.date.startsWith(yearVal)) return false;
+      if (monthVal) {
+        const parts = tx.date.split('-');
+        if (parts.length >= 2 && parts[1] !== monthVal) return false;
+      }
+      if (searchVal) {
+        const cat = (tx.category || '').toLowerCase();
+        const desc = (tx.description || '').toLowerCase();
+        const amt = String(tx.amount || '');
+        const date = (tx.date || '').toLowerCase();
+        if (!cat.includes(searchVal) && !desc.includes(searchVal) && !amt.includes(searchVal) && !date.includes(searchVal)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   // Reverse before sorting to keep newly added items for the same date at the top
   const sortedTxs = [...txsSource].reverse().sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
+  currentFilteredLedgerTxs = sortedTxs;
+
+  // Update badge count
+  const badge = document.getElementById('txCountBadge');
+  if (badge) {
+    badge.textContent = `${sortedTxs.length} รายการ`;
+  }
 
   if (sortedTxs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-receipt"></i>${state.language === 'th' ? 'ไม่มีรายการประวัติการเงิน' : 'No transactions recorded'}</td></tr>`;
@@ -3794,7 +3891,9 @@ function renderLedgerTable(filteredTxs) {
     tableContainer.scrollTop = 0;
   }
 
-  const limitedTxs = sortedTxs.slice(0, 50);
+  // If filtered, show up to 300 items; otherwise top 50
+  const isFiltered = Boolean(searchVal || yearVal || monthVal);
+  const limitedTxs = isFiltered ? sortedTxs.slice(0, 300) : sortedTxs.slice(0, 50);
 
   limitedTxs.forEach(tx => {
     const row = document.createElement('tr');
@@ -3844,6 +3943,74 @@ function renderLedgerTable(filteredTxs) {
 
     tbody.appendChild(row);
   });
+}
+
+function exportLedgerToCsv() {
+  const txsToExport = (currentFilteredLedgerTxs && currentFilteredLedgerTxs.length > 0) ? currentFilteredLedgerTxs : getCombinedTransactions();
+  if (!txsToExport || txsToExport.length === 0) {
+    showToast(state.language === 'th' ? "ไม่มีรายการข้อมูลสำหรับส่งออก" : "No transactions to export", 'warning');
+    return;
+  }
+
+  const sorted = [...txsToExport].sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
+  let csvContent = "\uFEFF"; // UTF-8 BOM for Thai Excel
+  csvContent += "วันที่ (Date),ประเภท (Type),หมวดหมู่ (Category),จำนวนเงิน (THB),รายละเอียด (Description),หลักฐาน (Slip URL)\n";
+
+  sorted.forEach(tx => {
+    const typeLabel = tx.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+    const amountVal = parseFloat(tx.amount) || 0;
+    const cleanDesc = (tx.description || '').replace(/"/g, '""');
+    const cleanCat = (tx.category || '').replace(/"/g, '""');
+    const urlMatch = (tx.description || '').match(/(https?:\/\/[^\s\)]+)/);
+    const slipUrl = urlMatch ? urlMatch[0] : '';
+
+    csvContent += `"${tx.date}","${typeLabel}","${cleanCat}",${amountVal},"${cleanDesc}","${slipUrl}"\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const monthVal = document.getElementById('txMonthFilter')?.value || '';
+  const yearVal = document.getElementById('txYearFilter')?.value || '';
+  let filename = "TheGrandSlam_Transactions";
+  if (yearVal) filename += `_${yearVal}`;
+  if (monthVal) filename += `-${monthVal}`;
+  filename += ".csv";
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  showToast(state.language === 'th' ? "ดาวน์โหลดไฟล์ CSV รายรับ-รายจ่ายสำเร็จ" : "Transactions exported to CSV successfully", 'success');
+}
+
+async function syncTransactionsToGoogleSheets() {
+  if (!state.config.gasUrl) {
+    showToast(state.language === 'th' ? "กรุณาระบุ Google Apps Script Web App URL ในระบบก่อน" : "GAS URL not configured", 'error');
+    return;
+  }
+
+  showToast(state.language === 'th' ? "กำลังซิงค์รายรับ-รายจ่ายเข้า Google Sheets..." : "Syncing transactions to Google Sheets...", 'info');
+
+  try {
+    const payload = {
+      action: "backup",
+      bookings: state.bookings,
+      transactions: state.transactions
+    };
+    const res = await sendGasRequest(payload);
+    if (res && res.status === 'success') {
+      showToast(state.language === 'th' ? "ซิงค์รายรับ-รายจ่ายเข้า Google Sheet เรียบร้อยแล้ว!" : "Transactions synced to Google Sheet successfully!", 'success');
+    } else {
+      throw new Error(res?.message || "Sync failed");
+    }
+  } catch (err) {
+    console.error("Failed to sync transactions to GAS:", err);
+    showToast(state.language === 'th' ? "ซิงค์เข้า Google Sheet ล้มเหลว: " + err.message : "Sync failed: " + err.message, 'error');
+  }
 }
 
 async function cancelBooking(bookingId) {
@@ -4475,6 +4642,108 @@ async function handleEditBookingSave() {
   }
 }
 
+function openEditFeeModal(booking) {
+  const modal = document.getElementById('editFeeModal');
+  const txtId = document.getElementById('editFeeBookingId');
+  const lblDate = document.getElementById('lblEditFeeDate');
+  const lblSlot = document.getElementById('lblEditFeeSlot');
+  const lblName = document.getElementById('lblEditFeeName');
+  const inputFee = document.getElementById('editFeeInput');
+
+  if (modal && txtId && inputFee) {
+    txtId.value = booking.id;
+    if (lblDate) lblDate.textContent = booking.date || "-";
+    if (lblSlot) lblSlot.textContent = booking.slot || "-";
+    if (lblName) lblName.textContent = booking.name || "-";
+    inputFee.value = (typeof booking.fee !== 'undefined' && booking.fee !== null) ? booking.fee : getSlotPrice(booking.slot);
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      inputFee.focus();
+      inputFee.select();
+    }, 50);
+  }
+}
+
+async function handleEditFeeSave() {
+  const bookingId = document.getElementById('editFeeBookingId')?.value;
+  const rawFeeVal = parseFloat(document.getElementById('editFeeInput')?.value);
+
+  if (!bookingId || isNaN(rawFeeVal) || rawFeeVal < 0) {
+    showToast(state.language === 'th' ? "กรุณาระบุราคาค่าบริการที่ถูกต้อง" : "Please enter a valid court fee", 'error');
+    return;
+  }
+
+  const booking = state.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+
+  const oldFee = booking.fee;
+  const newFee = rawFeeVal;
+
+  showToast(state.language === 'th' ? "กำลังบันทึกราคาใหม่..." : "Saving new fee...", 'info');
+
+  // 1. Update fee in Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from('bookings')
+        .update({ fee: newFee })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+    } catch (e) {
+      console.error("Failed to update fee in Supabase:", e);
+      showToast(state.language === 'th' ? "บันทึกล้มเหลวในฐานข้อมูล" : "Failed to save to database", 'error');
+      return;
+    }
+  }
+
+  // Update local state
+  booking.fee = newFee;
+  saveStateToStorage();
+
+  // 2. Notify Google Apps Script
+  if (state.config.gasUrl) {
+    try {
+      sendGasRequest({
+        action: "updateNotes",
+        id: bookingId,
+        name: booking.name,
+        phone: booking.phone,
+        email: booking.email || '',
+        lineUserId: booking.lineUserId || '',
+        date: booking.date,
+        slot: booking.slot,
+        court: booking.court || 'Main Court',
+        fee: newFee,
+        receiptNo: booking.receiptNo,
+        requireCoach: booking.requireCoach,
+        adminNotes: booking.adminNotes || ''
+      }).catch(console.error);
+    } catch (err) {
+      console.error("Failed to sync fee update with GAS:", err);
+    }
+  }
+
+  // Log admin action
+  logAdminActionToGas(
+    "แก้ไขราคาค่าบริการ (Edit Fee)", 
+    booking.name, 
+    booking.phone, 
+    `แก้ไขราคาค่าบริการของวันที่ ${booking.date} (${booking.slot}) จาก ${oldFee || 0} เป็น ${newFee.toLocaleString()} บาท`
+  );
+
+  document.getElementById('editFeeModal').style.display = 'none';
+  showToast(state.language === 'th' ? `อัปเดตราคาเป็น ${newFee.toLocaleString()} บาท เรียบร้อยแล้ว!` : "Court fee updated successfully!", 'success');
+
+  // Reload and rerender UI
+  renderCalendar();
+  renderTimeSlots();
+  renderBookingsTable();
+  if (state.isAdminLoggedIn && document.getElementById('admin').classList.contains('active')) {
+    renderAdminDashboard();
+  }
+}
+
 async function toggleCoachStatus(bookingId) {
   const booking = state.bookings.find(b => b.id === bookingId);
   if (!booking) return;
@@ -4585,6 +4854,14 @@ async function deleteTransaction(txId) {
       
       state.transactions = state.transactions.filter(tx => tx.id !== txId);
       saveStateToStorage();
+
+      if (state.config.gasUrl) {
+        sendGasRequest({
+          action: "deleteTransaction",
+          id: txId
+        }).catch(err => console.warn("Background GAS delete error:", err));
+      }
+
       showToast(translations[state.language].toastTxDeleted, 'success');
     } catch (error) {
       console.error("Failed to delete transaction in Supabase:", error);
@@ -4900,6 +5177,44 @@ async function init() {
     });
   }
 
+  // Set up Ledger Table Filters & Export Handlers
+  const txSearchInput = document.getElementById('txSearchInput');
+  const txYearFilter = document.getElementById('txYearFilter');
+  const txMonthFilter = document.getElementById('txMonthFilter');
+  const btnClearTxFilter = document.getElementById('btnClearTxFilter');
+  const btnExportTxCsv = document.getElementById('btnExportTxCsv');
+  const btnSyncTxToSheets = document.getElementById('btnSyncTxToSheets');
+
+  if (txSearchInput) {
+    txSearchInput.addEventListener('input', () => {
+      renderLedgerTable();
+    });
+  }
+  if (txYearFilter) {
+    txYearFilter.addEventListener('change', () => {
+      renderLedgerTable();
+    });
+  }
+  if (txMonthFilter) {
+    txMonthFilter.addEventListener('change', () => {
+      renderLedgerTable();
+    });
+  }
+  if (btnClearTxFilter) {
+    btnClearTxFilter.addEventListener('click', () => {
+      if (txSearchInput) txSearchInput.value = '';
+      if (txYearFilter) txYearFilter.value = '';
+      if (txMonthFilter) txMonthFilter.value = '';
+      renderLedgerTable();
+    });
+  }
+  if (btnExportTxCsv) {
+    btnExportTxCsv.addEventListener('click', exportLedgerToCsv);
+  }
+  if (btnSyncTxToSheets) {
+    btnSyncTxToSheets.addEventListener('click', syncTransactionsToGoogleSheets);
+  }
+
   // === Reschedule Modal Event Handlers ===
   const rescheduleModal = document.getElementById('rescheduleModal');
   const btnRescheduleClose = document.getElementById('btnRescheduleClose');
@@ -4938,6 +5253,26 @@ async function init() {
   }
   if (btnEditBookingSave) {
     btnEditBookingSave.addEventListener('click', handleEditBookingSave);
+  }
+
+  // === Edit Court Fee Modal Event Handlers ===
+  const editFeeModal = document.getElementById('editFeeModal');
+  const btnEditFeeClose = document.getElementById('btnEditFeeClose');
+  const btnEditFeeCancel = document.getElementById('btnEditFeeCancel');
+  const btnEditFeeSave = document.getElementById('btnEditFeeSave');
+
+  if (btnEditFeeClose && editFeeModal) {
+    btnEditFeeClose.addEventListener('click', () => {
+      editFeeModal.style.display = 'none';
+    });
+  }
+  if (btnEditFeeCancel && editFeeModal) {
+    btnEditFeeCancel.addEventListener('click', () => {
+      editFeeModal.style.display = 'none';
+    });
+  }
+  if (btnEditFeeSave) {
+    btnEditFeeSave.addEventListener('click', handleEditFeeSave);
   }
 
   const reschedulePrevMonthBtn = document.getElementById('reschedulePrevMonthBtn');
