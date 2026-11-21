@@ -1,4 +1,4 @@
-// ==========================================
+﻿// ==========================================
 // CONFIGURATION (ตั้งค่าการเชื่อมต่อ)
 // ==========================================
 function getCleanScriptProperty(key) {
@@ -16,7 +16,6 @@ const ADMIN_LINE_USER_ID = getCleanScriptProperty("ADMIN_LINE_USER_ID");
 const COACH_CALENDAR_ID = getCleanScriptProperty("COACH_CALENDAR_ID");
 const WEBHOOK_SECRET = getCleanScriptProperty("WEBHOOK_SECRET") || "GrandSlam@2026!SecureKey";
 const MAIN_CALENDAR_ID = getCleanScriptProperty("MAIN_CALENDAR_ID");
-
 const OFF_PEAK_PRICE = parseFloat(getCleanScriptProperty("OFF_PEAK_PRICE") || "250");
 const PEAK_PRICE = parseFloat(getCleanScriptProperty("PEAK_PRICE") || "350");
 const VALID_COURTS = ["Main Court"];
@@ -116,10 +115,6 @@ function doPost(e) {
       return handleUpdateNotes(data);
     } else if (action === "backup") {
       return handleBackup(data);
-    } else if (action === "syncTransaction") {
-      return handleSyncTransaction(data);
-    } else if (action === "deleteTransaction") {
-      return handleDeleteTransaction(data);
     } else if (action === "logAdminAction") {
       return handleLogAdminAction(data);
     } else if (action === "getAdminLogs") {
@@ -244,13 +239,42 @@ function handleSendConfirmation(data) {
   let uuids = [];
   let indexMap;
 
+  // คำนวณยอดเงินรวมสำหรับการจองนี้
+  let totalExpectedFee = 0;
+  uniqueSlots.forEach(function(slot) {
+    totalExpectedFee += getSlotFee(slot);
+  });
+
+  // ผลการวิเคราะห์สลิป (เริ่มต้นสถานะปลอดภัย)
+  let slipAnalysis = {
+    bank: "-",
+    senderName: "-",
+    amount: 0,
+    refNo: "-",
+    transferTime: "-",
+    status: (data.slipUrl ? "รอตรวจสอบ" : "ไม่มีสลิป"),
+    amountMatch: false,
+    isDuplicate: false
+  };
+
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     bookingSheet = spreadsheet.getSheetByName("Bookings");
+    const headers = [
+      "ID", "Date", "Time Slot", "Customer", "Phone", "Email", 
+      "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", 
+      "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", 
+      "Admin Notes", "Calendar Event ID", "Created At",
+      "Bank", "Sender Name", "Slip Amount", "Ref No", "Transfer Time", "Slip Status"
+    ];
     if (!bookingSheet) {
       bookingSheet = spreadsheet.insertSheet("Bookings");
-      const headers = ["ID", "Date", "Time Slot", "Customer", "Phone", "Email", "Court", "Require Coach", "Fee", "Invoice No", "Receipt No", "Slip URL", "LINE User ID", "Car Plate", "Reminder Sent", "Admin Notes", "Calendar Event ID", "Created At"];
       bookingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    } else {
+      const lastCol = bookingSheet.getLastColumn();
+      if (lastCol < headers.length) {
+        bookingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      }
     }
 
     indexMap = getBookingsIndexMap(bookingSheet);
@@ -280,6 +304,15 @@ function handleSendConfirmation(data) {
       throw new Error("DUPLICATE_BOOKINGS:" + duplicates.join(", "));
     }
 
+    // 🤖 สั่งการ AI ตรวจสอบและดึงข้อมูลจากสลิปโอนเงิน (Gemini Vision AI)
+    if (data.slipUrl) {
+      try {
+        slipAnalysis = analyzePaymentSlip(data.slipUrl, totalExpectedFee, bookingSheet);
+      } catch (slipErr) {
+        logError("Slip Analysis Failure", "handleSendConfirmation", slipErr.toString(), "WARNING");
+      }
+    }
+
     const newRows = [];
     const createdAtStr = Utilities.formatDate(new Date(), bookingSheet.getParent().getSpreadsheetTimeZone() || "GMT+7", "yyyy-MM-dd HH:mm:ss");
     uniqueSlots.forEach(function(slot) {
@@ -305,7 +338,13 @@ function handleSendConfirmation(data) {
         "No",
         "",
         "PENDING",
-        createdAtStr
+        createdAtStr,
+        slipAnalysis.bank || "-",
+        slipAnalysis.senderName || "-",
+        slipAnalysis.amount || 0,
+        slipAnalysis.refNo || "-",
+        slipAnalysis.transferTime || "-",
+        slipAnalysis.status || "-"
       ]);
     });
 
@@ -380,7 +419,7 @@ function handleSendConfirmation(data) {
   if (ADMIN_LINE_USER_ID && LINE_CHANNEL_ACCESS_TOKEN) {
     try {
       const slipUrl = data.slipUrl || "";
-      sendAdminSlipNotification(name, phone, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach);
+      sendAdminSlipNotification(name, phone, formattedDate, uniqueSlots, receiptNo, slipUrl, requireCoach, slipAnalysis);
       adminLineSent = true;
     } catch (e) {
       logError("Admin LINE Notification Error", "sendAdminSlipNotification", e.toString(), "WARNING");
@@ -698,7 +737,193 @@ function sendLineMessageReminder(lineUserId, name, dateStr, slots, receiptNo, re
   }
 }
 
-function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipUrl, requireCoach) {
+// ==========================================
+// 🤖 AI SLIP VERIFICATION & EXTRACTION (GEMINI VISION)
+// ==========================================
+/**
+ * วิเคราะห์และอ่านข้อมูลจากสลิปโอนเงินด้วย Google Gemini Vision AI
+ * ดึงข้อมูล: ธนาคาร, ชื่อผู้โอน, ยอดเงิน, รหัสอ้างอิง, วันเวลาโอน
+ * ตรวจสอบความถูกต้องของยอดเงิน และตรวจจับสลิปซ้ำในระบบ Google Sheets
+ */
+function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
+  const result = {
+    bank: "-",
+    senderName: "-",
+    amount: 0,
+    refNo: "-",
+    transferTime: "-",
+    status: "รอตรวจสอบ (ไม่มีสลิป)",
+    amountMatch: false,
+    isDuplicate: false
+  };
+
+  if (!slipUrl || typeof slipUrl !== "string" || slipUrl.indexOf("http") !== 0) {
+    return result;
+  }
+
+  const apiKey = getCleanScriptProperty("GEMINI_API_KEY");
+  if (!apiKey) {
+    result.status = "รอตรวจสอบ (ไม่ได้ตั้งค่า GEMINI_API_KEY)";
+    return result;
+  }
+
+  try {
+    // 1. ดาวน์โหลดภาพสลิปและแปลงเป็น Base64
+    const response = UrlFetchApp.fetch(slipUrl, {
+      method: "get",
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() !== 200) {
+      result.status = "รอตรวจสอบ (ดาวน์โหลดสลิปไม่สำเร็จ)";
+      return result;
+    }
+
+    const blob = response.getBlob();
+    const contentType = blob.getContentType() || "image/jpeg";
+    const base64Data = Utilities.base64Encode(blob.getBytes());
+
+    // 2. เรียกใช้งาน Gemini Vision API
+    const systemInstruction = 
+      "คุณคือ AI ตรวจสอบสลิปการโอนเงินของสนามเทนนิส The Grand Slam\n" +
+      "หน้าที่ของคุณคืออ่านข้อมูลตัวอักษรและตัวเลขจากภาพสลิปธนาคารไทยอย่างแม่นยำ และตอบกลับเฉพาะ JSON ล้วนเท่านั้น ห้ามใส่คำบรรยายอื่นและห้ามใส่ markdown code block เด็ดขาด";
+
+    const promptText = 
+      "กรุณาอ่านข้อมูลจากสลิปนี้ และตอบกลับเป็น JSON รูปแบบนี้เท่านั้น:\n" +
+      "{\n" +
+      '  "bank": "ชื่อธนาคารของผู้โอน เช่น กสิกรไทย, ไทยพาณิชย์, กรุงไทย, กรุงเทพ, ออมสิน, ทหารไทยธนชาต, กรุงศรี, พร้อมเพย์",\n' +
+      '  "senderName": "ชื่อ-นามสกุล หรือชื่อบัญชีของผู้โอนเงิน",\n' +
+      '  "amount": ตัวเลขยอดเงินที่โอนสำเร็จ (ตัวเลขทศนิยมหรือจำนวนเต็ม เช่น 250 หรือ 500.00 โดยไม่ใส่เครื่องหมายจุลภาค),\n' +
+      '  "refNo": "หมายเลขอ้างอิง หรือ รหัสธุรกรรม หรือ Transaction ID หรือ Ref No.",\n' +
+      '  "transferTime": "วันและเวลาที่โอนเงินตามที่ระบุในสลิป (เช่น 21 พ.ย. 69 14:30 น. หรือ 21/11/2026 14:30:00)"\n' +
+      "}";
+
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType: contentType,
+                data: base64Data
+              }
+            },
+            {
+              text: promptText
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    };
+
+    const models = [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash"
+    ];
+
+    let geminiRawResponse = "";
+    let callSuccess = false;
+
+    for (let m = 0; m < models.length; m++) {
+      const modelName = models[m];
+      const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
+
+      try {
+        const geminiRes = UrlFetchApp.fetch(apiUrl, {
+          method: "post",
+          contentType: "application/json",
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true
+        });
+
+        const resCode = geminiRes.getResponseCode();
+        const resText = geminiRes.getContentText();
+
+        if (resCode === 200) {
+          const resJson = JSON.parse(resText);
+          if (resJson.candidates && resJson.candidates.length > 0 && resJson.candidates[0].content) {
+            geminiRawResponse = resJson.candidates[0].content.parts[0].text.trim();
+            callSuccess = true;
+            break;
+          }
+        }
+      } catch (callErr) {
+        // ลองโมเดลถัดไป
+      }
+    }
+
+    if (!callSuccess || !geminiRawResponse) {
+      result.status = "รอตรวจสอบ (Gemini OCR ไม่ตอบกลับ)";
+      return result;
+    }
+
+    // 3. แปลงผลลัพธ์ JSON
+    let parsedData = {};
+    try {
+      let cleanJson = geminiRawResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+      parsedData = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      result.status = "รอตรวจสอบ (แปลงข้อมูลไม่สำเร็จ)";
+      return result;
+    }
+
+    result.bank = String(parsedData.bank || "-").trim();
+    result.senderName = String(parsedData.senderName || "-").trim();
+    result.amount = parseFloat(parsedData.amount) || 0;
+    result.refNo = String(parsedData.refNo || "-").trim();
+    result.transferTime = String(parsedData.transferTime || "-").trim();
+
+    // 4. ตรวจสอบความถูกต้องของยอดเงิน
+    const expFee = parseFloat(expectedFee) || 0;
+    if (result.amount > 0 && expFee > 0) {
+      if (Math.abs(result.amount - expFee) < 0.01) {
+        result.amountMatch = true;
+        result.status = "ยอดเงินตรง ✅";
+      } else {
+        result.amountMatch = false;
+        result.status = "⚠️ ยอดไม่ตรง (สลิป: " + result.amount + " บ., ค่าบริการ: " + expFee + " บ.)";
+      }
+    } else if (result.amount > 0) {
+      result.status = "มียอดเงิน " + result.amount + " บ.";
+    } else {
+      result.status = "รอตรวจสอบ (ไม่พบยอดเงินในสลิป)";
+    }
+
+    // 5. ตรวจสอบสลิปซ้ำ (Duplicate Detection) ใน Google Sheets คอลัมน์ Ref No (คอลัมน์ V / 22)
+    if (bookingSheet && result.refNo && result.refNo !== "-" && result.refNo.length >= 6) {
+      const lastRow = bookingSheet.getLastRow();
+      if (lastRow > 1 && bookingSheet.getLastColumn() >= 22) {
+        const existingRefs = bookingSheet.getRange(2, 22, lastRow - 1, 1).getValues();
+        for (let i = 0; i < existingRefs.length; i++) {
+          const existingRef = String(existingRefs[i][0] || "").trim();
+          if (existingRef && existingRef === result.refNo) {
+            result.isDuplicate = true;
+            result.status = "🚨 ตรวจพบสลิปซ้ำ (Ref: " + result.refNo + ")";
+            break;
+          }
+        }
+      }
+    }
+
+    return result;
+
+  } catch (err) {
+    logError("Slip Analysis Error", "analyzePaymentSlip", err.toString(), "WARNING");
+    result.status = "รอตรวจสอบ (เกิดข้อผิดพลาดในการอ่านสลิป)";
+    return result;
+  }
+}
+
+function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipUrl, requireCoach, slipAnalysis) {
   const adminId = ADMIN_LINE_USER_ID;
   if (!LINE_CHANNEL_ACCESS_TOKEN || !adminId) {
     console.warn("Skipping Admin LINE notification: missing LINE_CHANNEL_ACCESS_TOKEN or ADMIN_LINE_USER_ID.");
@@ -708,7 +933,230 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
   const url = "https://api.line.me/v2/bot/message/push";
   const slotsText = Array.isArray(slots) ? slots.join(", ") : String(slots || "");
 
-  // 1. Send Admin Flex Card First (Guaranteed 100% Delivery)
+  // สร้างกล่อง AI ตรวจสอบสลิปสำหรับแสดงผลใน LINE Flex Card
+  const aiBoxContents = [];
+  if (slipAnalysis && (slipUrl || (slipAnalysis.refNo && slipAnalysis.refNo !== "-"))) {
+    let badgeBg = "#E8F8EE";
+    let badgeTextColor = "#1DB446";
+    let badgeText = slipAnalysis.status || "ยอดเงินตรง ✅";
+
+    if (slipAnalysis.isDuplicate) {
+      badgeBg = "#FEE2E2";
+      badgeTextColor = "#DC2626";
+      badgeText = "🚨 ตรวจพบสลิปซ้ำ";
+    } else if (slipAnalysis.amountMatch === false && slipAnalysis.amount > 0) {
+      badgeBg = "#FFF4E5";
+      badgeTextColor = "#D97706";
+      badgeText = "⚠️ ยอดไม่ตรง";
+    } else if (slipAnalysis.status && slipAnalysis.status.indexOf("รอตรวจสอบ") !== -1) {
+      badgeBg = "#F1F5F9";
+      badgeTextColor = "#64748B";
+      badgeText = "⏳ รอตรวจสอบ";
+    }
+
+    aiBoxContents.push(
+      { type: "separator", margin: "md" },
+      {
+        type: "box",
+        layout: "vertical",
+        margin: "md",
+        paddingAll: "10px",
+        backgroundColor: "#F8FAFC",
+        cornerRadius: "8px",
+        borderColor: "#E2E8F0",
+        borderWidth: "1px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              {
+                type: "text",
+                text: "🤖 AI ตรวจสอบสลิป",
+                weight: "bold",
+                size: "xs",
+                color: "#1E3A8A",
+                flex: 5
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                backgroundColor: badgeBg,
+                cornerRadius: "4px",
+                paddingStart: "6px",
+                paddingEnd: "6px",
+                paddingTop: "2px",
+                paddingBottom: "2px",
+                contents: [
+                  {
+                    type: "text",
+                    text: badgeText,
+                    size: "xxs",
+                    weight: "bold",
+                    color: badgeTextColor,
+                    align: "center"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "sm",
+            spacing: "xs",
+            contents: [
+              {
+                type: "box",
+                layout: "baseline",
+                contents: [
+                  { type: "text", text: "ธนาคาร:", size: "xs", color: "#64748B", flex: 3 },
+                  { type: "text", text: String(slipAnalysis.bank || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
+                ]
+              },
+              {
+                type: "box",
+                layout: "baseline",
+                contents: [
+                  { type: "text", text: "ผู้โอน:", size: "xs", color: "#64748B", flex: 3 },
+                  { type: "text", text: String(slipAnalysis.senderName || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
+                ]
+              },
+              {
+                type: "box",
+                layout: "baseline",
+                contents: [
+                  { type: "text", text: "ยอดในสลิป:", size: "xs", color: "#64748B", flex: 3 },
+                  { type: "text", text: (slipAnalysis.amount ? Number(slipAnalysis.amount).toLocaleString("th-TH", { minimumFractionDigits: 2 }) + " บาท" : "-"), size: "xs", color: (slipAnalysis.amountMatch ? "#16A34A" : "#DC2626"), weight: "bold", flex: 6 }
+                ]
+              },
+              {
+                type: "box",
+                layout: "baseline",
+                contents: [
+                  { type: "text", text: "เลขที่รายการ:", size: "xs", color: "#64748B", flex: 3 },
+                  { type: "text", text: String(slipAnalysis.refNo || "-"), size: "xs", color: "#1E293B", flex: 6, wrap: true }
+                ]
+              },
+              {
+                type: "box",
+                layout: "baseline",
+                contents: [
+                  { type: "text", text: "วันเวลาโอน:", size: "xs", color: "#64748B", flex: 3 },
+                  { type: "text", text: String(slipAnalysis.transferTime || "-"), size: "xs", color: "#64748B", flex: 6, wrap: true }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    );
+  }
+
+  // ประกอบการ์ด Flex แจ้งเตือนแอดมิน
+  const bubbleBodyContents = [
+    {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "ลูกค้า", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: String(name || "-"), color: "#000000", size: "md", flex: 4 }
+          ]
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "เบอร์โทร", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: String(phone || "-"), color: "#000000", size: "md", flex: 4 }
+          ]
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "วันที่", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: String(dateStr || "-"), color: "#000000", size: "md", flex: 4 }
+          ]
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "เวลาที่จอง:", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: String(slotsText || "-"), color: "#000000", size: "md", flex: 4, wrap: true }
+          ]
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "โค้ช", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌"), color: "#000000", size: "md", flex: 4 }
+          ]
+        },
+        {
+          type: "box",
+          layout: "baseline",
+          contents: [
+            { type: "text", text: "เลขใบเสร็จ", color: "#555555", size: "md", flex: 2 },
+            { type: "text", text: String(receiptNo || "-"), color: "#000000", size: "md", flex: 4 }
+          ]
+        }
+      ]
+    }
+  ];
+
+  if (aiBoxContents.length > 0) {
+    aiBoxContents.forEach(function(item) {
+      bubbleBodyContents.push(item);
+    });
+  }
+
+  const bubbleContents = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#2B1190",
+      contents: [
+        { type: "text", text: "NEW BOOKING RECEIVED", weight: "bold", color: "#B8B3F4", size: "xs" },
+        { type: "text", text: "มีการจองสนามใหม่เข้าสู่ระบบ!", weight: "bold", color: "#FFFFFF", size: "md", margin: "xs" }
+      ]
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: bubbleBodyContents
+    }
+  };
+
+  if (slipUrl && typeof slipUrl === "string" && slipUrl.indexOf("http") === 0) {
+    bubbleContents.footer = {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: "#2B1190",
+          height: "sm",
+          action: {
+            type: "uri",
+            label: "🔍 ตรวจสอบภาพสลิป",
+            uri: slipUrl
+          }
+        }
+      ]
+    };
+  }
+
+  // 1. ส่ง Flex Card แจ้งเตือนแอดมินพร้อมข้อมูล AI ตรวจสอบสลิป
   try {
     const flexPayload = {
       to: adminId,
@@ -716,79 +1164,7 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
         {
           type: "flex",
           altText: "🔔 มีการจองสนามใหม่เข้าสู่ระบบ! (" + (name || "") + ")",
-          contents: {
-            type: "bubble",
-            header: {
-              type: "box",
-              layout: "vertical",
-              backgroundColor: "#2B1190",
-              contents: [
-                { type: "text", text: "NEW BOOKING RECEIVED", weight: "bold", color: "#B8B3F4", size: "xs" },
-                { type: "text", text: "มีการจองสนามใหม่เข้าสู่ระบบ!", weight: "bold", color: "#FFFFFF", size: "md", margin: "xs" }
-              ]
-            },
-            body: {
-              type: "box",
-              layout: "vertical",
-              contents: [
-                {
-                  type: "box",
-                  layout: "vertical",
-                  spacing: "sm",
-                  contents: [
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "ลูกค้า", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: String(name || "-"), color: "#000000", size: "md", flex: 4 }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "เบอร์โทร", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: String(phone || "-"), color: "#000000", size: "md", flex: 4 }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "วันที่", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: String(dateStr || "-"), color: "#000000", size: "md", flex: 4 }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "เวลาที่จอง:", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: String(slotsText || "-"), color: "#000000", size: "md", flex: 4, wrap: true }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "โค้ช", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: (requireCoach ? "ต้องการโค้ช 🟢" : "ไม่ต้องการโค้ช ❌"), color: "#000000", size: "md", flex: 4 }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "baseline",
-                      contents: [
-                        { type: "text", text: "เลขใบเสร็จ", color: "#555555", size: "md", flex: 2 },
-                        { type: "text", text: String(receiptNo || "-"), color: "#000000", size: "md", flex: 4 }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
+          contents: bubbleContents
         }
       ]
     };
@@ -806,7 +1182,7 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
     console.error("sendAdminSlipNotification Flex Error: " + e.toString());
   }
 
-  // 2. Send Payment Slip Image in a separate request (Safe & Independent)
+  // 2. ส่งภาพสลิปแนบไปด้วยเพื่อให้แอดมินเห็นภาพชัดเจนทันที
   if (slipUrl && typeof slipUrl === 'string' && slipUrl.indexOf('https://') === 0) {
     try {
       const imgPayload = {
@@ -954,6 +1330,81 @@ function removeBookingFromSheet(dateStr, slotStr, courtStr, calendarEventIdDirec
   } finally {
     try { lock.releaseLock(); } catch(err) {}
   }
+}
+
+function handleSyncTransaction(data) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let txSheet = spreadsheet.getSheetByName("Transactions");
+  const txHeaders = ["Transaction ID", "Date", "Type", "Category", "Amount", "Description", "Slip URL", "Booking ID", "Timestamp"];
+  if (!txSheet) {
+    txSheet = spreadsheet.insertSheet("Transactions");
+    txSheet.getRange(1, 1, 1, txHeaders.length).setValues([txHeaders]);
+  }
+
+  const tx = data.transaction || data;
+  if (!tx || !tx.id) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Transaction ID is required." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const txId = String(tx.id).trim();
+  const dateStr = String(tx.date || tx.transaction_date || "").trim();
+  const typeStr = String(tx.type || "").trim();
+  const catStr = String(tx.category || "").trim();
+  const amtNum = Number(tx.amount) || 0;
+  const descStr = String(tx.description || "").trim();
+  const slipUrl = String(tx.slipUrl || tx.slip_url || "").trim();
+  const bookingId = String(tx.bookingId || tx.booking_id || "").trim();
+  const nowIso = new Date().toISOString();
+
+  const lastRow = txSheet.getLastRow();
+  let existingRow = -1;
+  if (lastRow > 1) {
+    const ids = txSheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) { return String(r[0]); });
+    const idx = ids.indexOf(txId);
+    if (idx !== -1) {
+      existingRow = idx + 2;
+    }
+  }
+
+  const rowValues = [txId, dateStr, typeStr, catStr, amtNum, descStr, slipUrl, bookingId, nowIso];
+  if (existingRow > 0) {
+    txSheet.getRange(existingRow, 1, 1, txHeaders.length).setValues([rowValues]);
+  } else {
+    txSheet.appendRow(rowValues);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction synced.", id: txId }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleDeleteTransaction(data) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let txSheet = spreadsheet.getSheetByName("Transactions");
+  if (!txSheet) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "No Transactions sheet found." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const txId = String(data.id || "").trim();
+  if (!txId) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Transaction ID is required for deletion." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const lastRow = txSheet.getLastRow();
+  if (lastRow > 1) {
+    const ids = txSheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) { return String(r[0]); });
+    const idx = ids.indexOf(txId);
+    if (idx !== -1) {
+      txSheet.deleteRow(idx + 2);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction deleted from sheet.", id: txId }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction not found in sheet (already removed).", id: txId }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function handleUpdateNotes(data) {
@@ -1190,7 +1641,8 @@ function handleBackup(data) {
     const headers = [
       "Booking ID", "Date", "Time Slot", "Customer Name", "Phone", 
       "Email", "Court", "Require Coach", "Fee", "Invoice No", 
-      "Receipt No", "Slip URL", "LINE User ID", "LINE ID Input", "Customer Notes", "Admin Notes", "Calendar Event ID", "Created At"
+      "Receipt No", "Slip URL", "LINE User ID", "LINE ID Input", "Customer Notes", "Admin Notes", "Calendar Event ID", "Created At",
+      "Bank", "Sender Name", "Slip Amount", "Ref No", "Transfer Time", "Slip Status"
     ];
     tempBookingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     
@@ -1215,7 +1667,13 @@ function handleBackup(data) {
         item.customerNotes || "",
         item.adminNotes || "",
         item.calendarEventId || "",
-        item.createdAt || nowIso
+        item.createdAt || nowIso,
+        item.bank || "",
+        item.senderName || "",
+        item.slipAmount || 0,
+        item.refNo || "",
+        item.transferTime || "",
+        item.slipStatus || ""
       ]);
     });
     tempBookingSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
@@ -1230,42 +1688,7 @@ function handleBackup(data) {
       try { spreadsheet.deleteSheet(originalBookingSheet); } catch (delErr) {}
     }
     
-    // Also backup Transactions if provided
-    let txCount = 0;
-    if (data.transactions && Array.isArray(data.transactions)) {
-      let originalTxSheet = spreadsheet.getSheetByName("Transactions");
-      const tempTxSheetName = "Transactions_Temp_" + Date.now();
-      const tempTxSheet = spreadsheet.insertSheet(tempTxSheetName);
-      const txHeaders = ["Transaction ID", "Date", "Type", "Category", "Amount", "Description", "Booking ID", "Timestamp"];
-      tempTxSheet.getRange(1, 1, 1, txHeaders.length).setValues([txHeaders]);
-      if (data.transactions.length > 0) {
-        const txRows = data.transactions.map(function(t) {
-          return [
-            String(t.id || ""),
-            String(t.date || t.transaction_date || ""),
-            String(t.type || ""),
-            String(t.category || ""),
-            Number(t.amount) || 0,
-            String(t.description || ""),
-            String(t.bookingId || t.booking_id || ""),
-            new Date().toISOString()
-          ];
-        });
-        tempTxSheet.getRange(2, 1, txRows.length, txHeaders.length).setValues(txRows);
-        txCount = txRows.length;
-      }
-      if (originalTxSheet) {
-        try { spreadsheet.deleteSheet(originalTxSheet); } catch(delErr) {}
-      }
-      tempTxSheet.setName("Transactions");
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({ 
-      status: "success", 
-      message: "Backup completed.", 
-      totalRows: backupData.length,
-      totalTransactions: txCount 
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Backup completed.", totalRows: backupData.length })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
     try {
@@ -1283,7 +1706,7 @@ function handleBackup(data) {
 function handleSyncTransaction(data) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let txSheet = spreadsheet.getSheetByName("Transactions");
-  const txHeaders = ["Transaction ID", "Date", "Type", "Category", "Amount", "Description", "Booking ID", "Timestamp"];
+  const txHeaders = ["Transaction ID", "Date", "Type", "Category", "Amount", "Description", "Slip URL", "Booking ID", "Timestamp"];
   if (!txSheet) {
     txSheet = spreadsheet.insertSheet("Transactions");
     txSheet.getRange(1, 1, 1, txHeaders.length).setValues([txHeaders]);
@@ -1301,6 +1724,7 @@ function handleSyncTransaction(data) {
   const catStr = String(tx.category || "").trim();
   const amtNum = Number(tx.amount) || 0;
   const descStr = String(tx.description || "").trim();
+  const slipUrl = String(tx.slipUrl || tx.slip_url || "").trim();
   const bookingId = String(tx.bookingId || tx.booking_id || "").trim();
   const nowIso = new Date().toISOString();
 
@@ -1314,7 +1738,7 @@ function handleSyncTransaction(data) {
     }
   }
 
-  const rowValues = [txId, dateStr, typeStr, catStr, amtNum, descStr, bookingId, nowIso];
+  const rowValues = [txId, dateStr, typeStr, catStr, amtNum, descStr, slipUrl, bookingId, nowIso];
   if (existingRow > 0) {
     txSheet.getRange(existingRow, 1, 1, txHeaders.length).setValues([rowValues]);
   } else {
@@ -1488,9 +1912,8 @@ function checkRateLimit(data) {
   cache.put(cacheKey, (currentCount + 1).toString(), 60);
   return null;
 }
-
 // ========================================================
-// 🎾 SMART AI CHATBOT ENGINE (LINE + GEMINI AI + FAQ SHEET)
+// 🎾 SMART AI CHATBOT ENGINE (LINE + GEMINI AI + FAQ SHEET + NO_REPLY)
 // ========================================================
 
 /**
@@ -1513,14 +1936,16 @@ function handleLineAiWebhook(data) {
           continue;
         }
 
-        // 1. อ่านข้อมูลคู่มือสนามจากแท็บ "FAQ"
+        // 1. อ่านข้อมูลคู่มือสนาม (ข้อความ + ลิงก์รูป + ลิงก์ PDF) จากแท็บ "FAQ"
         const faqKnowledge = getFaqKnowledge();
         
         // 2. ให้ Gemini AI ประมวลผลคำตอบ
         const aiReply = askGeminiAi(userMessage, faqKnowledge);
         
-        // 3. ส่งคำตอบกลับไปหาลูกค้าใน LINE ผ่าน replyToken
-        replyLineMessage(replyToken, aiReply);
+        // 3. ถ้าไม่ใช่คำถาม AI จะคืนค่าว่างกลับมา -> บอทจะไม่ส่งข้อความกวนใจคนคุยกัน
+        if (aiReply && aiReply.trim() !== "") {
+          replyLineMessage(replyToken, aiReply);
+        }
       }
     }
     
@@ -1534,7 +1959,7 @@ function handleLineAiWebhook(data) {
 }
 
 /**
- * ดึงข้อมูลความรู้ทั้งหมดจากแท็บ FAQ
+ * ดึงข้อมูลความรู้ทั้งหมดจากแท็บ FAQ (รองรับ 4 คอลัมน์: A=คำถาม, B=คำตอบ, C=รูปภาพ, D=PDF)
  */
 function getFaqKnowledge() {
   try {
@@ -1543,17 +1968,22 @@ function getFaqKnowledge() {
     if (!sheet) return "";
     
     const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
     if (lastRow < 1) return "";
     
-    const data = sheet.getRange(1, 1, lastRow, Math.max(lastCol, 2)).getValues();
+    const data = sheet.getRange(1, 1, lastRow, Math.max(sheet.getLastColumn(), 4)).getValues();
     let knowledge = "";
     
     for (let r = 0; r < data.length; r++) {
       const colA = String(data[r][0] || "").trim();
       const colB = String(data[r][1] || "").trim();
+      const colC = String(data[r][2] || "").trim();
+      const colD = String(data[r][3] || "").trim();
+      
       if (colA || colB) {
-        knowledge += "- " + colA + ": " + colB + "\n";
+        knowledge += "- หัวข้อ: " + colA + " | ข้อมูล: " + colB;
+        if (colC) knowledge += " | แนบรูป: " + colC;
+        if (colD) knowledge += " | แนบPDF: " + colD;
+        knowledge += "\n";
       }
     }
     return knowledge;
@@ -1564,29 +1994,42 @@ function getFaqKnowledge() {
 }
 
 /**
- * ส่งคำถามและคู่มือไปให้ Google Gemini AI ประมวลผล
+ * แปลงลิงก์ Google Drive ให้เป็น Direct Image Link ที่ LINE โหลดภาพขึ้น 100%
+ */
+function formatDriveImageUrl(url) {
+  if (!url) return "";
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return "https://lh3.googleusercontent.com/d/" + match[1];
+  }
+  return url;
+}
+
+/**
+ * ส่งคำถามและคู่มือไปให้ Google Gemini AI ประมวลผล (กรองตอบเฉพาะที่เป็นคำถามจริง)
  */
 function askGeminiAi(userMessage, faqKnowledge) {
   const apiKey = getCleanScriptProperty("GEMINI_API_KEY");
   if (!apiKey) {
-    return "สวัสดีครับ 🎾 ขณะนี้ระบบ AI กำลังเตรียมความพร้อม หากมีเรื่องด่วนสามารถโทรติดต่อคุณณฐกรได้ที่ 089-4932242 ครับ";
+    return "";
   }
 
-  // ใช้โมเดล Gemini 1.5 Flash รวดเร็ว แม่นยำ และมี Free Tier จาก Google AI Studio
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
-
   const systemInstruction = 
-    "คุณคือ AI แอดมินผู้ช่วยของสนามเทนนิส 'The Grand Slam Tennis Court'\n" +
-    "หน้าที่ของคุณคือตอบคำถามลูกค้าเกี่ยวกับสนามเทนนิสอย่างสุภาพ เป็นกันเอง อบอุ่น และใส่ใจ ใช้ภาษาไทยที่กระชับ ชัดเจน มีอิโมจิเทนนิส 🎾\n" +
-    "ให้ตอบคำถามโดยอ้างอิงจากข้อมูลคู่มือสนาม (FAQ) ด้านล่างนี้เป็นหลัก:\n" +
+    "คุณคือ 'น้องสแลมมี่' AI เลขา(ผู้หญิง)ผู้ช่วยของคุณบาส แห่งสนามเทนนิส 'The Grand Slam'\n" +
+    "หน้าที่สำคัญที่สุดของคุณคือ: 'ตอบเฉพาะข้อความที่เป็นคำถามเท่านั้น โดยตอบให้ชัดเจนครอบคลุมภายในคำตอบเดียวให้ลูกค้าเข้าใจไม่ต้องถามเรื่องเดิมเพิ่ม หรือต้องการข้อมูลเกี่ยวกับสนามเทนนิสเท่านั้น'\n\n" +
+    "⚠️ กฎเหล็กในการแยกแยะข้อความ:\n" +
+    "1. หากข้อความ 'ไม่ใช่คำถาม' (เช่น คุยเล่น, ตอบรับสั้นๆ, ทักทายคนในแชท, รายงานดินฟ้าอากาศ, พูดคุยกับแอดมิน เช่น 'ตกล่ะ', 'ขาวมาเลย', 'ใช่พี่', 'ของคุณ joy ยก นะพี่', 'โอเค', '555', 'ครับ', 'อ่า', 'ได้เลย' และคำพูดอื่นๆที่ลูกค้าพูดเฉยๆไม่ใช่คำถาม หรือพิมพ์เรื่องเดิมซ้ำจากคำถามก่อนหน้าไม่ต้องตอบซ้ำ'):\n" +
+    "   -> ให้ตอบคำว่า '[NO_REPLY]' เพียงคำเดียวเท่านั้น ห้ามตอบข้อความอื่นเด็ดขาด!\n" +
+    "2. หากเป็นคำถามเกี่ยวกับสนามเทนนิส (เช่น ถามราคา, เวลาเปิดปิด, คอร์สเรียน, ขอแผนที่, คิวว่าง, ขอเลื่อนการจอง):\n" +
+    "   -> ให้ตอบคำถามโดยอ้างอิงจากคู่มือ FAQ ด้านล่างนี้เป็นหลัก:\n" +
     (faqKnowledge || "ไม่มีข้อมูลในคู่มือ") + "\n\n" +
-    "กฎเหล็กในการตอบ:\n" +
-    "1. ตอบเฉพาะข้อมูลที่มีในคู่มือเท่านั้น ห้ามแต่งข้อมูลขึ้นมาเองเด็ดขาด\n" +
-    "2. หากลูกค้าถามเรื่องที่ไม่มีในคู่มือ หรือเป็นเคสเฉพาะเจาะจง ให้ตอบอย่างสุภาพว่า 'ในส่วนนี้ขออนุญาตส่งต่อเรื่องให้แอดมินตรวจสอบข้อมูลก่อนนะครับ เดี๋ยวแอดมินจะรีบติดต่อกลับครับ'\n" +
-    "3. รักษาความยาวของคำตอบให้กระชับ อ่านง่ายบนหน้าจอมือถือ (ประมาณ 2-4 บรรทัด)";
+    "3. หากเป็นคำถามเกี่ยวกับสนามที่ไม่มีในคู่มือ FAQ: ให้ตอบอย่างสุภาพว่า 'ในส่วนนี้ขออนุญาตส่งต่อเรื่องให้แอดมินตรวจสอบข้อมูลก่อนนะครับ เดี๋ยวแอดมินจะรีบติดต่อกลับครับ'\n" +
+    "4. หากข้อมูลในคู่มือมี 'แนบรูป:' หรือ 'แนบPDF:' ที่ตรงกับคำถาม ให้ใส่แท็ก [IMAGE: ลิงก์รูป] หรือ [PDF: ลิงก์PDF] ต่อท้ายคำตอบ\n" +
+    "5. รักษาความยาวของคำตอบให้กระชับ ครบถ้วน อ่านง่ายบนหน้าจอมือถือ และถ้าเห็นว่าคำถามใกล้เคียงกับของเดิมไม่ต้องตอบรอให้แอดมินมาตอบเอง\n" +
+    "6. ทุกข้อความที่ตอบ (ยกเว้น [NO_REPLY]) ให้ขึ้นบรรทัดใหม่แล้วลงท้ายด้วย: '\n\n(ตอบกลับอัตโนมัติโดยน้องสแลมมี่)' เสมอ";
 
   const payload = {
-    system_instruction: {
+    systemInstruction: {
       parts: [{ text: systemInstruction }]
     },
     contents: [
@@ -1596,46 +2039,120 @@ function askGeminiAi(userMessage, faqKnowledge) {
       }
     ],
     generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 500
+      temperature: 0.2, // ลดความฟุ้งซ่านเพื่อให้แยกแยะคำถามได้แม่นยำ
+      maxOutputTokens: 1000
     }
   };
 
-  try {
-    const response = UrlFetchApp.fetch(url, {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
+  const models = [
+    "gemini-3.1-flash-lite",
+    "gemini-3.6-flash"
+  ];
 
-    const resJson = JSON.parse(response.getContentText());
-    if (resJson.candidates && resJson.candidates.length > 0 && resJson.candidates[0].content) {
-      return resJson.candidates[0].content.parts[0].text.trim();
-    } else {
-      return "สวัสดีครับคุณลูกค้า 🎾 มีข้อสงสัยเรื่องการจองสนามหรือสอบถามเรื่องใด แจ้งแอดมินไว้ได้เลยนะครับ เดี๋ยวแอดมินรีบมาตอบครับ";
+  let lastError = "";
+
+  for (let m = 0; m < models.length; m++) {
+    const modelName = models[m];
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
+
+    try {
+      const response = UrlFetchApp.fetch(url, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+
+      const resCode = response.getResponseCode();
+      const resText = response.getContentText();
+
+      if (resCode === 200) {
+        const resJson = JSON.parse(resText);
+        if (resJson.candidates && resJson.candidates.length > 0 && resJson.candidates[0].content) {
+          let reply = resJson.candidates[0].content.parts[0].text.trim();
+          
+          // หาก AI ประเมินว่าไม่ใช่คำถาม ให้คืนค่าว่างเพื่อไม่ส่งข้อความหาลูกค้า
+          if (reply.includes("[NO_REPLY]")) {
+            return "";
+          }
+          
+          if (!reply.includes("น้องสแลมมี่")) {
+            reply += "\n\n(ตอบกลับอัตโนมัติโดยน้องสแลมมี่)";
+          }
+          return reply;
+        }
+      }
+
+      lastError = modelName + " (HTTP " + resCode + "): " + resText;
+      if (resCode === 503 || resCode === 429 || resCode === 404) {
+        continue;
+      } else {
+        break;
+      }
+    } catch (err) {
+      lastError = modelName + " Error: " + err.toString();
     }
-  } catch (err) {
-    logError("Gemini AI API Error", "askGeminiAi", err.toString(), "ERROR");
-    return "ขออภัยครับ ขณะนี้ระบบขัดข้องชั่วคราว รบกวนแจ้งคำถามทิ้งไว้ เดี๋ยวแอดมินจะรีบติดต่อกลับครับ 🎾";
   }
+
+  logError("Gemini AI All Models Failed", "askGeminiAi", lastError, "ERROR");
+  return ""; // ไม่ส่งข้อความรบกวนเมื่อเกิด error เพื่อไม่ให้ขัดจังหวะคนคุยกัน
 }
 
 /**
- * ส่งข้อความตอบกลับหาลูกค้าผ่าน LINE Reply API (ฟรี ไม่เสียโควต้าข้อความ)
+ * ส่งข้อความตอบกลับหาลูกค้าผ่าน LINE Reply API (รองรับทั้งข้อความ, รูปลอยในแชท, และลิงก์ PDF)
  */
 function replyLineMessage(replyToken, messageText) {
-  if (!LINE_CHANNEL_ACCESS_TOKEN || !replyToken) return;
+  if (!LINE_CHANNEL_ACCESS_TOKEN || !replyToken || !messageText || messageText.trim() === "") return;
+
+  const messages = [];
+
+  // 1. สกัดตรวจหาแท็กรูปภาพ [IMAGE: url]
+  let imageUrl = "";
+  const imgMatch = messageText.match(/\[IMAGE:\s*([^\s\]]+)\]/i);
+  if (imgMatch) {
+    imageUrl = formatDriveImageUrl(imgMatch[1].trim());
+    messageText = messageText.replace(imgMatch[0], "").trim();
+  }
+
+  // 2. สกัดตรวจหาแท็ก PDF [PDF: url]
+  let pdfUrl = "";
+  const pdfMatch = messageText.match(/\[PDF:\s*([^\s\]]+)\]/i);
+  if (pdfMatch) {
+    pdfUrl = pdfMatch[1].trim();
+    messageText = messageText.replace(pdfMatch[0], "").trim();
+  }
+
+  // บอลลูนที่ 1: ข้อความคำตอบของน้องสแลมมี่
+  if (messageText) {
+    messages.push({
+      type: "text",
+      text: messageText
+    });
+  }
+
+  // บอลลูนที่ 2: รูปลอยในแชท (ถ้าคำตอบนั้นมีรูป)
+  if (imageUrl) {
+    messages.push({
+      type: "image",
+      originalContentUrl: imageUrl,
+      previewImageUrl: imageUrl
+    });
+  }
+
+  // บอลลูนที่ 3: ไฟล์ PDF (ถ้าคำตอบนั้นมีเอกสาร PDF)
+  if (pdfUrl) {
+    messages.push({
+      type: "text",
+      text: "📄 เอกสารแนบ (แตะเพื่อเปิดดูหรือดาวน์โหลดได้เลยครับ):\n" + pdfUrl
+    });
+  }
+
+  if (messages.length === 0) return;
 
   const url = "https://api.line.me/v2/bot/message/reply";
   const payload = {
     replyToken: replyToken,
-    messages: [
-      {
-        type: "text",
-        text: messageText
-      }
-    ]
+    messages: messages
   };
 
   try {
