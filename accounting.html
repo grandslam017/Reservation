@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบบัญชีและการเงิน | Tennis Court Booking</title>
+  <title>ระบบบัญชี การเงิน และเอกสารธุรกิจ | The Grand Slam Services Co., Ltd.</title>
   
   <!-- FontAwesome & Google Fonts -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Core Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
   
   <style>
     body {
@@ -26,11 +26,11 @@
     
     .accounting-grid {
       display: grid;
-      grid-template-columns: 260px 1fr;
+      grid-template-columns: 280px 1fr;
       min-height: 100vh;
     }
     
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       .accounting-grid {
         grid-template-columns: 1fr;
       }
@@ -41,35 +41,35 @@
     
     /* Sidebar */
     .sidebar {
-      background: rgba(15, 23, 42, 0.45);
-      backdrop-filter: blur(12px);
-      border-right: 1px solid rgba(255, 255, 255, 0.05);
-      padding: 2rem 1.5rem;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(14px);
+      border-right: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 1.75rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 1.5rem;
     }
     
     .sidebar-title {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       font-weight: 700;
       color: var(--accent-color);
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.65rem;
       padding-bottom: 1rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     
     .sidebar-menu {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.35rem;
       flex-grow: 1;
     }
     
     .menu-item {
-      padding: 0.85rem 1rem;
+      padding: 0.75rem 0.9rem;
       border-radius: 8px;
       color: var(--text-secondary);
       cursor: pointer;
@@ -77,6 +77,7 @@
       align-items: center;
       gap: 0.75rem;
       font-weight: 500;
+      font-size: 0.92rem;
       transition: all 0.2s;
       border: none;
       background: transparent;
@@ -92,8 +93,9 @@
     .menu-item.active {
       border-left: 4px solid var(--accent-color);
       border-radius: 0 8px 8px 0;
-      background: rgba(163, 230, 53, 0.06);
+      background: rgba(163, 230, 53, 0.08);
       color: var(--accent-color);
+      font-weight: 600;
     }
     
     /* Main Content */
@@ -106,20 +108,20 @@
     /* KPI Cards */
     .kpi-container {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
     
     .kpi-card {
-      background: rgba(15, 23, 42, 0.35);
+      background: rgba(15, 23, 42, 0.45);
       backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 1.25rem 1.5rem;
       border-radius: 12px;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.4rem;
       position: relative;
       overflow: hidden;
     }
@@ -137,18 +139,26 @@
     .kpi-card.income::before { background: #10b981; }
     .kpi-card.expense::before { background: #ef4444; }
     .kpi-card.profit::before { background: var(--accent-color); }
+    .kpi-card.cash::before { background: #3b82f6; }
+    .kpi-card.debt::before { background: #f59e0b; }
+    .kpi-card.tax::before { background: #ec4899; }
     
     .kpi-title {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     
     .kpi-value {
-      font-size: 1.8rem;
+      font-size: 1.65rem;
       font-weight: 700;
       color: #fff;
+    }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
     }
     
     /* Charts Container */
@@ -173,15 +183,17 @@
     }
     
     .acc-table th, .acc-table td {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
       text-align: left;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.92rem;
     }
     
     .acc-table th {
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(255, 255, 255, 0.03);
       color: var(--text-secondary);
       font-weight: 600;
+      letter-spacing: 0.02em;
     }
     
     .acc-table td {
@@ -189,7 +201,7 @@
     }
     
     .acc-table tr:hover {
-      background: rgba(255, 255, 255, 0.01);
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .form-row {
@@ -198,35 +210,147 @@
       gap: 1rem;
       margin-bottom: 1rem;
     }
-    
+
+    .badge-code {
+      font-family: monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      font-size: 0.8rem;
+    }
+
+    /* Document Studio Styles */
+    .doc-studio-grid {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1200px) {
+      .doc-studio-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .doc-type-btn {
+      padding: 0.55rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: #cbd5e1;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .doc-type-btn:hover, .doc-type-btn.active {
+      background: rgba(163, 230, 53, 0.15);
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+      font-weight: 600;
+    }
+
+    /* A4 Document Printable Sheet */
+    .doc-sheet-wrapper {
+      background: #334155;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      overflow-x: auto;
+    }
+
+    .doc-sheet {
+      background: #ffffff;
+      color: #0f172a;
+      width: 100%;
+      max-width: 794px; /* A4 width standard at 96dpi */
+      min-height: 1123px; /* A4 height */
+      margin: 0 auto;
+      padding: 2.5rem 2.8rem;
+      box-sizing: border-box;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13.5px;
+      line-height: 1.45;
+      position: relative;
+    }
+
+    .doc-sheet h1, .doc-sheet h2, .doc-sheet h3, .doc-sheet h4 {
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .doc-sheet table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    .doc-sheet th {
+      background: #f1f5f9;
+      color: #1e293b;
+      border-top: 1px solid #cbd5e1;
+      border-bottom: 2px solid #94a3b8;
+      padding: 8px 10px;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .doc-sheet td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #1e293b;
+    }
+
+    .doc-box-border {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: #f8fafc;
+    }
+
     /* Print Styles */
     @media print {
       body {
-        background: #fff !important;
-        color: #000 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+        margin: 0 !important;
       }
-      .sidebar, .nav-buttons, button, form, .no-print, .modal-overlay, .panel-header button {
+      .sidebar, .nav-buttons, button, form, .no-print, .modal-overlay, #accounting-login-gate, .doc-editor-col, #viewTitle, #currentPeriodLabel {
         display: none !important;
       }
       .accounting-grid {
+        display: block !important;
         grid-template-columns: 1fr !important;
       }
       .main-content {
         padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        max-height: none !important;
       }
-      .glass-panel {
+      .doc-studio-grid {
+        display: block !important;
+      }
+      .doc-sheet-wrapper {
         background: transparent !important;
-        border: none !important;
+        padding: 0 !important;
         box-shadow: none !important;
       }
-      .acc-table th {
-        background: #f3f4f6 !important;
-        color: #000 !important;
-        border-bottom: 2px solid #000 !important;
-      }
-      .acc-table td {
-        border-bottom: 1px solid #e5e7eb !important;
-        color: #000 !important;
+      .doc-sheet {
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0.5cm 1cm !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: auto !important;
       }
     }
   </style>
@@ -237,11 +361,12 @@
   <!-- VIEW: Admin Password Login Gate -->
   <!-- ========================================== -->
   <main id="accounting-login-gate" class="view" style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem;">
-    <div class="glass-panel admin-gate" style="max-width: 400px; width: 100%;">
+    <div class="glass-panel admin-gate" style="max-width: 420px; width: 100%;">
       <div style="text-align: center; margin-bottom: 2rem;">
         <i class="fa-solid fa-vault" style="font-size: 3rem; color: var(--accent-color); margin-bottom: 1rem;"></i>
-        <h2 style="font-weight: 700;">ระบบบัญชีการเงิน (Accounting)</h2>
-        <p class="text-secondary" style="font-size: 0.9rem; margin-top: 0.25rem;">เฉพาะผู้บริหารและผู้ดูแลระบบเท่านั้น</p>
+        <h2 style="font-weight: 700; margin-bottom: 0.25rem;">ระบบบัญชีการเงิน & เอกสารธุรกิจ</h2>
+        <p style="color: var(--accent-color); font-weight: 600; font-size: 0.95rem;">The Grand Slam Services Co., Ltd.</p>
+        <p class="text-secondary" style="font-size: 0.85rem; margin-top: 0.25rem;">เฉพาะผู้บริหารและผู้ดูแลระบบเท่านั้น</p>
       </div>
       
       <form id="formAccLogin" onsubmit="handleAccLogin(event)">
@@ -263,26 +388,38 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-title">
-        <i class="fa-solid fa-sack-dollar"></i>
-        <span>ระบบบัญชีสนาม</span>
+        <i class="fa-solid fa-scale-unbalanced-flip"></i>
+        <div>
+          <div style="font-size: 1rem; color: #fff;">ระบบบัญชีและภาษี</div>
+          <div style="font-size: 0.72rem; color: var(--accent-color); font-weight: normal;">Grand Slam Services Co., Ltd.</div>
+        </div>
       </div>
       <nav class="sidebar-menu">
         <button class="menu-item active" onclick="switchTab('dashboard')">
-          <i class="fa-solid fa-chart-line"></i> ภาพรวมแดชบอร์ด
+          <i class="fa-solid fa-chart-line"></i> 1. ภาพรวมแดชบอร์ด
         </button>
         <button class="menu-item" onclick="switchTab('pnl')">
-          <i class="fa-solid fa-file-invoice-dollar"></i> งบกำไรขาดทุน
+          <i class="fa-solid fa-file-invoice-dollar"></i> 2. งบกำไรขาดทุน (P&L)
         </button>
         <button class="menu-item" onclick="switchTab('balance')">
-          <i class="fa-solid fa-scale-balanced"></i> งบดุลการเงิน
+          <i class="fa-solid fa-scale-balanced"></i> 3. งบดุลการเงิน (Balance)
+        </button>
+        <button class="menu-item" onclick="switchTab('cashflow')">
+          <i class="fa-solid fa-money-bill-transfer"></i> 4. งบกระแสเงินสด (Cash Flow)
+        </button>
+        <button class="menu-item" onclick="switchTab('tax')">
+          <i class="fa-solid fa-landmark"></i> 5. ภาษี & ประกันสังคม (Tax)
+        </button>
+        <button class="menu-item" onclick="switchTab('documents')">
+          <i class="fa-solid fa-file-signature" style="color: var(--accent-color);"></i> 6. ออกเอกสารธุรกิจ (Docs)
         </button>
         <button class="menu-item" onclick="switchTab('ledger')">
-          <i class="fa-solid fa-book"></i> สมุดแยกประเภท (Ledger)
+          <i class="fa-solid fa-book-journal-whills"></i> 7. สมุดแยกประเภท (Ledger)
         </button>
       </nav>
       <div class="no-print">
         <a href="index.html" class="menu-item" style="color: var(--text-secondary); text-decoration: none;">
-          <i class="fa-solid fa-circle-arrow-left"></i> กลับหน้าจองหลัก
+          <i class="fa-solid fa-circle-arrow-left"></i> กลับหน้าจองสนามหลัก
         </a>
       </div>
     </aside>
@@ -290,20 +427,51 @@
     <!-- Main Content Area -->
     <section class="main-content">
       
-      <!-- HEADER BAR -->
+      <!-- HEADER BAR (Filters: Month & Year) -->
       <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
         <div>
-          <h1 id="viewTitle" style="font-weight: 700; margin: 0;">ภาพรวมแดชบอร์ดการเงิน</h1>
-          <p class="text-secondary" style="font-size: 0.9rem; margin-top: 0.25rem;">ข้อมูลบัญชีอ้างอิงจากฐานข้อมูล Supabase และ Google Sheets</p>
+          <h1 id="viewTitle" style="font-weight: 700; margin: 0; font-size: 1.75rem;">ภาพรวมแดชบอร์ดการเงิน</h1>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem;">
+            <span class="badge" style="background: rgba(163, 230, 53, 0.15); color: var(--accent-color); border: 1px solid var(--accent-color); font-size: 0.78rem;">
+              <i class="fa-solid fa-building"></i> บจก. เดอะ แกรนด์สแลม เซอร์วิสเซส
+            </span>
+            <span id="currentPeriodLabel" style="font-size: 0.88rem; color: #94a3b8;">
+              ข้อมูลประจำปี 2026 (พ.ศ. 2569)
+            </span>
+          </div>
         </div>
-        <div style="display: flex; gap: 0.75rem; align-items: center;">
-          <select id="accYearFilter" class="form-control" style="width: 120px; padding: 0.5rem;" onchange="loadFinancialData()">
-            <option value="2026">2026 (พ.ศ. 2569)</option>
-            <option value="2027">2027 (พ.ศ. 2570)</option>
+
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+          <!-- Filter: Month -->
+          <select id="accMonthFilter" class="form-control" style="width: 145px; padding: 0.5rem;" onchange="loadFinancialData()">
+            <option value="all">📅 ทุกเดือน (ทั้งปี)</option>
+            <option value="1">มกราคม (ม.ค.)</option>
+            <option value="2">กุมภาพันธ์ (ก.พ.)</option>
+            <option value="3">มีนาคม (มี.ค.)</option>
+            <option value="4">เมษายน (เม.ย.)</option>
+            <option value="5">พฤษภาคม (พ.ค.)</option>
+            <option value="6">มิถุนายน (มิ.ย.)</option>
+            <option value="7">กรกฎาคม (ก.ค.)</option>
+            <option value="8">สิงหาคม (ส.ค.)</option>
+            <option value="9">กันยายน (ก.ย.)</option>
+            <option value="10">ตุลาคม (ต.ค.)</option>
+            <option value="11">พฤศจิกายน (พ.ย.)</option>
+            <option value="12">ธันวาคม (ธ.ค.)</option>
           </select>
-          <button class="btn-secondary" style="padding: 0.5rem 1rem;" onclick="openConfigModal()">
+
+          <!-- Filter: Year -->
+          <select id="accYearFilter" class="form-control" style="width: 130px; padding: 0.5rem;" onchange="loadFinancialData()">
+            <option value="2026">2026 (2569)</option>
+            <option value="2027">2027 (2570)</option>
+            <option value="2025">2025 (2568)</option>
+          </select>
+
+          <!-- Config Button -->
+          <button class="btn-secondary" style="padding: 0.5rem 0.85rem;" onclick="openConfigModal()">
             <i class="fa-solid fa-sliders"></i> ตั้งค่าข้อมูลพื้นฐาน
           </button>
+
+          <!-- Print Button -->
           <button class="btn-primary" style="padding: 0.5rem 1rem; background: var(--accent-color); color: #000; font-weight: 600; border: none;" onclick="window.print()">
             <i class="fa-solid fa-print"></i> พิมพ์รายงาน
           </button>
@@ -314,23 +482,37 @@
       <!-- TAB 1: OVERVIEW DASHBOARD -->
       <!-- ========================================== -->
       <div id="tab-dashboard" class="tab-content">
-        <!-- KPI Cards -->
+        <!-- KPI Cards Grid (6 Cards) -->
         <div class="kpi-container">
           <div class="kpi-card income">
-            <span class="kpi-title">รายรับรวม (Total Revenue)</span>
+            <span class="kpi-title">รายรับรวม (Revenue)</span>
             <div id="kpiRevenue" class="kpi-value">฿0.00</div>
+            <span class="kpi-sub">ค่าเช่าสนาม, สอนโค้ช, เครื่องดื่ม</span>
           </div>
           <div class="kpi-card expense">
-            <span class="kpi-title">รายจ่ายรวม (Total Expense)</span>
+            <span class="kpi-title">รายจ่ายรวม (Expense)</span>
             <div id="kpiExpense" class="kpi-value">฿0.00</div>
+            <span class="kpi-sub">ซ่อมบำรุง, น้ำ-ไฟ, ค่าสอน, เสื่อมราคา</span>
           </div>
           <div class="kpi-card profit">
             <span class="kpi-title">กำไรสุทธิ (Net Profit)</span>
             <div id="kpiProfit" class="kpi-value">฿0.00</div>
+            <span class="kpi-sub">ก่อนหักภาษีเงินได้นิติบุคคล</span>
           </div>
-          <div class="kpi-card">
-            <span class="kpi-title">ประมาณการภาษีประจำปี</span>
-            <div id="kpiTax" class="kpi-value" style="color: #f59e0b;">฿0.00</div>
+          <div class="kpi-card cash">
+            <span class="kpi-title">เงินสดและธนาคาร (Cash & Bank)</span>
+            <div id="kpiCash" class="kpi-value" style="color: #60a5fa;">฿0.00</div>
+            <span class="kpi-sub">ttb, SCB, พร้อมเพย์, เงินสด</span>
+          </div>
+          <div class="kpi-card debt">
+            <span class="kpi-title">เงินกู้และเงินกรรมการ (Loans)</span>
+            <div id="kpiLoans" class="kpi-value" style="color: #fbbf24;">฿0.00</div>
+            <span class="kpi-sub">เงินยืมกรรมการ + หนี้สินค้างจ่าย</span>
+          </div>
+          <div class="kpi-card tax">
+            <span class="kpi-title">ภาษีค้างจ่าย/นำส่ง (Taxes)</span>
+            <div id="kpiTaxTotal" class="kpi-value" style="color: #f472b6;">฿0.00</div>
+            <span class="kpi-sub">ภ.ง.ด.1/3/53 + ภ.พ.30 + ประกันสังคม</span>
           </div>
         </div>
 
@@ -338,7 +520,8 @@
         <div class="charts-grid">
           <div class="glass-panel" style="padding: 1.5rem;">
             <div class="panel-header" style="margin-bottom: 1rem;">
-              <div class="panel-title"><i class="fa-solid fa-chart-bar"></i> รายรับ - รายจ่าย รายเดือน</div>
+              <div class="panel-title"><i class="fa-solid fa-chart-bar"></i> แนวโน้มรายรับ - รายจ่าย</div>
+              <span id="chartSubLabel" class="text-secondary" style="font-size: 0.85rem;">เปรียบเทียบตามช่วงเวลา</span>
             </div>
             <div style="height: 320px; position: relative;">
               <canvas id="monthlyChart"></canvas>
@@ -346,7 +529,7 @@
           </div>
           <div class="glass-panel" style="padding: 1.5rem;">
             <div class="panel-header" style="margin-bottom: 1rem;">
-              <div class="panel-title"><i class="fa-solid fa-chart-pie"></i> สัดส่วนรายจ่ายแยกประเภท</div>
+              <div class="panel-title"><i class="fa-solid fa-chart-pie"></i> สัดส่วนค่าใช้จ่ายแยกประเภท</div>
             </div>
             <div style="height: 320px; position: relative; display: flex; align-items: center; justify-content: center;">
               <canvas id="expenseChart"></canvas>
@@ -356,88 +539,129 @@
       </div>
 
       <!-- ========================================== -->
-      <!-- TAB 2: PROFIT & LOSS STATEMENT -->
+      <!-- TAB 2: PROFIT & LOSS STATEMENT (P&L) -->
       <!-- ========================================== -->
       <div id="tab-pnl" class="tab-content" style="display: none;">
         <div class="glass-panel" style="padding: 2rem;">
           <div style="text-align: center; margin-bottom: 2rem;">
             <h2 style="font-weight: 700; margin: 0;">งบกำไรขาดทุน (Profit & Loss Statement)</h2>
-            <p class="text-secondary">สำหรับปีสิ้นสุดวันที่ 31 ธันวาคม ค.ศ. <span class="current-selected-year">2026</span></p>
+            <p style="color: var(--accent-color); font-weight: 600; margin: 0.25rem 0;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</p>
+            <p class="text-secondary" id="pnlPeriodSubtitle">สำหรับรอบระยะเวลาบัญชีสิ้นสุดวันที่ 31 ธันวาคม 2026</p>
           </div>
 
-          <table class="acc-table" style="max-width: 800px; margin: 0 auto;">
+          <table class="acc-table" style="max-width: 860px; margin: 0 auto;">
             <thead>
               <tr>
-                <th>รายการบัญชี (Account Description)</th>
-                <th style="text-align: right;">จำนวนเงิน (บาท)</th>
+                <th style="width: 15%;">รหัสบัญชี</th>
+                <th style="width: 55%;">รายการบัญชี (Account Description)</th>
+                <th style="width: 30%; text-align: right;">จำนวนเงิน (บาท)</th>
               </tr>
             </thead>
             <tbody>
               <!-- Revenue Section -->
-              <tr style="font-weight: 700; background: rgba(255,255,255,0.02);">
-                <td colspan="2">รายได้ (Revenues)</td>
+              <tr style="font-weight: 700; background: rgba(255,255,255,0.03);">
+                <td colspan="3"><i class="fa-solid fa-coins" style="color: #10b981; margin-right: 0.5rem;"></i> รายได้จากการขายและการให้บริการ (Revenues)</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">รายได้ค่าบริการเช่าสนาม (Court Rental Revenue)</td>
+                <td><span class="badge-code">4101</span></td>
+                <td>รายได้ค่าบริการเช่าสนามเทนนิส (Court Rental)</td>
                 <td id="pnlRentalRev" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">รายได้ค่าฝึกสอน / โค้ช (Coaching Session Revenue)</td>
+                <td><span class="badge-code">4102</span></td>
+                <td>รายได้ค่าบริการฝึกสอนเทนนิส / โค้ช (Coaching Session)</td>
                 <td id="pnlCoachRev" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">รายได้อื่น ๆ (Other Revenue)</td>
+                <td><span class="badge-code">4103</span></td>
+                <td>รายได้ขายสินค้า อุปกรณ์ และเครื่องดื่ม (Pro Shop & Beverage)</td>
+                <td id="pnlShopRev" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">4104</span></td>
+                <td>รายได้ค่าจัดอีเวนต์ / การแข่งขัน (Tournaments & Events)</td>
+                <td id="pnlEventRev" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">4105</span></td>
+                <td>รายได้อื่น ๆ (Other Income)</td>
                 <td id="pnlOtherRev" style="text-align: right;">฿0.00</td>
               </tr>
-              <tr style="font-weight: 700; border-bottom: 2px solid #fff;">
-                <td style="padding-left: 1rem;">รายได้รวมทั้งสิ้น (Total Revenue)</td>
-                <td id="pnlTotalRev" style="text-align: right; color: #10b981;">฿0.00</td>
+              <tr style="font-weight: 700; border-top: 1px solid rgba(255,255,255,0.2); border-bottom: 2px solid #10b981;">
+                <td colspan="2" style="padding-left: 1rem;">รายได้รวมทั้งสิ้น (Total Revenue)</td>
+                <td id="pnlTotalRev" style="text-align: right; color: #10b981; font-size: 1.05rem;">฿0.00</td>
               </tr>
 
               <!-- Expense Section -->
-              <tr style="font-weight: 700; background: rgba(255,255,255,0.02); margin-top: 1rem;">
-                <td colspan="2">ค่าใช้จ่ายในการดำเนินงาน (Operating Expenses)</td>
+              <tr style="font-weight: 700; background: rgba(255,255,255,0.03);">
+                <td colspan="3" style="padding-top: 1.5rem;"><i class="fa-solid fa-receipt" style="color: #ef4444; margin-right: 0.5rem;"></i> ค่าใช้จ่ายในการดำเนินงาน (Operating Expenses)</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าใช้จ่ายในการบำรุงรักษาสนาม (Maintenance Costs)</td>
+                <td><span class="badge-code">5101</span></td>
+                <td>ค่าใช้จ่ายในการบำรุงรักษาพื้นสนามและสิ่งอำนวยความสะดวก (Maintenance)</td>
                 <td id="pnlMaintenanceExp" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าสาธารณูปโภค (ค่าน้ำ-ค่าไฟ) (Utility Costs)</td>
+                <td><span class="badge-code">5102</span></td>
+                <td>ค่าสาธารณูปโภค (ค่าน้ำ-ค่าไฟ-อินเทอร์เน็ต) (Utilities)</td>
                 <td id="pnlUtilityExp" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าสอน/ผลตอบแทนโค้ช (Coaching Compensation)</td>
+                <td><span class="badge-code">5103</span></td>
+                <td>ค่าตอบแทนผู้ฝึกสอน / โค้ช (Coach Compensation)</td>
                 <td id="pnlCompensationExp" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าอุปกรณ์และลูกเทนนิส (Equipment & Supplies)</td>
+                <td><span class="badge-code">5104</span></td>
+                <td>เงินเดือนและค่าจ้างพนักงานดูแลสนาม (Staff Salaries & Wages)</td>
+                <td id="pnlSalaryExp" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">5105</span></td>
+                <td>เงินสมทบกองทุนประกันสังคมส่วนนายจ้าง 5% (Employer SSO)</td>
+                <td id="pnlSsoExp" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">5106</span></td>
+                <td>ค่าอุปกรณ์สนาม ลูกเทนนิส และตาข่าย (Equipment & Supplies)</td>
                 <td id="pnlSupplyExp" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าเสื่อมราคาสนามเทนนิสสะสมปีปัจจุบัน (Depreciation Expense)</td>
+                <td><span class="badge-code">5107</span></td>
+                <td>ค่าเสื่อมราคาสนามเทนนิสและระบบไฟ (Depreciation Expense)</td>
                 <td id="pnlDepreciationExp" style="text-align: right;">฿0.00</td>
               </tr>
               <tr>
-                <td style="padding-left: 2rem;">ค่าใช้จ่ายดำเนินงานอื่น ๆ (Other Expenses)</td>
+                <td><span class="badge-code">5108</span></td>
+                <td>ค่าธรรมเนียมธนาคารและระบบชำระเงิน (Bank & Transfer Fees)</td>
+                <td id="pnlBankFeeExp" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">5109</span></td>
+                <td>ค่าดอกเบี้ยเงินกู้ยืม (Loan Interest Expense)</td>
+                <td id="pnlInterestExp" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">5110</span></td>
+                <td>ค่าใช้จ่ายดำเนินงานอื่น ๆ / เบ็ดเตล็ด (Other Operating Expenses)</td>
                 <td id="pnlOtherExp" style="text-align: right;">฿0.00</td>
               </tr>
-              <tr style="font-weight: 700; border-bottom: 2px solid #fff;">
-                <td style="padding-left: 1rem;">ค่าใช้จ่ายรวมทั้งสิ้น (Total Expense)</td>
-                <td id="pnlTotalExp" style="text-align: right; color: #ef4444;">฿0.00</td>
+              <tr style="font-weight: 700; border-top: 1px solid rgba(255,255,255,0.2); border-bottom: 2px solid #ef4444;">
+                <td colspan="2" style="padding-left: 1rem;">ค่าใช้จ่ายรวมทั้งสิ้น (Total Expenses)</td>
+                <td id="pnlTotalExp" style="text-align: right; color: #ef4444; font-size: 1.05rem;">฿0.00</td>
               </tr>
 
-              <!-- Profit Section -->
-              <tr style="font-weight: 700; font-size: 1.1rem; background: rgba(163, 230, 53, 0.05);">
-                <td>กำไรสุทธิก่อนหักภาษี (Net Income Before Tax)</td>
+              <!-- Profit Calculation Section -->
+              <tr style="font-weight: 700; font-size: 1.05rem; background: rgba(163, 230, 53, 0.06);">
+                <td colspan="2">กำไรสุทธิก่อนหักภาษีเงินได้ (Net Profit Before Tax)</td>
                 <td id="pnlNetProfit" style="text-align: right; color: var(--accent-color);">฿0.00</td>
               </tr>
               <tr style="color: var(--text-secondary);">
-                <td style="padding-left: 1rem;">ประมาณการภาษีหักจ่ายค้างชำระ (Estimated Income Tax)</td>
+                <td colspan="2" style="padding-left: 2rem;">หัก: ประมาณการภาษีเงินได้นิติบุคคล (ภ.ง.ด.50 / SME Rate)</td>
                 <td id="pnlEstTax" style="text-align: right; color: #f59e0b;">-฿0.00</td>
               </tr>
-              <tr style="font-weight: 700; font-size: 1.2rem; border-bottom: 4px double var(--accent-color);">
-                <td>กำไรสะสมสุทธิหลังหักภาษี (Net Profit After Tax)</td>
+              <tr style="font-weight: 700; font-size: 1.18rem; border-top: 2px solid var(--accent-color); border-bottom: 4px double var(--accent-color); background: rgba(163, 230, 53, 0.1);">
+                <td colspan="2">กำไรสุทธิหลังหักภาษี (Net Profit After Tax)</td>
                 <td id="pnlNetProfitAfterTax" style="text-align: right; color: var(--accent-color);">฿0.00</td>
               </tr>
             </tbody>
@@ -446,50 +670,85 @@
       </div>
 
       <!-- ========================================== -->
-      <!-- TAB 3: BALANCE SHEET -->
+      <!-- TAB 3: BALANCE SHEET (งบดุล) -->
       <!-- ========================================== -->
       <div id="tab-balance" class="tab-content" style="display: none;">
         <div class="glass-panel" style="padding: 2rem;">
           <div style="text-align: center; margin-bottom: 2rem;">
             <h2 style="font-weight: 700; margin: 0;">งบดุล (Balance Sheet)</h2>
-            <p class="text-secondary">ข้อมูล ณ วันที่ 31 ธันวาคม ค.ศ. <span class="current-selected-year">2026</span></p>
+            <p style="color: var(--accent-color); font-weight: 600; margin: 0.25rem 0;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</p>
+            <p class="text-secondary" id="bsPeriodSubtitle">ข้อมูลสะสม ณ วันที่ 31 ธันวาคม 2026</p>
           </div>
 
           <!-- Alert warning for unbalanced sheet -->
           <div id="balanceWarningBox" class="no-print" style="display: none; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
             <i class="fa-solid fa-circle-exclamation" style="margin-right: 0.5rem;"></i>
-            <span><strong>คำเตือน:</strong> ยอดบัญชีสมดุลคลาดเคลื่อน (สินทรัพย์ ไม่เท่ากับ หนี้สิน + ส่วนของเจ้าของ) กรุณาตรวจสอบหรือตั้งค่าเงินทุนใหม่ในปุ่ม "ตั้งค่าข้อมูลพื้นฐาน"</span>
+            <span><strong>คำเตือน:</strong> ยอดบัญชีสมดุลคลาดเคลื่อน (สินทรัพย์ ไม่เท่ากับ หนี้สิน + ส่วนของเจ้าของ) กรุณาตรวจสอบการบันทึกหรือยอดทุนเริ่มต้นในปุ่ม "ตั้งค่าข้อมูลพื้นฐาน"</span>
           </div>
 
           <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-            <!-- Left Side: Assets -->
-            <div style="flex: 1; min-width: 320px;">
-              <h3 style="font-weight: 700; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.5rem; color: var(--accent-color);">
-                สินทรัพย์ (Assets)
+            <!-- Left Column: Assets (สินทรัพย์) -->
+            <div style="flex: 1; min-width: 330px;">
+              <h3 style="font-weight: 700; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.5rem; color: var(--accent-color); display: flex; justify-content: space-between;">
+                <span>สินทรัพย์ (Assets)</span>
+                <span id="bsTotalAssetsTop" style="color: #fff; font-size: 1rem;">฿0.00</span>
               </h3>
+              
               <table class="acc-table">
                 <tbody>
-                  <tr style="font-weight: 700;"><td colspan="2">สินทรัพย์หมุนเวียน (Current Assets)</td></tr>
+                  <tr style="font-weight: 700; background: rgba(255,255,255,0.02);"><td colspan="2">1. สินทรัพย์หมุนเวียน (Current Assets)</td></tr>
                   <tr>
-                    <td style="padding-left: 1.5rem;">เงินสดในมือ & เงินฝากธนาคาร (Cash & Bank)</td>
-                    <td id="bsCashVal" style="text-align: right;">฿0.00</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1101</span> เงินสดในมือ (Cash on Hand)</td>
+                    <td id="bsCashOnHand" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1102</span> เงินฝากธนาคาร ttb (รับโอนหลัก)</td>
+                    <td id="bsBankTtb" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1103</span> เงินฝากธนาคาร SCB & พร้อมเพย์</td>
+                    <td id="bsBankOther" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1105</span> ลูกหนี้การค้า (Accounts Receivable: AR)</td>
+                    <td id="bsArVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1106</span> ลูกหนี้เงินยืมกรรมการ (Loans to Director)</td>
+                    <td id="bsLoanToDirVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1107</span> ภาษีซื้อรอขอคืน (Input VAT)</td>
+                    <td id="bsInputVatVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1108</span> ภาษีถูกหัก ณ ที่จ่าย (Prepaid WHT)</td>
+                    <td id="bsPrepaidWhtVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr style="font-weight: 600; border-top: 1px solid rgba(255,255,255,0.1); color: #93c5fd;">
+                    <td style="padding-left: 1rem;">รวมสินทรัพย์หมุนเวียน (Total Current Assets)</td>
+                    <td id="bsTotalCurrentAssets" style="text-align: right;">฿0.00</td>
                   </tr>
                   
-                  <tr style="font-weight: 700;"><td colspan="2">สินทรัพย์ถาวร (Non-Current Assets)</td></tr>
+                  <tr style="font-weight: 700; background: rgba(255,255,255,0.02);"><td colspan="2" style="padding-top: 1.25rem;">2. สินทรัพย์ไม่หมุนเวียน (Non-Current Assets)</td></tr>
                   <tr>
-                    <td style="padding-left: 1.5rem;">มูลค่าโครงสร้าง/สนามเทนนิสสะสม (Tennis Court Cost)</td>
-                    <td id="bsAssetCostVal" style="text-align: right;">฿0.00</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1201</span> สนามเทนนิสและสิ่งปลูกสร้าง (Tennis Court)</td>
+                    <td id="bsCourtAssetVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1202</span> ระบบไฟฟ้า LED และอุปกรณ์สนาม (Court Equipment)</td>
+                    <td id="bsEquipAssetVal" style="text-align: right;">฿0.00</td>
                   </tr>
                   <tr style="color: var(--text-secondary);">
-                    <td style="padding-left: 1.5rem;">หัก: ค่าเสื่อมราคาสะสม (Less: Accumulated Depreciation)</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">1209</span> หัก: ค่าเสื่อมราคาสะสม (Less: Accumulated Depreciation)</td>
                     <td id="bsDepreciationAccumVal" style="text-align: right;">-฿0.00</td>
                   </tr>
-                  <tr style="font-weight: 600; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <td style="padding-left: 1.5rem;">สินทรัพย์ถาวรสุทธิ (Net Fixed Assets)</td>
+                  <tr style="font-weight: 600; border-top: 1px solid rgba(255,255,255,0.1); color: #93c5fd;">
+                    <td style="padding-left: 1rem;">รวมสินทรัพย์ถาวรสุทธิ (Net Fixed Assets)</td>
                     <td id="bsNetAssetVal" style="text-align: right;">฿0.00</td>
                   </tr>
                   
-                  <tr style="font-weight: 700; font-size: 1.1rem; border-top: 2px solid #fff; border-bottom: 4px double #fff;">
+                  <tr style="font-weight: 700; font-size: 1.1rem; border-top: 2px solid #fff; border-bottom: 4px double #fff; background: rgba(163, 230, 53, 0.08);">
                     <td>สินทรัพย์รวมทั้งสิ้น (Total Assets)</td>
                     <td id="bsTotalAssets" style="text-align: right; color: var(--accent-color);">฿0.00</td>
                   </tr>
@@ -497,31 +756,69 @@
               </table>
             </div>
 
-            <!-- Right Side: Liabilities & Equity -->
-            <div style="flex: 1; min-width: 320px;">
-              <h3 style="font-weight: 700; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.5rem; color: var(--accent-color);">
-                หนี้สินและส่วนของเจ้าของ (Liabilities & Equity)
+            <!-- Right Column: Liabilities & Equity (หนี้สินและส่วนของเจ้าของ) -->
+            <div style="flex: 1; min-width: 330px;">
+              <h3 style="font-weight: 700; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.5rem; color: var(--accent-color); display: flex; justify-content: space-between;">
+                <span>หนี้สินและส่วนของเจ้าของ (Liabilities & Equity)</span>
+                <span id="bsTotalLiabEquityTop" style="color: #fff; font-size: 1rem;">฿0.00</span>
               </h3>
+              
               <table class="acc-table">
                 <tbody>
-                  <tr style="font-weight: 700;"><td colspan="2">หนี้สิน (Liabilities)</td></tr>
+                  <tr style="font-weight: 700; background: rgba(255,255,255,0.02);"><td colspan="2">1. หนี้สินหมุนเวียน (Current Liabilities)</td></tr>
                   <tr>
-                    <td style="padding-left: 1.5rem;">เจ้าหนี้การค้า & หนี้สินหมุนเวียน (Current Liabilities)</td>
-                    <td id="bsLiabilitiesVal" style="text-align: right;">฿0.00</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2101</span> เจ้าหนี้การค้า (Accounts Payable: AP)</td>
+                    <td id="bsApVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2102</span> เจ้าหนี้เงินยืมกรรมการ (Loans from Director)</td>
+                    <td id="bsLoanFromDirVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2103</span> เงินกู้ยืมสถาบันการเงิน / ธนาคาร (Bank Loans)</td>
+                    <td id="bsBankLoanVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2104</span> ภาษีขายค้างส่ง ภ.พ.30 (Output VAT Payable)</td>
+                    <td id="bsOutputVatVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2105</span> ภาษีหัก ณ ที่จ่ายค้างส่ง (ภ.ง.ด.1, 3, 53)</td>
+                    <td id="bsWhtPayableVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2108</span> เงินสมทบประกันสังคมค้างส่ง (SSO Payable)</td>
+                    <td id="bsSsoPayableVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">2109</span> ภาษีเงินได้นิติบุคคลค้างจ่าย (Corporate Tax Payable)</td>
+                    <td id="bsCorpTaxPayableVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr style="font-weight: 600; border-top: 1px solid rgba(255,255,255,0.1); color: #fca5a5;">
+                    <td style="padding-left: 1rem;">รวมหนี้สินทั้งสิ้น (Total Liabilities)</td>
+                    <td id="bsTotalLiabilities" style="text-align: right;">฿0.00</td>
                   </tr>
                   
-                  <tr style="font-weight: 700;"><td colspan="2">ส่วนของเจ้าของ (Equity)</td></tr>
+                  <tr style="font-weight: 700; background: rgba(255,255,255,0.02);"><td colspan="2" style="padding-top: 1.25rem;">2. ส่วนของเจ้าของ (Equity)</td></tr>
                   <tr>
-                    <td style="padding-left: 1.5rem;">ทุนจดทะเบียน / ทุนเริ่มต้น (Paid-in Capital)</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">3101</span> ทุนจดทะเบียน / ทุนที่ชำระแล้ว (Paid-in Capital)</td>
                     <td id="bsCapitalVal" style="text-align: right;">฿0.00</td>
                   </tr>
                   <tr>
-                    <td style="padding-left: 1.5rem;">กำไรสะสมสุทธิ (Retained Earnings)</td>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">3102</span> กำไร(ขาดทุน)สะสมยกมาจากปีก่อน (Retained Earnings)</td>
                     <td id="bsRetainedEarningsVal" style="text-align: right;">฿0.00</td>
                   </tr>
+                  <tr>
+                    <td style="padding-left: 1.5rem;"><span class="badge-code">3103</span> กำไร(ขาดทุน)สุทธิประจำงวด (Net Income for Period)</td>
+                    <td id="bsPeriodProfitVal" style="text-align: right;">฿0.00</td>
+                  </tr>
+                  <tr style="font-weight: 600; border-top: 1px solid rgba(255,255,255,0.1); color: #86efac;">
+                    <td style="padding-left: 1rem;">รวมส่วนของเจ้าของ (Total Equity)</td>
+                    <td id="bsTotalEquity" style="text-align: right;">฿0.00</td>
+                  </tr>
                   
-                  <tr style="font-weight: 700; font-size: 1.1rem; border-top: 2px solid #fff; border-bottom: 4px double #fff;">
-                    <td>รวมหนี้สินและส่วนของเจ้าของ (Total Liabilities & Equity)</td>
+                  <tr style="font-weight: 700; font-size: 1.1rem; border-top: 2px solid #fff; border-bottom: 4px double #fff; background: rgba(163, 230, 53, 0.08);">
+                    <td>รวมหนี้สินและส่วนของเจ้าของ (Total Liab & Equity)</td>
                     <td id="bsTotalLiabilitiesEquity" style="text-align: right; color: var(--accent-color);">฿0.00</td>
                   </tr>
                 </tbody>
@@ -532,14 +829,443 @@
       </div>
 
       <!-- ========================================== -->
-      <!-- TAB 4: LEDGER & MANUAL LOG ENTRY -->
+      <!-- TAB 4: CASH FLOW STATEMENT (งบกระแสเงินสด) -->
+      <!-- ========================================== -->
+      <div id="tab-cashflow" class="tab-content" style="display: none;">
+        <div class="glass-panel" style="padding: 2rem;">
+          <div style="text-align: center; margin-bottom: 2rem;">
+            <h2 style="font-weight: 700; margin: 0;">งบกระแสเงินสด (Cash Flow Statement)</h2>
+            <p style="color: var(--accent-color); font-weight: 600; margin: 0.25rem 0;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</p>
+            <p class="text-secondary" id="cfPeriodSubtitle">สำหรับรอบระยะเวลาสิ้นสุด 31 ธันวาคม 2026</p>
+          </div>
+
+          <table class="acc-table" style="max-width: 860px; margin: 0 auto;">
+            <thead>
+              <tr>
+                <th style="width: 70%;">กิจกรรมกระแสเงินสด (Cash Flow Activities)</th>
+                <th style="width: 30%; text-align: right;">จำนวนเงิน (บาท)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Operating Activities -->
+              <tr style="font-weight: 700; background: rgba(255,255,255,0.03);">
+                <td colspan="2"><i class="fa-solid fa-briefcase" style="color: #38bdf8; margin-right: 0.5rem;"></i> 1. กระแสเงินสดจากกิจกรรมดำเนินงาน (Cash Flows from Operating Activities: CFO)</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(+) เงินสดรับจากค่าบริการเช่าสนามเทนนิส และค่าสอนโค้ช</td>
+                <td id="cfOperatingInflow" style="text-align: right; color: #10b981;">฿0.00</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(-) เงินสดจ่ายค่าใช้จ่ายในการดำเนินงาน (ค่าน้ำ-ค่าไฟ, ซ่อมบำรุง, อุปกรณ์)</td>
+                <td id="cfOperatingOutflow" style="text-align: right; color: #ef4444;">-฿0.00</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(-) เงินสดจ่ายเงินเดือนพนักงานและค่าตอบแทนโค้ช</td>
+                <td id="cfWageOutflow" style="text-align: right; color: #ef4444;">-฿0.00</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(-) เงินสดจ่ายภาษีและเงินสมทบประกันสังคม</td>
+                <td id="cfTaxOutflow" style="text-align: right; color: #ef4444;">-฿0.00</td>
+              </tr>
+              <tr style="font-weight: 700; border-top: 1px solid rgba(255,255,255,0.15); border-bottom: 2px solid #38bdf8;">
+                <td style="padding-left: 1rem;">กระแสเงินสดสุทธิจากกิจกรรมดำเนินงาน (Net CFO)</td>
+                <td id="cfNetOperating" style="text-align: right; font-size: 1.05rem;">฿0.00</td>
+              </tr>
+
+              <!-- Investing Activities -->
+              <tr style="font-weight: 700; background: rgba(255,255,255,0.03);">
+                <td colspan="2" style="padding-top: 1.5rem;"><i class="fa-solid fa-screwdriver-wrench" style="color: #f59e0b; margin-right: 0.5rem;"></i> 2. กระแสเงินสดจากกิจกรรมลงทุน (Cash Flows from Investing Activities: CFI)</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(-) เงินสดจ่ายเพื่อการสร้างสนาม ปรับปรุงคอร์ต และระบบไฟส่องสว่าง LED</td>
+                <td id="cfInvestingOutflow" style="text-align: right; color: #ef4444;">฿0.00</td>
+              </tr>
+              <tr style="font-weight: 700; border-top: 1px solid rgba(255,255,255,0.15); border-bottom: 2px solid #f59e0b;">
+                <td style="padding-left: 1rem;">กระแสเงินสดสุทธิจากกิจกรรมลงทุน (Net CFI)</td>
+                <td id="cfNetInvesting" style="text-align: right; font-size: 1.05rem;">฿0.00</td>
+              </tr>
+
+              <!-- Financing Activities -->
+              <tr style="font-weight: 700; background: rgba(255,255,255,0.03);">
+                <td colspan="2" style="padding-top: 1.5rem;"><i class="fa-solid fa-hand-holding-dollar" style="color: #a855f7; margin-right: 0.5rem;"></i> 3. กระแสเงินสดจากกิจกรรมจัดหาเงิน (Cash Flows from Financing Activities: CFF)</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(+/-) เงินกู้ยืมจากกรรมการ (รับเข้า / จ่ายคืน)</td>
+                <td id="cfDirectorLoanNet" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(+/-) เงินกู้ยืมจากสถาบันการเงิน / ธนาคาร</td>
+                <td id="cfBankLoanNet" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 1.5rem;">(+) เงินสดรับจากการเพิ่มทุนจดทะเบียน</td>
+                <td id="cfCapitalInflow" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr style="font-weight: 700; border-top: 1px solid rgba(255,255,255,0.15); border-bottom: 2px solid #a855f7;">
+                <td style="padding-left: 1rem;">กระแสเงินสดสุทธิจากกิจกรรมจัดหาเงิน (Net CFF)</td>
+                <td id="cfNetFinancing" style="text-align: right; font-size: 1.05rem;">฿0.00</td>
+              </tr>
+
+              <!-- Net Cash Flow Summary -->
+              <tr style="font-weight: 700; font-size: 1.05rem; background: rgba(163, 230, 53, 0.05); border-top: 2px solid #fff;">
+                <td>กระแสเงินสดสุทธิเพิ่มขึ้น (ลดลง) ประจำงวด</td>
+                <td id="cfNetCashChange" style="text-align: right; color: var(--accent-color);">฿0.00</td>
+              </tr>
+              <tr style="color: var(--text-secondary);">
+                <td style="padding-left: 1.5rem;">บวก: เงินสดและเงินฝากธนาคารต้นงวด</td>
+                <td id="cfBeginningCash" style="text-align: right;">฿0.00</td>
+              </tr>
+              <tr style="font-weight: 700; font-size: 1.2rem; border-top: 2px solid var(--accent-color); border-bottom: 4px double var(--accent-color); background: rgba(163, 230, 53, 0.12);">
+                <td>เงินสดและเงินฝากธนาคารคงเหลือปลายงวด</td>
+                <td id="cfEndingCash" style="text-align: right; color: var(--accent-color);">฿0.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 5: TAX & SOCIAL SECURITY (ระบบภาษีและประกันสังคม) -->
+      <!-- ========================================== -->
+      <div id="tab-tax" class="tab-content" style="display: none;">
+        <div class="glass-panel" style="padding: 2rem;">
+          <div style="text-align: center; margin-bottom: 2rem;">
+            <h2 style="font-weight: 700; margin: 0;">ระบบบัญชีภาษีและประกันสังคม (Tax & Compliance)</h2>
+            <p style="color: var(--accent-color); font-weight: 600; margin: 0.25rem 0;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด (เลขประจำตัวผู้เสียภาษี: 0105569192114)</p>
+            <p class="text-secondary" id="taxPeriodSubtitle">สรุปยอดภาษีที่ต้องนำส่งสรรพากรและสำนักงานประกันสังคม</p>
+          </div>
+
+          <!-- Tax Monthly Summary Cards Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <!-- ภ.ง.ด.1 -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid #38bdf8;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: #38bdf8;">ภ.ง.ด.1</span>
+                <span class="badge" style="background: rgba(56,189,248,0.1); color: #38bdf8; font-size: 0.75rem;">ยื่นทุกวันที่ 7-15</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">ภาษีหัก ณ ที่จ่ายเงินเดือนพนักงาน</div>
+              <div id="taxPnd1Amount" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxPnd1Base" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ฐานเงินเดือน: ฿0.00</div>
+            </div>
+
+            <!-- ประกันสังคม SSO -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid #10b981;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: #10b981;">ประกันสังคม (SSO)</span>
+                <span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981; font-size: 0.75rem;">ยื่นทุกวันที่ 15</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">สปส.1-10 (ลูกจ้าง 5% + นายจ้าง 5%)</div>
+              <div id="taxSsoAmount" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxSsoBreakdown" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ลูกจ้าง ฿0.00 | นายจ้าง ฿0.00</div>
+            </div>
+
+            <!-- ภ.ง.ด.3 -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid #f59e0b;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: #f59e0b;">ภ.ง.ด.3</span>
+                <span class="badge" style="background: rgba(245,158,11,0.1); color: #f59e0b; font-size: 0.75rem;">ยื่นทุกวันที่ 7-15</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">หัก ณ ที่จ่ายบุคคลธรรมดา (ค่าสอนโค้ช 3%)</div>
+              <div id="taxPnd3Amount" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxPnd3Base" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ฐานค่าจ้าง: ฿0.00</div>
+            </div>
+
+            <!-- ภ.ง.ด.53 -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid #a855f7;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: #a855f7;">ภ.ง.ด.53</span>
+                <span class="badge" style="background: rgba(168,85,247,0.1); color: #a855f7; font-size: 0.75rem;">ยื่นทุกวันที่ 7-15</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">หัก ณ ที่จ่ายนิติบุคคล (ค่าบริการ 3%, เช่า 5%)</div>
+              <div id="taxPnd53Amount" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxPnd53Base" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ฐานบริการ: ฿0.00</div>
+            </div>
+
+            <!-- ภ.พ.30 (VAT 7%) -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid #ec4899;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: #ec4899;">ภ.พ.30 (VAT 7%)</span>
+                <span class="badge" style="background: rgba(236,72,153,0.1); color: #ec4899; font-size: 0.75rem;">ยื่นทุกวันที่ 15-23</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">ภาษีมูลค่าเพิ่มสุทธิ (ภาษีขาย - ภาษีซื้อ)</div>
+              <div id="taxVatNet" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxVatBreakdown" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ภาษีขาย ฿0.00 | ภาษีซื้อ ฿0.00</div>
+            </div>
+
+            <!-- ภ.ง.ด.50 / 51 (นิติบุคคล) -->
+            <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid var(--accent-color);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 700; font-size: 1rem; color: var(--accent-color);">ภ.ง.ด.50 / 51</span>
+                <span class="badge" style="background: rgba(163,230,53,0.1); color: var(--accent-color); font-size: 0.75rem;">ภาษีครึ่งปี & ประจำปี</span>
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-secondary);">ประมาณการภาษีเงินได้นิติบุคคล (SME)</div>
+              <div id="taxCorpAnnual" style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.5rem;">฿0.00</div>
+              <div id="taxCorpDesc" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">ยกเว้น 300,000 แรก, 15% ส่วนถัดไป</div>
+            </div>
+          </div>
+
+          <!-- Tax Schedule and Compliance Guide -->
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <div class="panel-header" style="margin-bottom: 1rem;">
+              <div class="panel-title"><i class="fa-solid fa-calendar-check"></i> ปฏิทินและกำหนดเวลายื่นภาษีของบริษัท</div>
+            </div>
+            <table class="acc-table">
+              <thead>
+                <tr>
+                  <th>แบบภาษี</th>
+                  <th>หน่วยงาน</th>
+                  <th>กำหนดการยื่นปกติ</th>
+                  <th>กำหนดยื่น e-Filing</th>
+                  <th>สถานะงวดปัจจุบัน</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>ภ.ง.ด.1</strong> (เงินเดือนพนักงาน)</td>
+                  <td>กรมสรรพากร</td>
+                  <td>ภายในวันที่ 7 ของเดือนถัดไป</td>
+                  <td>ภายในวันที่ 15 ของเดือนถัดไป</td>
+                  <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">ปกติ</span></td>
+                </tr>
+                <tr>
+                  <td><strong>สปส.1-10</strong> (กองทุนประกันสังคม)</td>
+                  <td>สำนักงานประกันสังคม</td>
+                  <td>ภายในวันที่ 15 ของเดือนถัดไป</td>
+                  <td>ภายในวันที่ 15 ของเดือนถัดไป</td>
+                  <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">ปกติ</span></td>
+                </tr>
+                <tr>
+                  <td><strong>ภ.ง.ด.3 / ภ.ง.ด.53</strong> (หัก ณ ที่จ่ายบุคคล/นิติบุคคล)</td>
+                  <td>กรมสรรพากร</td>
+                  <td>ภายในวันที่ 7 ของเดือนถัดไป</td>
+                  <td>ภายในวันที่ 15 ของเดือนถัดไป</td>
+                  <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">ปกติ</span></td>
+                </tr>
+                <tr>
+                  <td><strong>ภ.พ.30</strong> (ภาษีมูลค่าเพิ่ม VAT 7%)</td>
+                  <td>กรมสรรพากร</td>
+                  <td>ภายในวันที่ 15 ของเดือนถัดไป</td>
+                  <td>ภายในวันที่ 23 ของเดือนถัดไป</td>
+                  <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">ปกติ</span></td>
+                </tr>
+                <tr>
+                  <td><strong>ภ.ง.ด.51</strong> (ภาษีนิติบุคคลครึ่งปี)</td>
+                  <td>กรมสรรพากร</td>
+                  <td>ภายใน 2 เดือนนับแต่วันสิ้น 6 เดือนแรก</td>
+                  <td>บวกเพิ่มอีก 8 วันทำการ</td>
+                  <td><span class="badge" style="background: rgba(245,158,11,0.1); color: #f59e0b;">รอรอบครึ่งปี</span></td>
+                </tr>
+                <tr>
+                  <td><strong>ภ.ง.ด.50</strong> (ภาษีนิติบุคคลประจำปี)</td>
+                  <td>กรมสรรพากร</td>
+                  <td>ภายใน 150 วันนับแต่วันสิ้นรอบปีบัญชี</td>
+                  <td>บวกเพิ่มอีก 8 วันทำการ</td>
+                  <td><span class="badge" style="background: rgba(245,158,11,0.1); color: #f59e0b;">รอรอบสิ้นปี</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 6: BUSINESS DOCUMENT STUDIO (✨ เอกสารธุรกิจ - ใหม่!) -->
+      <!-- ========================================== -->
+      <div id="tab-documents" class="tab-content" style="display: none;">
+        
+        <!-- Document Type Selector Bar -->
+        <div class="glass-panel no-print" style="padding: 1.25rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div style="font-weight: 700; font-size: 1.05rem;"><i class="fa-solid fa-file-signature" style="color: var(--accent-color); margin-right: 0.5rem;"></i> เลือกประเภทเอกสารที่ต้องการออก</div>
+              <div class="text-secondary" style="font-size: 0.85rem; margin-top: 0.2rem;">ใช้หัวเอกสารบริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด สำหรับธุรกิจสนามหรือธุรกิจอื่น ๆ ได้ทันที</div>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="doc-type-btn active" id="btnDocQuotation" onclick="switchDocType('quotation')">
+                <i class="fa-solid fa-file-lines"></i> ใบเสนอราคา (QT)
+              </button>
+              <button class="doc-type-btn" id="btnDocInvoice" onclick="switchDocType('invoice')">
+                <i class="fa-solid fa-file-invoice"></i> ใบแจ้งหนี้ (INV)
+              </button>
+              <button class="doc-type-btn" id="btnDocReceipt" onclick="switchDocType('receipt')">
+                <i class="fa-solid fa-receipt"></i> ใบเสร็จ / ใบกำกับภาษี (RC/TAX)
+              </button>
+              <button class="doc-type-btn" id="btnDocDelivery" onclick="switchDocType('delivery_order')">
+                <i class="fa-solid fa-truck-ramp-box"></i> ใบส่งสินค้า (DO)
+              </button>
+              <button class="doc-type-btn" id="btnDocWht" onclick="switchDocType('wht_cert')">
+                <i class="fa-solid fa-certificate"></i> หนังสือหัก ณ ที่จ่าย (50 ทวิ)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Studio Grid: Left (Editor Form) + Right (A4 Preview) -->
+        <div class="doc-studio-grid">
+          
+          <!-- LEFT COLUMN: Editor Form -->
+          <div class="doc-editor-col no-print">
+            <div class="glass-panel" style="padding: 1.5rem;">
+              
+              <!-- Quick Preset Buttons -->
+              <div style="margin-bottom: 1.25rem;">
+                <label class="form-label" style="font-size: 0.82rem; margin-bottom: 0.4rem; display: block;">⚡ ตัวอย่างรายการด่วน (Quick Presets):</label>
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                  <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="applyDocPreset('court')">🎾 ค่าเช่าสนาม</button>
+                  <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="applyDocPreset('coach')">🎾 ค่าสอนโค้ช</button>
+                  <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="applyDocPreset('goods')">📦 ขายอุปกรณ์/สินค้า</button>
+                  <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="applyDocPreset('service')">💼 งานบริการ/สัญญา</button>
+                  <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="applyDocPreset('wht3')">📄 หัก 3% (โค้ช/บริการ)</button>
+                </div>
+              </div>
+
+              <!-- Document Metadata -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="edDocNo" class="form-label">เลขที่เอกสาร (Document No.)</label>
+                  <input type="text" id="edDocNo" class="form-control" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                </div>
+                <div class="form-group">
+                  <label for="edDocDate" class="form-label">วันที่เอกสาร (Date)</label>
+                  <input type="date" id="edDocDate" class="form-control" style="padding: 0.6rem;" onchange="updateDocPreview()">
+                </div>
+                <div class="form-group">
+                  <label for="edDocDueDate" class="form-label" id="lblDocDueDate">กำหนดชำระ / ยืนราคา</label>
+                  <input type="date" id="edDocDueDate" class="form-control" style="padding: 0.6rem;" onchange="updateDocPreview()">
+                </div>
+              </div>
+
+              <!-- Customer / Recipient Info -->
+              <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--accent-color);">
+                  <i class="fa-solid fa-user-tag"></i> ข้อมูลลูกค้า / ผู้รับเอกสาร
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="flex: 2;">
+                    <label for="edCustName" class="form-label">ชื่อลูกค้า / บริษัท</label>
+                    <input type="text" id="edCustName" class="form-control" placeholder="เช่น บริษัท กิจการร่วมค้า จำกัด หรือ คุณณฐกร" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                  </div>
+                  <div class="form-group" style="flex: 1;">
+                    <label for="edCustTaxId" class="form-label">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label>
+                    <input type="text" id="edCustTaxId" class="form-control" placeholder="010XXXXXXXXXX" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="flex: 2;">
+                    <label for="edCustAddress" class="form-label">ที่อยู่ลูกค้า</label>
+                    <input type="text" id="edCustAddress" class="form-control" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                  </div>
+                  <div class="form-group" style="flex: 1;">
+                    <label for="edCustBranch" class="form-label">สาขา / สำนักงาน</label>
+                    <input type="text" id="edCustBranch" class="form-control" placeholder="สำนักงานใหญ่" value="สำนักงานใหญ่" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Line Items Table (Dynamic Add/Remove) -->
+              <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                  <div style="font-weight: 600; font-size: 0.95rem; color: var(--accent-color);">
+                    <i class="fa-solid fa-list-check"></i> รายการสินค้า / บริการ
+                  </div>
+                  <button type="button" class="btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; background: var(--accent-color); color: #000; font-weight: 600; border: none; border-radius: 6px;" onclick="addDocItemRow()">
+                    <i class="fa-solid fa-plus"></i> เพิ่มแถวรายการ
+                  </button>
+                </div>
+
+                <div id="docItemsEditorContainer" style="display: flex; flex-direction: column; gap: 0.6rem;">
+                  <!-- Dynamic Item Rows Inserted Here -->
+                </div>
+              </div>
+
+              <!-- Tax & Discount Options -->
+              <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="edTradeDiscount" class="form-label">ส่วนลดพิเศษ (บาท)</label>
+                    <input type="number" id="edTradeDiscount" class="form-control" placeholder="0.00" min="0" step="0.01" style="padding: 0.6rem;" oninput="updateDocPreview()">
+                  </div>
+                  <div class="form-group">
+                    <label for="edVatChoice" class="form-label">ภาษีมูลค่าเพิ่ม (VAT 7%)</label>
+                    <select id="edVatChoice" class="form-control" style="padding: 0.6rem;" onchange="updateDocPreview()">
+                      <option value="none">ไม่มี VAT / ได้รับการยกเว้น</option>
+                      <option value="included">รวม VAT 7% ในยอดเงินแล้ว</option>
+                      <option value="excluded">แยกนอก VAT 7% เพิ่มเติม</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="edWhtChoice" class="form-label">หัก ณ ที่จ่าย (Withholding Tax)</label>
+                    <select id="edWhtChoice" class="form-control" style="padding: 0.6rem;" onchange="updateDocPreview()">
+                      <option value="none">ไม่หัก ณ ที่จ่าย (0%)</option>
+                      <option value="1">หัก 1% (ค่าขนส่ง)</option>
+                      <option value="3">หัก 3% (ค่าบริการ / ค่าสอนโค้ช)</option>
+                      <option value="5">หัก 5% (ค่าเช่าสถานที่)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- 50 ทวิ specific selection -->
+                <div id="whtCertSpecificBlock" style="display: none; background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 0.85rem; margin-top: 0.5rem;">
+                  <label for="edWhtIncomeType" class="form-label" style="color: #38bdf8; font-weight: 600;">ประเภทเงินได้พึงประเมิน (ตามมาตรา 50 ทวิ):</label>
+                  <select id="edWhtIncomeType" class="form-control" style="padding: 0.6rem;" onchange="updateDocPreview()">
+                    <option value="service_3">ค่าจ้างทำของ / ค่าบริการ / ค่าฝึกสอนโค้ช (หัก 3%)</option>
+                    <option value="rent_5">ค่าเช่าทรัพย์สิน / อาคารสถานที่ (หัก 5%)</option>
+                    <option value="transport_1">ค่าขนส่ง (หัก 1%)</option>
+                    <option value="salary_1">เงินเดือน ค่าจ้าง โบนัส ตามมาตรา 40(1)</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 0.75rem;">
+                  <label for="edDocRemarks" class="form-label">หมายเหตุ / เงื่อนไขการชำระเงินท้ายบิล</label>
+                  <textarea id="edDocRemarks" class="form-control" rows="2" style="padding: 0.6rem;" oninput="updateDocPreview()"></textarea>
+                </div>
+              </div>
+
+              <!-- Action Command Buttons -->
+              <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap;">
+                <button type="button" class="btn-primary" style="padding: 0.75rem 1.5rem; background: var(--accent-color); color: #000; font-weight: 700; border: none; border-radius: 8px; flex: 2;" onclick="printCustomDocument()">
+                  <i class="fa-solid fa-print"></i> พิมพ์เอกสาร / บันทึก PDF
+                </button>
+                <button type="button" class="btn-secondary" style="padding: 0.75rem 1rem; border-radius: 8px; flex: 1;" onclick="saveCustomDocument()">
+                  <i class="fa-solid fa-floppy-disk"></i> บันทึกเอกสาร
+                </button>
+                <button type="button" class="btn-secondary" style="padding: 0.75rem 1rem; border-radius: 8px;" onclick="openSavedDocsModal()">
+                  <i class="fa-solid fa-folder-open"></i> ประวัติ
+                </button>
+                <button type="button" class="btn-secondary" style="padding: 0.75rem 1rem; border-radius: 8px;" onclick="resetCustomDocument()">
+                  <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                </button>
+                <button type="button" class="btn-secondary" style="padding: 0.75rem 1rem; border-radius: 8px; background: rgba(16,185,129,0.1); color: #10b981; border-color: rgba(16,185,129,0.3);" onclick="postCustomDocToLedger()" title="นำยอดเงินเข้าสู่สมุดบัญชีแยกประเภท">
+                  <i class="fa-solid fa-book"></i> ลงสมุดบัญชี
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: Live A4 Printable Preview -->
+          <div class="doc-preview-col">
+            <div class="doc-sheet-wrapper">
+              <div id="printableDocSheet" class="doc-sheet">
+                <!-- Live HTML Preview Rendered by JavaScript -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 7: GENERAL LEDGER & MANUAL TRANSACTION -->
       <!-- ========================================== -->
       <div id="tab-ledger" class="tab-content" style="display: none;">
-        <!-- Form to Add Manual Transaction -->
+        <!-- Form to Add Manual Transaction with Chart of Accounts & Tax -->
         <div class="glass-panel no-print" style="padding: 1.5rem; margin-bottom: 2rem;">
           <div class="panel-header" style="margin-bottom: 1rem;">
             <div class="panel-title">
-              <i class="fa-solid fa-cash-register"></i> บันทึกธุรกรรมรายรับ-รายจ่าย (Manual Transaction Form)
+              <i class="fa-solid fa-cash-register"></i> บันทึกธุรกรรมการเงินและภาษี (Transaction & Tax Entry Form)
             </div>
           </div>
           
@@ -550,30 +1276,45 @@
                 <input type="date" id="txDate" class="form-control" required style="padding: 0.65rem;">
               </div>
               <div class="form-group">
-                <label for="txType" class="form-label">ประเภท</label>
-                <select id="txType" class="form-control" required style="padding: 0.65rem;">
-                  <option value="income">รายรับ (Income)</option>
-                  <option value="expense">รายจ่าย (Expense)</option>
+                <label for="txAccountCode" class="form-label">ผังบัญชี (Chart of Accounts)</label>
+                <select id="txAccountCode" class="form-control" required style="padding: 0.65rem;" onchange="handleAccountCodeChange()">
+                  <optgroup label="หมวด 4: รายได้ (Revenue)">
+                    <option value="4101">4101 - รายได้ค่าบริการเช่าสนามเทนนิส</option>
+                    <option value="4102">4102 - รายได้ค่าบริการฝึกสอน / โค้ช</option>
+                    <option value="4103">4103 - รายได้ขายสินค้า ลูกบอล และเครื่องดื่ม</option>
+                    <option value="4104">4104 - รายได้ค่าจัดอีเวนต์ / ทัวร์นาเมนต์</option>
+                    <option value="4105">4105 - รายได้อื่น ๆ</option>
+                  </optgroup>
+                  <optgroup label="หมวด 5: ค่าใช้จ่าย (Expenses)">
+                    <option value="5101">5101 - ค่าซ่อมบำรุงและดูแลสนาม</option>
+                    <option value="5102">5102 - ค่าสาธารณูปโภค (ค่าน้ำ-ค่าไฟ-เน็ต)</option>
+                    <option value="5103">5103 - ค่าตอบแทนโค้ชและผู้ฝึกสอน</option>
+                    <option value="5104">5104 - เงินเดือนและค่าจ้างพนักงาน</option>
+                    <option value="5105">5105 - เงินสมทบประกันสังคมส่วนนายจ้าง 5%</option>
+                    <option value="5106">5106 - ค่าอุปกรณ์สนาม ลูกเทนนิส และตาข่าย</option>
+                    <option value="5107">5107 - ค่าเสื่อมราคาสนามและอุปกรณ์</option>
+                    <option value="5108">5108 - ค่าธรรมเนียมธนาคาร / การเงิน</option>
+                    <option value="5109">5109 - ค่าดอกเบี้ยเงินกู้ยืม</option>
+                    <option value="5110">5110 - ค่าใช้จ่ายเบ็ดเตล็ด</option>
+                  </optgroup>
+                  <optgroup label="หมวด 1: สินทรัพย์ & ธนาคาร (Assets & Cash)">
+                    <option value="1101">1101 - เงินสดในมือ (Cash on Hand)</option>
+                    <option value="1102">1102 - เงินฝากธนาคาร ttb (บัญชีหลักรับโอน)</option>
+                    <option value="1103">1103 - เงินฝากธนาคาร SCB & พร้อมเพย์</option>
+                    <option value="1105">1105 - ลูกหนี้การค้า (Accounts Receivable: AR)</option>
+                    <option value="1106">1106 - ลูกหนี้เงินยืมกรรมการ (Loans to Director)</option>
+                    <option value="1201">1201 - สิ่งปลูกสร้างและโครงสร้างสนามเทนนิส</option>
+                    <option value="1202">1202 - ระบบไฟฟ้า LED และอุปกรณ์สนาม</option>
+                  </optgroup>
+                  <optgroup label="หมวด 2: หนี้สิน & เงินกู้ (Liabilities & Loans)">
+                    <option value="2101">2101 - เจ้าหนี้การค้า (Accounts Payable: AP)</option>
+                    <option value="2102">2102 - เจ้าหนี้เงินยืมกรรมการ (Loans from Director)</option>
+                    <option value="2103">2103 - เงินกู้ยืมสถาบันการเงิน / ธนาคาร</option>
+                  </optgroup>
+                  <optgroup label="หมวด 3: ส่วนของเจ้าของ (Equity)">
+                    <option value="3101">3101 - ทุนจดทะเบียน / ทุนชำระแล้ว</option>
+                  </optgroup>
                 </select>
-              </div>
-              <div class="form-group">
-                <label for="txCategory" class="form-label">หมวดหมู่บัญชี</label>
-                <select id="txCategory" class="form-control" required style="padding: 0.65rem;">
-                  <option value="court_rental">ค่าเช่าสนาม (Court Rental)</option>
-                  <option value="coaching_fee">ค่าสอนโค้ช (Coaching Fee)</option>
-                  <option value="maintenance">ค่าซ่อมบำรุง (Maintenance)</option>
-                  <option value="utility">ค่าน้ำ-ค่าไฟ (Utilities)</option>
-                  <option value="coach_compensation">ค่าตอบแทนโค้ช (Coach compensation)</option>
-                  <option value="supplies">ค่าอุปกรณ์/ลูกบอล (Equipment & Supplies)</option>
-                  <option value="other">อื่น ๆ (Other)</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group" style="flex: 2;">
-                <label for="txDesc" class="form-label">คำอธิบาย/รายละเอียดธุรกรรม</label>
-                <input type="text" id="txDesc" class="form-control" placeholder="รายละเอียดประกอบธุรกรรม" required style="padding: 0.65rem;">
               </div>
               <div class="form-group">
                 <label for="txAmount" class="form-label">จำนวนเงิน (บาท)</label>
@@ -581,9 +1322,48 @@
               </div>
             </div>
             
+            <div class="form-row">
+              <div class="form-group">
+                <label for="txVatOption" class="form-label">ภาษีมูลค่าเพิ่ม (VAT 7%)</label>
+                <select id="txVatOption" class="form-control" style="padding: 0.65rem;">
+                  <option value="none">ไม่มี VAT / ยกเว้นภาษี</option>
+                  <option value="included">รวม VAT 7% ในยอดเงินแล้ว</option>
+                  <option value="excluded">แยกนอก VAT 7% เพิ่มเติม</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="txWhtOption" class="form-label">ภาษีหัก ณ ที่จ่าย (Withholding Tax)</label>
+                <select id="txWhtOption" class="form-control" style="padding: 0.65rem;">
+                  <option value="none">ไม่หักภาษี ณ ที่จ่าย</option>
+                  <option value="wht1">หัก 1% (ค่าขนส่ง / สัญญา)</option>
+                  <option value="wht3_indiv">หัก 3% บุคคลธรรมดา (ภ.ง.ด.3 เช่น โค้ช)</option>
+                  <option value="wht3_corp">หัก 3% นิติบุคคล (ภ.ง.ด.53 เช่น บริการ/ซ่อม)</option>
+                  <option value="wht5">หัก 5% (ค่าเช่าสถานที่ / สนาม)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="txSsoOption" class="form-label">ประกันสังคม (SSO 5%+5%)</label>
+                <select id="txSsoOption" class="form-control" style="padding: 0.65rem;">
+                  <option value="none">ไม่เกี่ยวข้อง</option>
+                  <option value="sso_calc">คำนวณหักลูกจ้าง 5% + สมทบนายจ้าง 5%</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group" style="flex: 2;">
+                <label for="txDesc" class="form-label">คำอธิบาย / รายละเอียดธุรกรรม</label>
+                <input type="text" id="txDesc" class="form-control" placeholder="ระบุรายละเอียด เช่น ค่าไฟรอบ พ.ย. 69, ค่าลูกเทนนิส 10 ลัง" required style="padding: 0.65rem;">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="txSlipUrl" class="form-label">ลิงก์ภาพสลิป / ใบกำกับภาษี (ถ้ามี)</label>
+                <input type="url" id="txSlipUrl" class="form-control" placeholder="https://..." style="padding: 0.65rem;">
+              </div>
+            </div>
+            
             <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-              <button type="submit" class="btn-primary" style="background: var(--accent-color); color: #000; font-weight: bold; border: none; padding: 0.75rem 1.5rem; border-radius: 8px;">
-                <i class="fa-solid fa-floppy-disk"></i> บันทึกธุรกรรมลง Supabase
+              <button type="submit" class="btn-primary" style="background: var(--accent-color); color: #000; font-weight: bold; border: none; padding: 0.75rem 1.75rem; border-radius: 8px;">
+                <i class="fa-solid fa-floppy-disk"></i> บันทึกธุรกรรมลงระบบบัญชี
               </button>
             </div>
           </form>
@@ -593,10 +1373,10 @@
         <div class="glass-panel" style="padding: 1.5rem;">
           <div class="panel-header" style="flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
             <div class="panel-title">
-              <i class="fa-solid fa-list-ul"></i> ประวัติสมุดบัญชีรายรับ-รายจ่ายล่าสุด
+              <i class="fa-solid fa-list-ul"></i> รายการสมุดบัญชีแยกประเภท (General Ledger Entries)
             </div>
-            <div class="no-print" style="width: 250px;">
-              <input type="text" id="ledgerSearchInput" class="form-control" placeholder="ค้นหาตามคำอธิบาย..." style="padding: 0.5rem 0.75rem;" onkeyup="filterLedgerTable()">
+            <div class="no-print" style="width: 280px;">
+              <input type="text" id="ledgerSearchInput" class="form-control" placeholder="ค้นหาตามรหัส, ชื่อ หรือรายละเอียด..." style="padding: 0.5rem 0.75rem;" onkeyup="filterLedgerTable()">
             </div>
           </div>
           
@@ -604,16 +1384,17 @@
             <table class="acc-table">
               <thead>
                 <tr>
-                  <th>วันที่</th>
-                  <th>ประเภท</th>
-                  <th>หมวดหมู่</th>
-                  <th style="text-align: right;">จำนวนเงิน</th>
-                  <th>คำอธิบาย</th>
-                  <th class="no-print" style="text-align: center;">จัดการ</th>
+                  <th style="width: 12%;">วันที่</th>
+                  <th style="width: 10%;">รหัสบัญชี</th>
+                  <th style="width: 22%;">ผังบัญชี</th>
+                  <th style="width: 14%; text-align: right;">จำนวนเงิน</th>
+                  <th style="width: 14%;">ภาษี/หัก ณ ที่จ่าย</th>
+                  <th style="width: 20%;">รายละเอียด</th>
+                  <th class="no-print" style="width: 8%; text-align: center;">จัดการ</th>
                 </tr>
               </thead>
               <tbody id="ledgerTableBody">
-                <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">กำลังโหลดประวัติธุรกรรม...</td></tr>
+                <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">กำลังโหลดประวัติธุรกรรม...</td></tr>
               </tbody>
             </table>
           </div>
@@ -623,17 +1404,37 @@
   </main>
 
   <!-- ========================================== -->
+  <!-- MODAL: Saved Documents History -->
+  <!-- ========================================== -->
+  <div id="savedDocsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 650px; width: 92%;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-folder-open"></i> ประวัติเอกสารธุรกิจที่เคยบันทึกไว้</div>
+        <button class="modal-close" onclick="closeSavedDocsModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem;">
+        <div id="savedDocsListContainer" style="max-height: 400px; overflow-y: auto;">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; padding: 1rem 1.25rem;">
+        <button class="btn-secondary" onclick="closeSavedDocsModal()">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
   <!-- MODAL: Configuration/Initial Setup -->
   <!-- ========================================== -->
   <div id="configModal" class="modal-overlay" style="display: none;">
-    <div class="modal-content" style="max-width: 480px; width: 90%;">
+    <div class="modal-content" style="max-width: 540px; width: 92%;">
       <div class="modal-header">
-        <div class="modal-title"><i class="fa-solid fa-sliders"></i> ตั้งค่าข้อมูลพื้นฐานของสนาม</div>
+        <div class="modal-title"><i class="fa-solid fa-sliders"></i> ตั้งค่าข้อมูลพื้นฐานของกิจการ</div>
         <button class="modal-close" onclick="closeConfigModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body" style="padding: 1.5rem;">
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label for="cfgCapital" class="form-label">ทุนจดทะเบียน / เงินลงทุนเริ่มต้น (บาท)</label>
+          <label for="cfgCapital" class="form-label">ทุนจดทะเบียน / ทุนที่ชำระแล้ว (บาท)</label>
           <input type="number" id="cfgCapital" class="form-control" style="padding: 0.65rem;">
         </div>
         <div class="form-group" style="margin-bottom: 1rem;">
@@ -645,10 +1446,25 @@
           <input type="number" id="cfgDeprecRate" min="0" max="100" class="form-control" style="padding: 0.65rem;">
         </div>
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label for="cfgBusinessType" class="form-label">ประเภทการยื่นภาษีประจำปี</label>
+          <label for="cfgDirectorLoan" class="form-label">ยอดตั้งต้นเงินกู้ยืม/ทดรองจ่ายจากกรรมการ (บาท)</label>
+          <input type="number" id="cfgDirectorLoan" class="form-control" placeholder="0.00" style="padding: 0.65rem;">
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="cfgBankLoan" class="form-label">ยอดตั้งต้นเงินกู้ยืมจากธนาคาร/สถาบันการเงิน (บาท)</label>
+          <input type="number" id="cfgBankLoan" class="form-control" placeholder="0.00" style="padding: 0.65rem;">
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="cfgBusinessType" class="form-label">ประเภทนิติบุคคล / การยื่นภาษี</label>
           <select id="cfgBusinessType" class="form-control" style="padding: 0.65rem;">
+            <option value="corporate_sme">นิติบุคคล SME (บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด)</option>
             <option value="sole_proprietor">บุคคลธรรมดา (Sole Proprietor)</option>
-            <option value="corporate_sme">นิติบุคคล / บริษัทจำกัด (SME Corp)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="cfgVatRegistered" class="form-label">สถานะการจดทะเบียนภาษีมูลค่าเพิ่ม (VAT 7%)</label>
+          <select id="cfgVatRegistered" class="form-control" style="padding: 0.65rem;">
+            <option value="yes">จดทะเบียนภาษีมูลค่าเพิ่มแล้ว (ยื่น ภ.พ.30 ทุกเดือน)</option>
+            <option value="no">ยังไม่ได้จดทะเบียน VAT (รายได้ไม่เกิน 1.8 ล้านบาท)</option>
           </select>
         </div>
       </div>
@@ -662,6 +1478,55 @@
   </div>
 
   <script>
+    // ==========================================
+    // 🏛️ CHART OF ACCOUNTS (ผังบัญชีมาตรฐาน)
+    // ==========================================
+    const CHART_OF_ACCOUNTS = {
+      // หมวด 1: สินทรัพย์
+      "1101": { code: "1101", name: "เงินสดในมือ (Cash on Hand)", type: "asset", sub: "cash" },
+      "1102": { code: "1102", name: "เงินฝากธนาคาร ttb (รับโอนสลิปหลัก)", type: "asset", sub: "bank" },
+      "1103": { code: "1103", name: "เงินฝากธนาคาร SCB & พร้อมเพย์", type: "asset", sub: "bank" },
+      "1105": { code: "1105", name: "ลูกหนี้การค้า (Accounts Receivable: AR)", type: "asset", sub: "ar" },
+      "1106": { code: "1106", name: "ลูกหนี้เงินยืมกรรมการ (Loans to Director)", type: "asset", sub: "loan_to_dir" },
+      "1107": { code: "1107", name: "ภาษีซื้อ (Input VAT)", type: "asset", sub: "input_vat" },
+      "1108": { code: "1108", name: "ภาษีถูกหัก ณ ที่จ่าย (Prepaid WHT)", type: "asset", sub: "prepaid_wht" },
+      "1201": { code: "1201", name: "สนามเทนนิสและสิ่งปลูกสร้าง (Tennis Court)", type: "asset", sub: "fixed_court" },
+      "1202": { code: "1202", name: "ระบบไฟฟ้า LED และอุปกรณ์สนาม (Court Equipment)", type: "asset", sub: "fixed_equip" },
+      "1209": { code: "1209", name: "ค่าเสื่อมราคาสะสม (Accumulated Depreciation)", type: "asset", sub: "accum_deprec" },
+
+      // หมวด 2: หนี้สิน
+      "2101": { code: "2101", name: "เจ้าหนี้การค้า (Accounts Payable: AP)", type: "liability", sub: "ap" },
+      "2102": { code: "2102", name: "เจ้าหนี้เงินยืมกรรมการ (Loans from Director)", type: "liability", sub: "loan_from_dir" },
+      "2103": { code: "2103", name: "เงินกู้ยืมสถาบันการเงิน / ธนาคาร (Bank Loans)", type: "liability", sub: "bank_loan" },
+      "2104": { code: "2104", name: "ภาษีขายค้างส่ง ภ.พ.30 (Output VAT Payable)", type: "liability", sub: "output_vat" },
+      "2105": { code: "2105", name: "ภาษีหัก ณ ที่จ่ายค้างส่ง (WHT Payable)", type: "liability", sub: "wht_payable" },
+      "2108": { code: "2108", name: "เงินสมทบประกันสังคมค้างส่ง (SSO Payable)", type: "liability", sub: "sso_payable" },
+      "2109": { code: "2109", name: "ภาษีเงินได้นิติบุคคลค้างจ่าย (Corporate Tax Payable)", type: "liability", sub: "corp_tax_payable" },
+
+      // หมวด 3: ส่วนของเจ้าของ
+      "3101": { code: "3101", name: "ทุนจดทะเบียน / ทุนที่ชำระแล้ว (Paid-in Capital)", type: "equity", sub: "capital" },
+      "3102": { code: "3102", name: "กำไรสะสมยกมาจากปีก่อน (Retained Earnings)", type: "equity", sub: "retained_earnings" },
+
+      // หมวด 4: รายได้
+      "4101": { code: "4101", name: "รายได้ค่าบริการเช่าสนามเทนนิส (Court Rental)", type: "income", sub: "court_rental" },
+      "4102": { code: "4102", name: "รายได้ค่าบริการฝึกสอน / โค้ช (Coaching Session)", type: "income", sub: "coaching_fee" },
+      "4103": { code: "4103", name: "รายได้ขายสินค้าและเครื่องดื่ม (Shop & Beverage)", type: "income", sub: "shop_sales" },
+      "4104": { code: "4104", name: "รายได้ค่าจัดอีเวนต์ / การแข่งขัน (Tournaments)", type: "income", sub: "event_rev" },
+      "4105": { code: "4105", name: "รายได้อื่น ๆ (Other Income)", type: "income", sub: "other_income" },
+
+      // หมวด 5: ค่าใช้จ่าย
+      "5101": { code: "5101", name: "ค่าซ่อมบำรุงและดูแลสนาม (Court Maintenance)", type: "expense", sub: "maintenance" },
+      "5102": { code: "5102", name: "ค่าสาธารณูปโภค (ค่าน้ำ-ค่าไฟ-เน็ต) (Utilities)", type: "expense", sub: "utility" },
+      "5103": { code: "5103", name: "ค่าตอบแทนผู้ฝึกสอน / โค้ช (Coach Compensation)", type: "expense", sub: "coach_compensation" },
+      "5104": { code: "5104", name: "เงินเดือนและค่าจ้างพนักงาน (Staff Salaries)", type: "expense", sub: "salary" },
+      "5105": { code: "5105", name: "เงินสมทบประกันสังคมส่วนนายจ้าง 5% (Employer SSO)", type: "expense", sub: "sso_expense" },
+      "5106": { code: "5106", name: "ค่าอุปกรณ์สนาม ลูกเทนนิส และตาข่าย (Supplies)", type: "expense", sub: "supplies" },
+      "5107": { code: "5107", name: "ค่าเสื่อมราคาสนามและอุปกรณ์ (Depreciation Expense)", type: "expense", sub: "depreciation" },
+      "5108": { code: "5108", name: "ค่าธรรมเนียมธนาคาร / การเงิน (Bank Fees)", type: "expense", sub: "bank_fees" },
+      "5109": { code: "5109", name: "ค่าดอกเบี้ยเงินกู้ยืม (Loan Interest Expense)", type: "expense", sub: "interest" },
+      "5110": { code: "5110", name: "ค่าใช้จ่ายเบ็ดเตล็ด (Miscellaneous Expenses)", type: "expense", sub: "misc" }
+    };
+
     // Parse config from local storage (matching app.js)
     const localConfigStr = localStorage.getItem('tennis_config');
     let localConfig = {};
@@ -675,7 +1540,6 @@
 
     const state = {
       language: 'th',
-      bookings: [],
       transactions: [],
       config: {
         supabaseUrl: localConfig.supabaseUrl || 'https://eqwmodrhorcbwsshbepg.supabase.co',
@@ -684,12 +1548,37 @@
       },
       accounting: {
         depreciationRate: 5,
-        fixedAssetVal: 300000,
-        initialCapital: 500000,
-        businessType: 'sole_proprietor',
-        liabilities: 0
+        fixedAssetVal: 500000,
+        initialCapital: 1000000,
+        directorLoan: 0,
+        bankLoan: 0,
+        businessType: 'corporate_sme',
+        vatRegistered: 'yes'
       },
-      currentTab: 'dashboard'
+      currentTab: 'dashboard',
+      
+      // Document Studio State
+      activeDoc: {
+        type: 'quotation',
+        docNo: '',
+        date: '',
+        dueDate: '',
+        customer: {
+          name: '',
+          taxId: '',
+          branch: 'สำนักงานใหญ่',
+          address: '',
+          phone: ''
+        },
+        items: [
+          { desc: 'ค่าบริการเช่าสนามเทนนิส (Court Rental)', qty: 2, unit: 'ชม.', price: 250, discount: 0 }
+        ],
+        tradeDiscount: 0,
+        vatChoice: 'none',
+        whtChoice: 'none',
+        whtIncomeType: 'service_3',
+        remarks: 'เงื่อนไขการชำระเงิน: โอนเข้าบัญชี บจก. เดอะ แกรนด์สแลม เซอร์วิสเซส\nธนาคารทหารไทยธนชาต (ttb) หรือ พร้อมเพย์ 0105569192114'
+      }
     };
 
     let supabaseClient = null;
@@ -697,6 +1586,14 @@
     let expenseChartInstance = null;
 
     window.addEventListener('DOMContentLoaded', () => {
+      // Set default transaction date to today
+      const todayIso = new Date().toISOString().split('T')[0];
+      const txDateInput = document.getElementById('txDate');
+      if (txDateInput) txDateInput.value = todayIso;
+
+      // Initialize Document Studio Defaults
+      initDocStudioDefaults();
+
       if (state.config.supabaseUrl && state.config.supabaseKey) {
         supabaseClient = supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
       }
@@ -730,7 +1627,7 @@
         }
       }
 
-      // 2. Fallback static validation (Offline or test mode)
+      // 2. Fallback static validation
       const staticPassword = state.config.adminPassword;
       if (staticPassword && enteredPassword === staticPassword) {
         loginSuccessful = true;
@@ -747,12 +1644,88 @@
     async function initAccountingPortal() {
       document.getElementById('accounting-login-gate').style.display = 'none';
       document.getElementById('accounting-portal').style.display = 'grid';
-      
+
       if (!supabaseClient && state.config.supabaseUrl && state.config.supabaseKey) {
         supabaseClient = supabase.createClient(state.config.supabaseUrl, state.config.supabaseKey);
       }
 
       await loadFinancialData();
+      renderDocItemsEditor();
+      updateDocPreview();
+    }
+
+    // Helper: Map any transaction to standard COA
+    function getTransactionAccount(tx) {
+      const rawCat = String(tx.category || "").trim();
+      const codeMatch = rawCat.match(/^(\d{4})/);
+      if (codeMatch && CHART_OF_ACCOUNTS[codeMatch[1]]) {
+        return CHART_OF_ACCOUNTS[codeMatch[1]];
+      }
+      if (CHART_OF_ACCOUNTS[rawCat]) {
+        return CHART_OF_ACCOUNTS[rawCat];
+      }
+
+      // Legacy category mapping
+      const legacyMap = {
+        "court_rental": "4101",
+        "coaching_fee": "4102",
+        "maintenance": "5101",
+        "utility": "5102",
+        "coach_compensation": "5103",
+        "supplies": "5106",
+        "other": (tx.type === 'income' ? "4105" : "5110")
+      };
+
+      const code = legacyMap[rawCat] || (tx.type === 'income' ? "4105" : "5110");
+      return CHART_OF_ACCOUNTS[code] || { code: "5110", name: rawCat || "อื่นๆ", type: tx.type || "expense", sub: "misc" };
+    }
+
+    // Helper: Parse Tax metadata from transaction description or category
+    function parseTransactionTax(tx) {
+      const desc = String(tx.description || "");
+      let vatType = "none";
+      let whtRate = 0;
+      let whtType = "none";
+      let hasSso = false;
+
+      if (desc.indexOf("[VAT:inc]") !== -1) vatType = "included";
+      else if (desc.indexOf("[VAT:exc]") !== -1) vatType = "excluded";
+
+      if (desc.indexOf("[WHT:1%]") !== -1) { whtRate = 0.01; whtType = "wht1"; }
+      else if (desc.indexOf("[WHT:3%_indiv]") !== -1) { whtRate = 0.03; whtType = "wht3_indiv"; }
+      else if (desc.indexOf("[WHT:3%_corp]") !== -1) { whtRate = 0.03; whtType = "wht3_corp"; }
+      else if (desc.indexOf("[WHT:5%]") !== -1) { whtRate = 0.05; whtType = "wht5"; }
+
+      if (desc.indexOf("[SSO:5%]") !== -1) hasSso = true;
+
+      const amt = parseFloat(tx.amount) || 0;
+      let baseAmount = amt;
+      let vatAmount = 0;
+
+      if (vatType === "included") {
+        baseAmount = (amt * 100) / 107;
+        vatAmount = amt - baseAmount;
+      } else if (vatType === "excluded") {
+        baseAmount = amt;
+        vatAmount = amt * 0.07;
+      }
+
+      const whtAmount = baseAmount * whtRate;
+      const ssoEmployee = hasSso ? Math.min(baseAmount * 0.05, 750) : 0;
+      const ssoEmployer = hasSso ? Math.min(baseAmount * 0.05, 750) : 0;
+
+      return {
+        baseAmount,
+        vatType,
+        vatAmount,
+        whtRate,
+        whtType,
+        whtAmount,
+        hasSso,
+        ssoEmployee,
+        ssoEmployer,
+        ssoTotal: ssoEmployee + ssoEmployer
+      };
     }
 
     async function loadFinancialData() {
@@ -774,19 +1747,89 @@
         const configRow = state.transactions.find(tx => tx.description === '__ACCOUNTING_CONFIG__');
         if (configRow) {
           try {
-            state.accounting = JSON.parse(configRow.category);
+            state.accounting = Object.assign({}, state.accounting, JSON.parse(configRow.category));
           } catch(e) {
             console.error("Failed to parse accounting configs:", e);
           }
         }
 
+        // Update Period Subtitle
+        updatePeriodLabels();
+
+        // Render All Reports
         renderDashboard();
         renderProfitAndLoss();
         renderBalanceSheet();
+        renderCashFlowStatement();
+        renderTaxModule();
         renderLedgerTable();
       } catch (err) {
         console.error("Failed to load financial records from Supabase:", err);
       }
+    }
+
+    function updatePeriodLabels() {
+      const year = parseInt(document.getElementById('accYearFilter').value);
+      const monthVal = document.getElementById('accMonthFilter').value;
+      const monthNames = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+      
+      let periodText = `ข้อมูลประจำปี ${year} (พ.ศ. ${year + 543})`;
+      let subText = `สำหรับรอบระยะเวลาบัญชีสิ้นสุดวันที่ 31 ธันวาคม ค.ศ. ${year}`;
+
+      if (monthVal !== 'all') {
+        const m = parseInt(monthVal);
+        periodText = `ข้อมูลประจำเดือน ${monthNames[m]} ${year} (พ.ศ. ${year + 543})`;
+        subText = `สำหรับงวดประจำเดือน ${monthNames[m]} ${year}`;
+      }
+
+      const labelEl = document.getElementById('currentPeriodLabel');
+      if (labelEl) labelEl.textContent = periodText;
+
+      const pnlSub = document.getElementById('pnlPeriodSubtitle');
+      if (pnlSub) pnlSub.textContent = subText;
+
+      const bsSub = document.getElementById('bsPeriodSubtitle');
+      if (bsSub) bsSub.textContent = (monthVal !== 'all' ? `ข้อมูลสะสม ณ วันสิ้นเดือน ${monthNames[parseInt(monthVal)]} ${year}` : `ข้อมูลสะสม ณ วันที่ 31 ธันวาคม ${year}`);
+
+      const cfSub = document.getElementById('cfPeriodSubtitle');
+      if (cfSub) cfSub.textContent = subText;
+
+      const taxSub = document.getElementById('taxPeriodSubtitle');
+      if (taxSub) taxSub.textContent = (monthVal !== 'all' ? `สรุปภาษีนำส่งงวดประจำเดือน ${monthNames[parseInt(monthVal)]} ${year}` : `สรุปภาษีนำส่งรวมทั้งปี ${year}`);
+    }
+
+    // Helper: Filter Transactions by current selected Period
+    function getFilteredTransactions() {
+      const year = parseInt(document.getElementById('accYearFilter').value);
+      const monthVal = document.getElementById('accMonthFilter').value;
+
+      return state.transactions.filter(tx => {
+        if (tx.description === '__ACCOUNTING_CONFIG__') return false;
+        const d = new Date(tx.transaction_date);
+        if (d.getFullYear() !== year) return false;
+        if (monthVal !== 'all') {
+          return (d.getMonth() + 1) === parseInt(monthVal);
+        }
+        return true;
+      });
+    }
+
+    // Helper: Cumulative Filter for Balance Sheet
+    function getCumulativeTransactions() {
+      const year = parseInt(document.getElementById('accYearFilter').value);
+      const monthVal = document.getElementById('accMonthFilter').value;
+
+      return state.transactions.filter(tx => {
+        if (tx.description === '__ACCOUNTING_CONFIG__') return false;
+        const d = new Date(tx.transaction_date);
+        const txYear = d.getFullYear();
+        if (txYear < year) return true;
+        if (txYear > year) return false;
+        if (monthVal !== 'all') {
+          return (d.getMonth() + 1) <= parseInt(monthVal);
+        }
+        return true;
+      });
     }
 
     function switchTab(tabId) {
@@ -798,117 +1841,183 @@
 
       const tabContents = document.querySelectorAll('.tab-content');
       tabContents.forEach(c => c.style.display = 'none');
-      document.getElementById(`tab-${tabId}`).style.display = 'block';
+      
+      const targetTab = document.getElementById(`tab-${tabId}`);
+      if (targetTab) targetTab.style.display = 'block';
 
       const titles = {
-        dashboard: 'ภาพรวมแดชบอร์ดการเงิน',
-        pnl: 'งบกำไรขาดทุน',
-        balance: 'งบดุลการเงิน',
-        ledger: 'สมุดแยกประเภท (Ledger)'
+        dashboard: '1. ภาพรวมแดชบอร์ดการเงิน',
+        pnl: '2. งบกำไรขาดทุน (P&L)',
+        balance: '3. งบดุลการเงิน (Balance Sheet)',
+        cashflow: '4. งบกระแสเงินสด (Cash Flow Statement)',
+        tax: '5. ระบบภาษีและประกันสังคม (Tax & Compliance)',
+        documents: '6. ระบบสร้างและออกเอกสารธุรกิจ (Business Document Studio)',
+        ledger: '7. สมุดบัญชีแยกประเภท (General Ledger)'
       };
-      document.getElementById('viewTitle').textContent = titles[tabId];
+      document.getElementById('viewTitle').textContent = titles[tabId] || 'ระบบบัญชีการเงิน';
+
+      if (tabId === 'documents') {
+        renderDocItemsEditor();
+        updateDocPreview();
+      }
     }
 
+    // ==========================================
+    // 1. DASHBOARD
+    // ==========================================
     function renderDashboard() {
-      const year = parseInt(document.getElementById('accYearFilter').value);
-      const filtered = state.transactions.filter(tx => 
-        tx.description !== '__ACCOUNTING_CONFIG__' && 
-        new Date(tx.transaction_date).getFullYear() === year
-      );
+      const filtered = getFilteredTransactions();
+      const cumulative = getCumulativeTransactions();
+      const monthVal = document.getElementById('accMonthFilter').value;
+      const isMonthly = monthVal !== 'all';
 
       let totalRev = 0;
       let totalExp = 0;
 
       filtered.forEach(tx => {
-        const amt = parseFloat(tx.amount);
-        if (tx.type === 'income') {
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        if (acc.type === 'income') {
           totalRev += amt;
-        } else {
+        } else if (acc.type === 'expense') {
           totalExp += amt;
         }
       });
 
+      // Depreciation calculation
       const assetCost = parseFloat(state.accounting.fixedAssetVal || 0);
       const deprecRate = parseFloat(state.accounting.depreciationRate || 0);
-      const annualDepreciation = (assetCost * deprecRate) / 100;
-      totalExp += annualDepreciation;
+      const periodDeprec = (assetCost * deprecRate / 100) * (isMonthly ? (1 / 12) : 1);
+      totalExp += periodDeprec;
 
       const netProfit = totalRev - totalExp;
       const tax = calculateEstimatedTax(netProfit);
 
+      // Cash & Bank balance (cumulative)
+      let cumRev = 0;
+      let cumExp = 0;
+      let cumLoanDir = parseFloat(state.accounting.directorLoan || 0);
+      let cumBankLoan = parseFloat(state.accounting.bankLoan || 0);
+
+      cumulative.forEach(tx => {
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        if (acc.type === 'income') cumRev += amt;
+        else if (acc.type === 'expense') cumExp += amt;
+        else if (acc.code === '2102') cumLoanDir += amt;
+        else if (acc.code === '2103') cumBankLoan += amt;
+      });
+
+      const initialCap = parseFloat(state.accounting.initialCapital || 0);
+      const totalCashAndBank = initialCap + cumRev - cumExp + cumLoanDir + cumBankLoan;
+
       document.getElementById('kpiRevenue').textContent = formatCurrency(totalRev);
       document.getElementById('kpiExpense').textContent = formatCurrency(totalExp);
       document.getElementById('kpiProfit').textContent = formatCurrency(netProfit);
-      document.getElementById('kpiTax').textContent = formatCurrency(tax);
+      document.getElementById('kpiCash').textContent = formatCurrency(totalCashAndBank);
+      document.getElementById('kpiLoans').textContent = formatCurrency(cumLoanDir + cumBankLoan);
+      document.getElementById('kpiTaxTotal').textContent = formatCurrency(tax);
 
-      renderCharts(filtered, annualDepreciation);
+      renderDashboardCharts(filtered, periodDeprec, isMonthly);
     }
 
-    function renderCharts(filteredTx, annualDepreciation) {
-      const monthlyData = Array(12).fill(0).map(() => ({ rev: 0, exp: 0 }));
+    function renderDashboardCharts(filteredTx, periodDeprec, isMonthly) {
+      const year = parseInt(document.getElementById('accYearFilter').value);
+      const monthVal = document.getElementById('accMonthFilter').value;
       
-      filteredTx.forEach(tx => {
-        const date = new Date(tx.transaction_date);
-        const m = date.getMonth();
-        const amt = parseFloat(tx.amount);
-        if (tx.type === 'income') {
-          monthlyData[m].rev += amt;
-        } else {
-          monthlyData[m].exp += amt;
-        }
-      });
-
-      const monthlyDeprec = annualDepreciation / 12;
-      monthlyData.forEach(d => d.exp += monthlyDeprec);
-
       const ctxMonthly = document.getElementById('monthlyChart')?.getContext('2d');
       if (ctxMonthly) {
         if (monthlyChartInstance) monthlyChartInstance.destroy();
-        monthlyChartInstance = new Chart(ctxMonthly, {
-          type: 'bar',
-          data: {
-            labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
-            datasets: [
-              {
-                label: 'รายรับ (Revenue)',
-                data: monthlyData.map(d => d.rev),
-                backgroundColor: '#10b981',
-                borderRadius: 4
-              },
-              {
-                label: 'รายจ่าย (Expense)',
-                data: monthlyData.map(d => d.exp),
-                backgroundColor: '#ef4444',
-                borderRadius: 4
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-              x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+
+        if (!isMonthly) {
+          // Yearly View: 12 Months
+          const monthlyData = Array(12).fill(0).map(() => ({ rev: 0, exp: 0 }));
+          filteredTx.forEach(tx => {
+            const date = new Date(tx.transaction_date);
+            const m = date.getMonth();
+            const amt = parseFloat(tx.amount) || 0;
+            const acc = getTransactionAccount(tx);
+            if (acc.type === 'income') monthlyData[m].rev += amt;
+            else if (acc.type === 'expense') monthlyData[m].exp += amt;
+          });
+
+          const monthlyDeprec = periodDeprec / 12;
+          monthlyData.forEach(d => d.exp += monthlyDeprec);
+
+          monthlyChartInstance = new Chart(ctxMonthly, {
+            type: 'bar',
+            data: {
+              labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
+              datasets: [
+                { label: 'รายรับ (Revenue)', data: monthlyData.map(d => d.rev), backgroundColor: '#10b981', borderRadius: 4 },
+                { label: 'รายจ่าย (Expense)', data: monthlyData.map(d => d.exp), backgroundColor: '#ef4444', borderRadius: 4 }
+              ]
             },
-            plugins: { legend: { labels: { color: '#f3f4f6' } } }
-          }
-        });
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+              },
+              plugins: { legend: { labels: { color: '#f3f4f6' } } }
+            }
+          });
+        } else {
+          // Monthly View: Days 1 to 31
+          const daysInMonth = new Date(year, parseInt(monthVal), 0).getDate();
+          const dailyData = Array(daysInMonth).fill(0).map(() => ({ rev: 0, exp: 0 }));
+          
+          filteredTx.forEach(tx => {
+            const date = new Date(tx.transaction_date);
+            const dayIdx = date.getDate() - 1;
+            if (dayIdx >= 0 && dayIdx < daysInMonth) {
+              const amt = parseFloat(tx.amount) || 0;
+              const acc = getTransactionAccount(tx);
+              if (acc.type === 'income') dailyData[dayIdx].rev += amt;
+              else if (acc.type === 'expense') dailyData[dayIdx].exp += amt;
+            }
+          });
+
+          monthlyChartInstance = new Chart(ctxMonthly, {
+            type: 'bar',
+            data: {
+              labels: Array.from({ length: daysInMonth }, (_, i) => `${i + 1}`),
+              datasets: [
+                { label: 'รายรับ (Revenue)', data: dailyData.map(d => d.rev), backgroundColor: '#10b981', borderRadius: 3 },
+                { label: 'รายจ่าย (Expense)', data: dailyData.map(d => d.exp), backgroundColor: '#ef4444', borderRadius: 3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+              },
+              plugins: { legend: { labels: { color: '#f3f4f6' } } }
+            }
+          });
+        }
       }
 
+      // Expense Breakdown Chart
       const expenseCats = {
-        maintenance: 0,
-        utility: 0,
-        coach_compensation: 0,
-        supplies: 0,
-        other: 0,
-        depreciation: annualDepreciation
+        "5101": 0, // ซ่อมบำรุง
+        "5102": 0, // น้ำ-ไฟ
+        "5103": 0, // ค่าสอนโค้ช
+        "5104": 0, // เงินเดือนพนักงาน
+        "5106": 0, // อุปกรณ์
+        "5107": periodDeprec, // เสื่อมราคา
+        "other": 0
       };
 
       filteredTx.forEach(tx => {
-        if (tx.type === 'expense') {
-          const amt = parseFloat(tx.amount);
-          if (expenseCats[tx.category] !== undefined) {
-            expenseCats[tx.category] += amt;
+        const acc = getTransactionAccount(tx);
+        if (acc.type === 'expense') {
+          const amt = parseFloat(tx.amount) || 0;
+          if (expenseCats[acc.code] !== undefined) {
+            expenseCats[acc.code] += amt;
           } else {
             expenseCats.other += amt;
           }
@@ -921,17 +2030,18 @@
         expenseChartInstance = new Chart(ctxExpense, {
           type: 'doughnut',
           data: {
-            labels: ['ซ่อมบำรุง', 'ค่าน้ำ-ไฟ', 'ค่าตัวโค้ช', 'อุปกรณ์', 'เสื่อมราคา', 'อื่นๆ'],
+            labels: ['ซ่อมบำรุง (5101)', 'น้ำ-ไฟ (5102)', 'ค่าสอนโค้ช (5103)', 'เงินเดือน (5104)', 'อุปกรณ์ (5106)', 'เสื่อมราคา (5107)', 'อื่นๆ'],
             datasets: [{
               data: [
-                expenseCats.maintenance,
-                expenseCats.utility,
-                expenseCats.coach_compensation,
-                expenseCats.supplies,
-                expenseCats.depreciation,
+                expenseCats["5101"],
+                expenseCats["5102"],
+                expenseCats["5103"],
+                expenseCats["5104"],
+                expenseCats["5106"],
+                expenseCats["5107"],
                 expenseCats.other
               ],
-              backgroundColor: ['#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280', '#6366f1'],
+              backgroundColor: ['#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#ec4899', '#6b7280', '#6366f1'],
               borderWidth: 0
             }]
           },
@@ -939,67 +2049,64 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { position: 'bottom', labels: { color: '#f3f4f6', boxWidth: 12 } }
+              legend: { position: 'bottom', labels: { color: '#f3f4f6', boxWidth: 10, font: { size: 11 } } }
             }
           }
         });
       }
     }
 
+    // ==========================================
+    // 2. PROFIT & LOSS STATEMENT (P&L)
+    // ==========================================
     function renderProfitAndLoss() {
-      const year = parseInt(document.getElementById('accYearFilter').value);
-      const filtered = state.transactions.filter(tx => 
-        tx.description !== '__ACCOUNTING_CONFIG__' && 
-        new Date(tx.transaction_date).getFullYear() === year
-      );
+      const filtered = getFilteredTransactions();
+      const isMonthly = document.getElementById('accMonthFilter').value !== 'all';
 
-      let rentalRev = 0;
-      let coachRev = 0;
-      let otherRev = 0;
-      
-      let maintenanceExp = 0;
-      let utilityExp = 0;
-      let compensationExp = 0;
-      let supplyExp = 0;
-      let otherExp = 0;
+      const rev = { "4101": 0, "4102": 0, "4103": 0, "4104": 0, "4105": 0 };
+      const exp = { "5101": 0, "5102": 0, "5103": 0, "5104": 0, "5105": 0, "5106": 0, "5107": 0, "5108": 0, "5109": 0, "5110": 0 };
 
       filtered.forEach(tx => {
-        const amt = parseFloat(tx.amount);
-        if (tx.type === 'income') {
-          if (tx.category === 'court_rental') rentalRev += amt;
-          else if (tx.category === 'coaching_fee') coachRev += amt;
-          else otherRev += amt;
-        } else {
-          if (tx.category === 'maintenance') maintenanceExp += amt;
-          else if (tx.category === 'utility') utilityExp += amt;
-          else if (tx.category === 'coach_compensation') compensationExp += amt;
-          else if (tx.category === 'supplies') supplyExp += amt;
-          else otherExp += amt;
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        if (acc.type === 'income') {
+          if (rev[acc.code] !== undefined) rev[acc.code] += amt;
+          else rev["4105"] += amt;
+        } else if (acc.type === 'expense') {
+          if (exp[acc.code] !== undefined) exp[acc.code] += amt;
+          else exp["5110"] += amt;
         }
       });
 
       const assetCost = parseFloat(state.accounting.fixedAssetVal || 0);
       const deprecRate = parseFloat(state.accounting.depreciationRate || 0);
-      const annualDepreciation = (assetCost * deprecRate) / 100;
+      const periodDeprec = (assetCost * deprecRate / 100) * (isMonthly ? (1 / 12) : 1);
+      exp["5107"] += periodDeprec;
 
-      const totalRev = rentalRev + coachRev + otherRev;
-      const totalExp = maintenanceExp + utilityExp + compensationExp + supplyExp + otherExp + annualDepreciation;
+      const totalRev = Object.values(rev).reduce((a, b) => a + b, 0);
+      const totalExp = Object.values(exp).reduce((a, b) => a + b, 0);
       const netProfit = totalRev - totalExp;
       const estTax = calculateEstimatedTax(netProfit);
       const profitAfterTax = netProfit - estTax;
 
-      document.querySelectorAll('.current-selected-year').forEach(el => el.textContent = year);
-      document.getElementById('pnlRentalRev').textContent = formatCurrency(rentalRev);
-      document.getElementById('pnlCoachRev').textContent = formatCurrency(coachRev);
-      document.getElementById('pnlOtherRev').textContent = formatCurrency(otherRev);
+      // Populate Elements
+      document.getElementById('pnlRentalRev').textContent = formatCurrency(rev["4101"]);
+      document.getElementById('pnlCoachRev').textContent = formatCurrency(rev["4102"]);
+      document.getElementById('pnlShopRev').textContent = formatCurrency(rev["4103"]);
+      document.getElementById('pnlEventRev').textContent = formatCurrency(rev["4104"]);
+      document.getElementById('pnlOtherRev').textContent = formatCurrency(rev["4105"]);
       document.getElementById('pnlTotalRev').textContent = formatCurrency(totalRev);
 
-      document.getElementById('pnlMaintenanceExp').textContent = formatCurrency(maintenanceExp);
-      document.getElementById('pnlUtilityExp').textContent = formatCurrency(utilityExp);
-      document.getElementById('pnlCompensationExp').textContent = formatCurrency(compensationExp);
-      document.getElementById('pnlSupplyExp').textContent = formatCurrency(supplyExp);
-      document.getElementById('pnlDepreciationExp').textContent = formatCurrency(annualDepreciation);
-      document.getElementById('pnlOtherExp').textContent = formatCurrency(otherExp);
+      document.getElementById('pnlMaintenanceExp').textContent = formatCurrency(exp["5101"]);
+      document.getElementById('pnlUtilityExp').textContent = formatCurrency(exp["5102"]);
+      document.getElementById('pnlCompensationExp').textContent = formatCurrency(exp["5103"]);
+      document.getElementById('pnlSalaryExp').textContent = formatCurrency(exp["5104"]);
+      document.getElementById('pnlSsoExp').textContent = formatCurrency(exp["5105"]);
+      document.getElementById('pnlSupplyExp').textContent = formatCurrency(exp["5106"]);
+      document.getElementById('pnlDepreciationExp').textContent = formatCurrency(exp["5107"]);
+      document.getElementById('pnlBankFeeExp').textContent = formatCurrency(exp["5108"]);
+      document.getElementById('pnlInterestExp').textContent = formatCurrency(exp["5109"]);
+      document.getElementById('pnlOtherExp').textContent = formatCurrency(exp["5110"]);
       document.getElementById('pnlTotalExp').textContent = formatCurrency(totalExp);
 
       document.getElementById('pnlNetProfit').textContent = formatCurrency(netProfit);
@@ -1007,109 +2114,1096 @@
       document.getElementById('pnlNetProfitAfterTax').textContent = formatCurrency(profitAfterTax);
     }
 
+    // ==========================================
+    // 3. BALANCE SHEET (งบดุล)
+    // ==========================================
     function renderBalanceSheet() {
+      const cumulative = getCumulativeTransactions();
+      const isMonthly = document.getElementById('accMonthFilter').value !== 'all';
       const year = parseInt(document.getElementById('accYearFilter').value);
-      
+
       let cumRev = 0;
       let cumExp = 0;
+      let cashOnHand = 0;
+      let bankTtb = 0;
+      let bankOther = 0;
+      let arVal = 0;
+      let loanToDir = 0;
+      let inputVat = 0;
+      let prepaidWht = 0;
 
-      state.transactions.forEach(tx => {
-        if (tx.description === '__ACCOUNTING_CONFIG__') return;
-        const txYear = new Date(tx.transaction_date).getFullYear();
-        if (txYear > year) return;
+      let apVal = 0;
+      let loanFromDir = parseFloat(state.accounting.directorLoan || 0);
+      let bankLoan = parseFloat(state.accounting.bankLoan || 0);
+      let outputVat = 0;
+      let whtPayable = 0;
+      let ssoPayable = 0;
 
-        const amt = parseFloat(tx.amount);
-        if (tx.type === 'income') {
+      cumulative.forEach(tx => {
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        const taxInfo = parseTransactionTax(tx);
+
+        if (acc.type === 'income') {
           cumRev += amt;
-        } else {
+          bankTtb += amt; // default to main ttb account
+          if (taxInfo.vatType !== 'none') outputVat += taxInfo.vatAmount;
+        } else if (acc.type === 'expense') {
           cumExp += amt;
-        }
+          bankTtb -= amt;
+          if (taxInfo.vatType !== 'none') inputVat += taxInfo.vatAmount;
+          if (taxInfo.whtAmount > 0) whtPayable += taxInfo.whtAmount;
+          if (taxInfo.hasSso) ssoPayable += taxInfo.ssoTotal;
+        } else if (acc.code === '1101') cashOnHand += amt;
+        else if (acc.code === '1102') bankTtb += amt;
+        else if (acc.code === '1103') bankOther += amt;
+        else if (acc.code === '1105') arVal += amt;
+        else if (acc.code === '1106') loanToDir += amt;
+        else if (acc.code === '2101') apVal += amt;
+        else if (acc.code === '2102') loanFromDir += amt;
+        else if (acc.code === '2103') bankLoan += amt;
       });
 
       const capital = parseFloat(state.accounting.initialCapital || 0);
-      const assetCost = parseFloat(state.accounting.fixedAssetVal || 0);
+      bankTtb += capital; // capital deposited to bank
+
+      const courtCost = parseFloat(state.accounting.fixedAssetVal || 0) * 0.8;
+      const equipCost = parseFloat(state.accounting.fixedAssetVal || 0) * 0.2;
+      const totalAssetCost = courtCost + equipCost;
       const deprecRate = parseFloat(state.accounting.depreciationRate || 0);
 
-      const yearsElapsed = 1;
-      const accumDeprec = (assetCost * deprecRate * yearsElapsed) / 100;
-      const netFixedAssets = assetCost - accumDeprec;
+      // Accumulated Depreciation
+      const accumDeprec = (totalAssetCost * deprecRate / 100);
+      const netFixedAssets = totalAssetCost - accumDeprec;
 
-      const retainedEarnings = cumRev - (cumExp + accumDeprec);
-      const cashVal = capital + cumRev - cumExp;
-      const totalAssets = cashVal + netFixedAssets;
-      
-      const liabilities = parseFloat(state.accounting.liabilities || 0);
-      const totalLiabilitiesEquity = liabilities + capital + retainedEarnings;
+      const totalCurrentAssets = cashOnHand + bankTtb + bankOther + arVal + loanToDir + inputVat + prepaidWht;
+      const totalAssets = totalCurrentAssets + netFixedAssets;
 
-      document.getElementById('bsCashVal').textContent = formatCurrency(cashVal);
-      document.getElementById('bsAssetCostVal').textContent = formatCurrency(assetCost);
+      // Retained Earnings & Current Period Profit
+      const retainedEarnings = 0; // beginning retained earnings
+      const netProfit = cumRev - (cumExp + accumDeprec);
+      const corpTaxPayable = calculateEstimatedTax(netProfit);
+
+      const totalLiabilities = apVal + loanFromDir + bankLoan + outputVat + whtPayable + ssoPayable + corpTaxPayable;
+      const totalEquity = capital + retainedEarnings + (netProfit - corpTaxPayable);
+      const totalLiabEquity = totalLiabilities + totalEquity;
+
+      // Populate Elements
+      document.getElementById('bsCashOnHand').textContent = formatCurrency(cashOnHand);
+      document.getElementById('bsBankTtb').textContent = formatCurrency(bankTtb);
+      document.getElementById('bsBankOther').textContent = formatCurrency(bankOther);
+      document.getElementById('bsArVal').textContent = formatCurrency(arVal);
+      document.getElementById('bsLoanToDirVal').textContent = formatCurrency(loanToDir);
+      document.getElementById('bsInputVatVal').textContent = formatCurrency(inputVat);
+      document.getElementById('bsPrepaidWhtVal').textContent = formatCurrency(prepaidWht);
+      document.getElementById('bsTotalCurrentAssets').textContent = formatCurrency(totalCurrentAssets);
+
+      document.getElementById('bsCourtAssetVal').textContent = formatCurrency(courtCost);
+      document.getElementById('bsEquipAssetVal').textContent = formatCurrency(equipCost);
       document.getElementById('bsDepreciationAccumVal').textContent = formatCurrency(accumDeprec);
       document.getElementById('bsNetAssetVal').textContent = formatCurrency(netFixedAssets);
       document.getElementById('bsTotalAssets').textContent = formatCurrency(totalAssets);
+      document.getElementById('bsTotalAssetsTop').textContent = formatCurrency(totalAssets);
 
-      document.getElementById('bsLiabilitiesVal').textContent = formatCurrency(liabilities);
+      document.getElementById('bsApVal').textContent = formatCurrency(apVal);
+      document.getElementById('bsLoanFromDirVal').textContent = formatCurrency(loanFromDir);
+      document.getElementById('bsBankLoanVal').textContent = formatCurrency(bankLoan);
+      document.getElementById('bsOutputVatVal').textContent = formatCurrency(outputVat);
+      document.getElementById('bsWhtPayableVal').textContent = formatCurrency(whtPayable);
+      document.getElementById('bsSsoPayableVal').textContent = formatCurrency(ssoPayable);
+      document.getElementById('bsCorpTaxPayableVal').textContent = formatCurrency(corpTaxPayable);
+      document.getElementById('bsTotalLiabilities').textContent = formatCurrency(totalLiabilities);
+
       document.getElementById('bsCapitalVal').textContent = formatCurrency(capital);
       document.getElementById('bsRetainedEarningsVal').textContent = formatCurrency(retainedEarnings);
-      document.getElementById('bsTotalLiabilitiesEquity').textContent = formatCurrency(totalLiabilitiesEquity);
+      document.getElementById('bsPeriodProfitVal').textContent = formatCurrency(netProfit - corpTaxPayable);
+      document.getElementById('bsTotalEquity').textContent = formatCurrency(totalEquity);
+      document.getElementById('bsTotalLiabilitiesEquity').textContent = formatCurrency(totalLiabEquity);
+      document.getElementById('bsTotalLiabEquityTop').textContent = formatCurrency(totalLiabEquity);
 
       const warningBox = document.getElementById('balanceWarningBox');
-      const diff = Math.abs(totalAssets - totalLiabilitiesEquity);
+      const diff = Math.abs(totalAssets - totalLiabEquity);
       if (warningBox) {
-        if (diff > 1) {
-          warningBox.style.display = 'block';
-        } else {
-          warningBox.style.display = 'none';
-        }
+        warningBox.style.display = diff > 10 ? 'block' : 'none';
       }
     }
 
-    function renderLedgerTable() {
-      const year = parseInt(document.getElementById('accYearFilter').value);
-      const filtered = state.transactions.filter(tx => 
-        tx.description !== '__ACCOUNTING_CONFIG__' && 
-        new Date(tx.transaction_date).getFullYear() === year
-      );
+    // ==========================================
+    // 4. CASH FLOW STATEMENT (งบกระแสเงินสด)
+    // ==========================================
+    function renderCashFlowStatement() {
+      const filtered = getFilteredTransactions();
+      
+      let operatingInflow = 0;
+      let operatingOutflow = 0;
+      let wageOutflow = 0;
+      let taxOutflow = 0;
+      let investingOutflow = 0;
+      let dirLoanNet = 0;
+      let bankLoanNet = 0;
+      let capitalInflow = 0;
 
+      filtered.forEach(tx => {
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        const taxInfo = parseTransactionTax(tx);
+
+        if (acc.type === 'income') {
+          operatingInflow += amt;
+        } else if (acc.type === 'expense') {
+          if (acc.code === '5103' || acc.code === '5104') {
+            wageOutflow += amt;
+          } else if (acc.code === '5105' || acc.code === '5108') {
+            taxOutflow += amt;
+          } else if (acc.code !== '5107') { // non-cash depreciation excluded
+            operatingOutflow += amt;
+          }
+        } else if (acc.code === '1201' || acc.code === '1202') {
+          investingOutflow += amt;
+        } else if (acc.code === '2102') {
+          dirLoanNet += amt;
+        } else if (acc.code === '2103') {
+          bankLoanNet += amt;
+        } else if (acc.code === '3101') {
+          capitalInflow += amt;
+        }
+      });
+
+      const netOperating = operatingInflow - (operatingOutflow + wageOutflow + taxOutflow);
+      const netInvesting = -investingOutflow;
+      const netFinancing = dirLoanNet + bankLoanNet + capitalInflow;
+      const netCashChange = netOperating + netInvesting + netFinancing;
+
+      const initialCap = parseFloat(state.accounting.initialCapital || 0);
+      const beginningCash = initialCap; // baseline
+      const endingCash = beginningCash + netCashChange;
+
+      document.getElementById('cfOperatingInflow').textContent = formatCurrency(operatingInflow);
+      document.getElementById('cfOperatingOutflow').textContent = formatCurrency(operatingOutflow);
+      document.getElementById('cfWageOutflow').textContent = formatCurrency(wageOutflow);
+      document.getElementById('cfTaxOutflow').textContent = formatCurrency(taxOutflow);
+      document.getElementById('cfNetOperating').textContent = formatCurrency(netOperating);
+
+      document.getElementById('cfInvestingOutflow').textContent = formatCurrency(investingOutflow);
+      document.getElementById('cfNetInvesting').textContent = formatCurrency(netInvesting);
+
+      document.getElementById('cfDirectorLoanNet').textContent = formatCurrency(dirLoanNet);
+      document.getElementById('cfBankLoanNet').textContent = formatCurrency(bankLoanNet);
+      document.getElementById('cfCapitalInflow').textContent = formatCurrency(capitalInflow);
+      document.getElementById('cfNetFinancing').textContent = formatCurrency(netFinancing);
+
+      document.getElementById('cfNetCashChange').textContent = formatCurrency(netCashChange);
+      document.getElementById('cfBeginningCash').textContent = formatCurrency(beginningCash);
+      document.getElementById('cfEndingCash').textContent = formatCurrency(endingCash);
+    }
+
+    // ==========================================
+    // 5. TAX & COMPLIANCE MODULE (ระบบภาษีและประกันสังคม)
+    // ==========================================
+    function renderTaxModule() {
+      const filtered = getFilteredTransactions();
+
+      let pnd1Base = 0;
+      let pnd1Tax = 0;
+      let ssoBase = 0;
+      let ssoEmp = 0;
+      let ssoComp = 0;
+
+      let pnd3Base = 0;
+      let pnd3Tax = 0;
+
+      let pnd53Base = 0;
+      let pnd53Tax = 0;
+
+      let outputVat = 0;
+      let inputVat = 0;
+
+      let totalIncome = 0;
+      let totalExpense = 0;
+
+      filtered.forEach(tx => {
+        const acc = getTransactionAccount(tx);
+        const amt = parseFloat(tx.amount) || 0;
+        const taxInfo = parseTransactionTax(tx);
+
+        if (acc.type === 'income') {
+          totalIncome += amt;
+          if (taxInfo.vatType !== 'none') outputVat += taxInfo.vatAmount;
+        } else if (acc.type === 'expense') {
+          totalExpense += amt;
+          if (taxInfo.vatType !== 'none') inputVat += taxInfo.vatAmount;
+        }
+
+        // PND1 & SSO (Staff Salary)
+        if (acc.code === '5104') {
+          pnd1Base += amt;
+          if (amt > 25000) pnd1Tax += (amt - 25000) * 0.05; // estimated progressive
+          ssoBase += amt;
+          ssoEmp += Math.min(amt * 0.05, 750);
+          ssoComp += Math.min(amt * 0.05, 750);
+        }
+
+        // PND3 (Individual WHT - Coach)
+        if (acc.code === '5103' || taxInfo.whtType === 'wht3_indiv') {
+          pnd3Base += amt;
+          pnd3Tax += amt * 0.03;
+        }
+
+        // PND53 (Corporate WHT - Services)
+        if (taxInfo.whtType === 'wht3_corp' || (acc.code === '5101' && taxInfo.whtRate > 0)) {
+          pnd53Base += amt;
+          pnd53Tax += amt * (taxInfo.whtRate || 0.03);
+        }
+      });
+
+      const netVat = outputVat - inputVat;
+      const netProfit = totalIncome - totalExpense;
+      const corpTax = calculateEstimatedTax(netProfit);
+
+      document.getElementById('taxPnd1Amount').textContent = formatCurrency(pnd1Tax);
+      document.getElementById('taxPnd1Base').textContent = `ฐานเงินเดือน: ${formatCurrency(pnd1Base)}`;
+
+      document.getElementById('taxSsoAmount').textContent = formatCurrency(ssoEmp + ssoComp);
+      document.getElementById('taxSsoBreakdown').textContent = `ลูกจ้าง ${formatCurrency(ssoEmp)} | นายจ้าง ${formatCurrency(ssoComp)}`;
+
+      document.getElementById('taxPnd3Amount').textContent = formatCurrency(pnd3Tax);
+      document.getElementById('taxPnd3Base').textContent = `ฐานค่าจ้าง: ${formatCurrency(pnd3Base)}`;
+
+      document.getElementById('taxPnd53Amount').textContent = formatCurrency(pnd53Tax);
+      document.getElementById('taxPnd53Base').textContent = `ฐานบริการ: ${formatCurrency(pnd53Base)}`;
+
+      document.getElementById('taxVatNet').textContent = formatCurrency(netVat);
+      document.getElementById('taxVatBreakdown').textContent = `ภาษีขาย ${formatCurrency(outputVat)} | ภาษีซื้อ ${formatCurrency(inputVat)}`;
+
+      document.getElementById('taxCorpAnnual').textContent = formatCurrency(corpTax);
+    }
+
+    // ==========================================
+    // 6. BUSINESS DOCUMENT STUDIO (✨ เอกสารธุรกิจ - ใหม่!)
+    // ==========================================
+    function initDocStudioDefaults() {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      const due = new Date();
+      due.setDate(today.getDate() + 15);
+      const dueStr = due.toISOString().split('T')[0];
+
+      state.activeDoc.date = todayStr;
+      state.activeDoc.dueDate = dueStr;
+      state.activeDoc.docNo = generateDocNumber('quotation');
+
+      const edDate = document.getElementById('edDocDate');
+      if (edDate) edDate.value = todayStr;
+
+      const edDueDate = document.getElementById('edDocDueDate');
+      if (edDueDate) edDueDate.value = dueStr;
+
+      const edDocNo = document.getElementById('edDocNo');
+      if (edDocNo) edDocNo.value = state.activeDoc.docNo;
+    }
+
+    function generateDocNumber(type) {
+      const d = new Date();
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const prefixMap = {
+        'quotation': 'QT',
+        'invoice': 'INV',
+        'receipt': 'REC',
+        'tax_invoice': 'TAX',
+        'delivery_order': 'DO',
+        'wht_cert': 'WHT'
+      };
+      const prefix = prefixMap[type] || 'DOC';
+      const rand = Math.floor(100 + Math.random() * 900);
+      return `${prefix}-${yy}${mm}-${rand}`;
+    }
+
+    function switchDocType(type) {
+      state.activeDoc.type = type;
+      
+      // Update Button Active States
+      document.querySelectorAll('.doc-type-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtnMap = {
+        'quotation': 'btnDocQuotation',
+        'invoice': 'btnDocInvoice',
+        'receipt': 'btnDocReceipt',
+        'delivery_order': 'btnDocDelivery',
+        'wht_cert': 'btnDocWht'
+      };
+      const curBtn = document.getElementById(activeBtnMap[type]);
+      if (curBtn) curBtn.classList.add('active');
+
+      // Update Labels & Visibility
+      const lblDue = document.getElementById('lblDocDueDate');
+      const whtBlock = document.getElementById('whtCertSpecificBlock');
+      if (lblDue) {
+        if (type === 'quotation') lblDue.textContent = 'กำหนดยืนราคา (Valid Until)';
+        else if (type === 'delivery_order') lblDue.textContent = 'วันที่จัดส่ง (Delivery Date)';
+        else if (type === 'wht_cert') lblDue.textContent = 'วันเดือนปีที่จ่ายเงิน';
+        else lblDue.textContent = 'กำหนดชำระเงิน (Due Date)';
+      }
+
+      if (whtBlock) {
+        whtBlock.style.display = (type === 'wht_cert' ? 'block' : 'none');
+      }
+
+      // Generate Matching Document Number
+      state.activeDoc.docNo = generateDocNumber(type);
+      const edDocNo = document.getElementById('edDocNo');
+      if (edDocNo) edDocNo.value = state.activeDoc.docNo;
+
+      updateDocPreview();
+    }
+
+    function renderDocItemsEditor() {
+      const container = document.getElementById('docItemsEditorContainer');
+      if (!container) return;
+
+      container.innerHTML = '';
+      state.activeDoc.items.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display: grid; grid-template-columns: 2fr 75px 65px 100px 80px 35px; gap: 0.4rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);';
+        
+        row.innerHTML = `
+          <div><input type="text" class="form-control" style="padding: 0.45rem; font-size: 0.85rem;" placeholder="รายละเอียดสินค้า/บริการ" value="${escapeHtml(item.desc)}" oninput="updateDocItem(${idx}, 'desc', this.value)"></div>
+          <div><input type="number" class="form-control" style="padding: 0.45rem; font-size: 0.85rem;" placeholder="จำนวน" min="0" step="1" value="${item.qty}" oninput="updateDocItem(${idx}, 'qty', this.value)"></div>
+          <div><input type="text" class="form-control" style="padding: 0.45rem; font-size: 0.85rem;" placeholder="หน่วย" value="${escapeHtml(item.unit)}" oninput="updateDocItem(${idx}, 'unit', this.value)"></div>
+          <div><input type="number" class="form-control" style="padding: 0.45rem; font-size: 0.85rem;" placeholder="ราคา" min="0" step="0.01" value="${item.price}" oninput="updateDocItem(${idx}, 'price', this.value)"></div>
+          <div><input type="number" class="form-control" style="padding: 0.45rem; font-size: 0.85rem;" placeholder="ส่วนลด" min="0" step="0.01" value="${item.discount || 0}" oninput="updateDocItem(${idx}, 'discount', this.value)"></div>
+          <div><button type="button" class="btn-secondary" style="padding: 0.45rem; color: #ef4444; width: 100%; border: none;" onclick="removeDocItemRow(${idx})" title="ลบรายการ"><i class="fa-solid fa-trash-can"></i></button></div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function addDocItemRow() {
+      state.activeDoc.items.push({
+        desc: 'รายการใหม่',
+        qty: 1,
+        unit: 'รายการ',
+        price: 0,
+        discount: 0
+      });
+      renderDocItemsEditor();
+      updateDocPreview();
+    }
+
+    function removeDocItemRow(idx) {
+      if (state.activeDoc.items.length <= 1) {
+        alert("ต้องมีรายการสินค้า/บริการอย่างน้อย 1 รายการ");
+        return;
+      }
+      state.activeDoc.items.splice(idx, 1);
+      renderDocItemsEditor();
+      updateDocPreview();
+    }
+
+    function updateDocItem(idx, field, val) {
+      if (!state.activeDoc.items[idx]) return;
+      if (field === 'qty' || field === 'price' || field === 'discount') {
+        state.activeDoc.items[idx][field] = parseFloat(val) || 0;
+      } else {
+        state.activeDoc.items[idx][field] = val;
+      }
+      updateDocPreview();
+    }
+
+    function applyDocPreset(presetKey) {
+      if (presetKey === 'court') {
+        switchDocType('invoice');
+        state.activeDoc.items = [
+          { desc: 'ค่าบริการเช่าสนามเทนนิส Main Court (18:00 - 20:00)', qty: 2, unit: 'ชม.', price: 250, discount: 0 }
+        ];
+        state.activeDoc.vatChoice = 'none';
+        state.activeDoc.whtChoice = 'none';
+      } else if (presetKey === 'coach') {
+        switchDocType('receipt');
+        state.activeDoc.items = [
+          { desc: 'ค่าบริการฝึกสอนเทนนิสพร้อมโค้ชมืออาชีพ', qty: 1, unit: 'เซสชัน', price: 600, discount: 0 }
+        ];
+        state.activeDoc.vatChoice = 'none';
+        state.activeDoc.whtChoice = '3';
+      } else if (presetKey === 'goods') {
+        switchDocType('delivery_order');
+        state.activeDoc.items = [
+          { desc: 'ลูกเทนนิสแข่งขัน Dunlop Fort All Court (กระป๋อง 4 ลูก)', qty: 10, unit: 'กระป๋อง', price: 320, discount: 100 },
+          { desc: 'กริปพันด้ามไม้เทนนิส Yonex Super Grap (แพ็ค 3 ชิ้น)', qty: 5, unit: 'แพ็ค', price: 180, discount: 0 }
+        ];
+        state.activeDoc.vatChoice = 'included';
+      } else if (presetKey === 'service') {
+        switchDocType('quotation');
+        state.activeDoc.items = [
+          { desc: 'ค่าบริการจัดการแข่งขันเทนนิสกระชับมิตร ประจำไตรมาส', qty: 1, unit: 'งาน', price: 15000, discount: 1000 },
+          { desc: 'บริการผู้ตัดสินและเจ้าหน้าที่ประจำสนามตลอดการแข่งขัน', qty: 1, unit: 'ชุด', price: 5000, discount: 0 }
+        ];
+        state.activeDoc.vatChoice = 'excluded';
+        state.activeDoc.whtChoice = '3';
+      } else if (presetKey === 'wht3') {
+        switchDocType('wht_cert');
+        state.activeDoc.items = [
+          { desc: 'ค่าตอบแทนผู้ฝึกสอนเทนนิส / ค่าจ้างบริการวิชาชีพอิสระ', qty: 1, unit: 'งวด', price: 10000, discount: 0 }
+        ];
+        state.activeDoc.whtChoice = '3';
+        state.activeDoc.whtIncomeType = 'service_3';
+      }
+
+      // Sync Form Controls
+      document.getElementById('edTradeDiscount').value = state.activeDoc.tradeDiscount || 0;
+      document.getElementById('edVatChoice').value = state.activeDoc.vatChoice;
+      document.getElementById('edWhtChoice').value = state.activeDoc.whtChoice;
+
+      renderDocItemsEditor();
+      updateDocPreview();
+    }
+
+    function calculateDocTotals() {
+      let subtotal = 0;
+      state.activeDoc.items.forEach(item => {
+        const lineTotal = (item.qty * item.price) - (item.discount || 0);
+        subtotal += Math.max(lineTotal, 0);
+      });
+
+      const tradeDiscount = parseFloat(document.getElementById('edTradeDiscount')?.value) || 0;
+      state.activeDoc.tradeDiscount = tradeDiscount;
+      const afterDiscount = Math.max(subtotal - tradeDiscount, 0);
+
+      const vatChoice = document.getElementById('edVatChoice')?.value || 'none';
+      state.activeDoc.vatChoice = vatChoice;
+      let vatAmount = 0;
+      let netBeforeVat = afterDiscount;
+
+      if (vatChoice === 'included') {
+        netBeforeVat = (afterDiscount * 100) / 107;
+        vatAmount = afterDiscount - netBeforeVat;
+      } else if (vatChoice === 'excluded') {
+        netBeforeVat = afterDiscount;
+        vatAmount = afterDiscount * 0.07;
+      }
+
+      const whtChoice = document.getElementById('edWhtChoice')?.value || 'none';
+      state.activeDoc.whtChoice = whtChoice;
+      let whtRate = 0;
+      if (whtChoice === '1') whtRate = 0.01;
+      else if (whtChoice === '3') whtRate = 0.03;
+      else if (whtChoice === '5') whtRate = 0.05;
+
+      const whtAmount = netBeforeVat * whtRate;
+      const grandTotal = netBeforeVat + vatAmount;
+      const netPayable = grandTotal - whtAmount;
+
+      return {
+        subtotal,
+        tradeDiscount,
+        afterDiscount,
+        netBeforeVat,
+        vatAmount,
+        whtRate,
+        whtAmount,
+        grandTotal,
+        netPayable
+      };
+    }
+
+    function updateDocPreview() {
+      const type = state.activeDoc.type;
+      const docNo = document.getElementById('edDocNo')?.value || state.activeDoc.docNo || '-';
+      const docDate = document.getElementById('edDocDate')?.value || state.activeDoc.date || '';
+      const dueDate = document.getElementById('edDocDueDate')?.value || state.activeDoc.dueDate || '';
+
+      const custName = document.getElementById('edCustName')?.value.trim() || 'ลูกค้าทั่วไป / Cash Customer';
+      const custTaxId = document.getElementById('edCustTaxId')?.value.trim() || '-';
+      const custBranch = document.getElementById('edCustBranch')?.value.trim() || 'สำนักงานใหญ่';
+      const custAddress = document.getElementById('edCustAddress')?.value.trim() || '-';
+      const remarks = document.getElementById('edDocRemarks')?.value.trim() || state.activeDoc.remarks;
+
+      const totals = calculateDocTotals();
+      const thaiBaht = thaiBahtText(type === 'invoice' && totals.whtAmount > 0 ? totals.netPayable : totals.grandTotal);
+
+      const previewContainer = document.getElementById('printableDocSheet');
+      if (!previewContainer) return;
+
+      // 1. Special Layout: หนังสือรับรองการหักภาษี ณ ที่จ่าย (50 ทวิ)
+      if (type === 'wht_cert') {
+        previewContainer.innerHTML = renderWht50TwiHTML(docNo, docDate, custName, custTaxId, custAddress, totals);
+        return;
+      }
+
+      // 2. Standard Business Documents (Quotation / Invoice / Receipt / Delivery Order)
+      const docTitles = {
+        'quotation': { th: 'ใบเสนอราคา', en: 'QUOTATION', badgeColor: '#2563eb' },
+        'invoice': { th: 'ใบแจ้งหนี้ / ใบวางบิล', en: 'INVOICE / BILLING', badgeColor: '#d97706' },
+        'receipt': { th: 'ใบเสร็จรับเงิน / ใบกำกับภาษี', en: 'RECEIPT / TAX INVOICE', badgeColor: '#16a34a' },
+        'delivery_order': { th: 'ใบส่งสินค้า / ใบส่งของ', en: 'DELIVERY ORDER', badgeColor: '#4f46e5' }
+      };
+      const curTitle = docTitles[type] || docTitles['quotation'];
+
+      let rowsHtml = '';
+      state.activeDoc.items.forEach((item, idx) => {
+        const lineTotal = (item.qty * item.price) - (item.discount || 0);
+        rowsHtml += `
+          <tr>
+            <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="font-weight: 500;">${escapeHtml(item.desc)}</td>
+            <td style="text-align: center;">${item.qty} ${escapeHtml(item.unit || '')}</td>
+            <td style="text-align: right;">${formatNumber(item.price)}</td>
+            <td style="text-align: right; color: #64748b;">${item.discount > 0 ? '-' + formatNumber(item.discount) : '-'}</td>
+            <td style="text-align: right; font-weight: 600;">${formatNumber(lineTotal)}</td>
+          </tr>
+        `;
+      });
+
+      // Signature Blocks according to doc type
+      let signaturesHtml = '';
+      if (type === 'quotation') {
+        signaturesHtml = `
+          <div style="display: flex; justify-content: space-between; margin-top: 2.5rem; text-align: center;">
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้เสนอราคา / Authorized Signature</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้อนุมัติสั่งซื้อ / Customer Acceptance</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+          </div>
+        `;
+      } else if (type === 'delivery_order') {
+        signaturesHtml = `
+          <div style="margin-top: 1.5rem; padding: 8px 12px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px; color: #475569;">
+            <strong>เงื่อนไขการรับสินค้า:</strong> ผู้รับสินค้าได้ตรวจนับและรับสินค้าตามรายการข้างต้นในสภาพเรียบร้อย ถูกต้อง ครบถ้วนสมบูรณ์แล้วทุกประการ
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 2rem; text-align: center;">
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้จัดส่งสินค้า / Delivered By</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้รับสินค้า / Received By</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+          </div>
+        `;
+      } else {
+        signaturesHtml = `
+          <div style="display: flex; justify-content: space-between; margin-top: 2.5rem; text-align: center;">
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้รับเงิน / ผู้วางบิล / Collector</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+            <div style="width: 45%;">
+              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
+              <div style="color: #64748b; font-size: 12px;">ผู้มีอำนาจลงนาม / Authorized Signature</div>
+              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
+            </div>
+          </div>
+        `;
+      }
+
+      previewContainer.innerHTML = `
+        <!-- Header: Company & Document Title -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 1.25rem; border-bottom: 2px solid #0f172a;">
+          <div style="max-width: 60%;">
+            <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</h2>
+            <div style="font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px;">The Grand Slam Services Co., Ltd.</div>
+            <div style="font-size: 12px; color: #334155;"><strong>เลขประจำตัวผู้เสียภาษีอากร:</strong> 0105569192114 (สำนักงานใหญ่)</div>
+            <div style="font-size: 12px; color: #475569; margin-top: 2px;">บริการสนามเทนนิสมาตรฐาน, ฝึกสอน, จำหน่ายอุปกรณ์ และบริการธุรกิจครบวงจร</div>
+            <div style="font-size: 12px; color: #475569;">โทร: 089-493-2242 | พร้อมเพย์: 0105569192114</div>
+          </div>
+
+          <div style="text-align: right;">
+            <div style="font-size: 18px; font-weight: 800; color: ${curTitle.badgeColor}; letter-spacing: 0.5px;">${curTitle.th}</div>
+            <div style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 6px;">${curTitle.en}</div>
+            <div style="font-size: 12px; color: #334155;"><strong>เลขที่ / No:</strong> <span style="font-weight: 700; font-family: monospace; font-size: 13px;">${escapeHtml(docNo)}</span></div>
+            <div style="font-size: 12px; color: #334155;"><strong>วันที่ / Date:</strong> ${formatDateTh(docDate)}</div>
+            ${dueDate ? `<div style="font-size: 12px; color: #dc2626;"><strong>กำหนดชำระ / Due:</strong> ${formatDateTh(dueDate)}</div>` : ''}
+          </div>
+        </div>
+
+        <!-- Customer Box & Meta Box -->
+        <div style="display: flex; gap: 1rem; margin: 1.25rem 0;">
+          <div class="doc-box-border" style="flex: 2;">
+            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">ลูกค้า / ข้อมูลผู้รับ (CUSTOMER DETAILS):</div>
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 3px;">${escapeHtml(custName)}</div>
+            <div style="font-size: 12px; color: #334155; margin-top: 2px;"><strong>ที่อยู่:</strong> ${escapeHtml(custAddress)}</div>
+            <div style="font-size: 12px; color: #334155; margin-top: 2px;">
+              <strong>เลขประจำตัวผู้เสียภาษี:</strong> ${escapeHtml(custTaxId)} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>สาขา:</strong> ${escapeHtml(custBranch)}
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Items Table -->
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 6%; text-align: center;">ลำดับ</th>
+              <th style="width: 48%;">รายการ (Description)</th>
+              <th style="width: 12%; text-align: center;">จำนวน</th>
+              <th style="width: 12%; text-align: right;">ราคา/หน่วย</th>
+              <th style="width: 10%; text-align: right;">ส่วนลด</th>
+              <th style="width: 12%; text-align: right;">จำนวนเงิน</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <!-- Summary & Totals -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 1rem; gap: 1.5rem;">
+          <!-- Left: Remarks & Bank Info -->
+          <div style="flex: 1.2;">
+            <div class="doc-box-border">
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">หมายเหตุและช่องทางการชำระเงิน (PAYMENT DETAILS):</div>
+              <div style="font-size: 12px; color: #1e293b; margin-top: 4px; white-space: pre-line;">${escapeHtml(remarks)}</div>
+            </div>
+            
+            <div style="margin-top: 8px; padding: 6px 10px; background: #f1f5f9; border-radius: 4px; font-size: 12px; color: #334155;">
+              <strong>จำนวนเงินตัวอักษร:</strong> <span style="font-weight: 700; color: #0f172a;">( ${thaiBaht} )</span>
+            </div>
+          </div>
+
+          <!-- Right: Calculations Summary -->
+          <div style="flex: 0.9;">
+            <table style="margin: 0; font-size: 12.5px;">
+              <tbody>
+                <tr>
+                  <td style="padding: 4px 6px; border: none; color: #475569;">รวมเป็นเงิน (Subtotal):</td>
+                  <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.subtotal)}</td>
+                </tr>
+                ${totals.tradeDiscount > 0 ? `
+                  <tr>
+                    <td style="padding: 4px 6px; border: none; color: #dc2626;">ส่วนลดการค้า (Discount):</td>
+                    <td style="padding: 4px 6px; border: none; text-align: right; color: #dc2626; font-weight: 600;">-${formatNumber(totals.tradeDiscount)}</td>
+                  </tr>
+                ` : ''}
+                ${state.activeDoc.vatChoice !== 'none' ? `
+                  <tr>
+                    <td style="padding: 4px 6px; border: none; color: #475569;">มูลค่าก่อนภาษี (Net Amount):</td>
+                    <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.netBeforeVat)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 6px; border: none; color: #475569;">ภาษีมูลค่าเพิ่ม (VAT 7%):</td>
+                    <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.vatAmount)}</td>
+                  </tr>
+                ` : ''}
+                <tr style="border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f172a;">
+                  <td style="padding: 6px 6px; font-weight: 700; font-size: 13.5px;">จำนวนเงินรวมทั้งสิ้น (Grand Total):</td>
+                  <td style="padding: 6px 6px; text-align: right; font-weight: 800; font-size: 15px; color: #0f172a;">${formatNumber(totals.grandTotal)}</td>
+                </tr>
+                ${totals.whtAmount > 0 ? `
+                  <tr>
+                    <td style="padding: 4px 6px; border: none; color: #d97706;">หัก ณ ที่จ่าย (WHT ${(totals.whtRate * 100)}%):</td>
+                    <td style="padding: 4px 6px; border: none; text-align: right; color: #d97706; font-weight: 600;">-${formatNumber(totals.whtAmount)}</td>
+                  </tr>
+                  <tr style="border-top: 1px dashed #94a3b8;">
+                    <td style="padding: 6px 6px; font-weight: 800; font-size: 14px; color: #16a34a;">ยอดชำระสุทธิ (Net Payable):</td>
+                    <td style="padding: 6px 6px; text-align: right; font-weight: 800; font-size: 16px; color: #16a34a;">${formatNumber(totals.netPayable)}</td>
+                  </tr>
+                ` : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Signatures Block -->
+        ${signaturesHtml}
+      `;
+    }
+
+    // Helper: Standard Thai Revenue Dept 50 ทวิ Layout
+    function renderWht50TwiHTML(docNo, docDate, custName, custTaxId, custAddress, totals) {
+      const typeOption = document.getElementById('edWhtIncomeType')?.value || 'service_3';
+      const whtRateMap = {
+        'service_3': 0.03,
+        'rent_5': 0.05,
+        'transport_1': 0.01,
+        'salary_1': 0.05
+      };
+      const rate = whtRateMap[typeOption] || 0.03;
+      const basePay = totals.subtotal;
+      const taxWithheld = basePay * rate;
+      const thaiBaht = thaiBahtText(taxWithheld);
+
+      return `
+        <div style="border: 2px solid #0f172a; padding: 1.5rem; font-family: 'Sarabun', sans-serif; font-size: 12.5px;">
+          <!-- Top Title -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: #0f172a;">หนังสือรับรองการหักภาษี ณ ที่จ่าย</div>
+              <div style="font-size: 11px; color: #475569;">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
+            </div>
+            <div style="text-align: right;">
+              <div><strong>เล่มที่ / เลขที่:</strong> <span style="font-family: monospace; font-weight: 700;">${escapeHtml(docNo)}</span></div>
+              <div><strong>ฉบับที่ 1:</strong> (สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการ)</div>
+            </div>
+          </div>
+
+          <!-- Section 1: ผู้มีหน้าที่หักภาษี ณ ที่จ่าย (Payer) -->
+          <div style="border: 1px solid #94a3b8; border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; background: #f8fafc;">
+            <div><strong>1. ผู้มีหน้าที่หักภาษี ณ ที่จ่าย:</strong></div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+              <div><strong>ชื่อ:</strong> บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</div>
+              <div><strong>เลขประจำตัวผู้เสียภาษีอากร:</strong> <span style="font-family: monospace; font-weight: 700; letter-spacing: 1px;">0-1055-69192-11-4</span></div>
+            </div>
+            <div style="margin-top: 2px;"><strong>ที่อยู่:</strong> สำนักงานใหญ่ (The Grand Slam Tennis Court & Services)</div>
+          </div>
+
+          <!-- Section 2: ผู้ถูกหักภาษี ณ ที่จ่าย (Payee) -->
+          <div style="border: 1px solid #94a3b8; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; background: #f8fafc;">
+            <div><strong>2. ผู้ถูกหักภาษี ณ ที่จ่าย:</strong></div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+              <div><strong>ชื่อ:</strong> <span style="font-weight: 700;">${escapeHtml(custName)}</span></div>
+              <div><strong>เลขประจำตัวผู้เสียภาษี / บัตรประชาชน:</strong> <span style="font-family: monospace; font-weight: 700;">${escapeHtml(custTaxId)}</span></div>
+            </div>
+            <div style="margin-top: 2px;"><strong>ที่อยู่:</strong> ${escapeHtml(custAddress)}</div>
+          </div>
+
+          <!-- Section 3: Tax Filing Category (ภ.ง.ด.) -->
+          <div style="margin-bottom: 8px; font-size: 12px;">
+            <strong>ลำดับที่ในแบบยื่น:</strong> &nbsp;&nbsp;
+            [ &nbsp; ] (1) ภ.ง.ด.1ก &nbsp;&nbsp;&nbsp;
+            [ &nbsp; ] (2) ภ.ง.ด.1ก พิเศษ &nbsp;&nbsp;&nbsp;
+            [ ${rate === 0.03 && typeOption === 'service_3' ? '<strong>X</strong>' : '&nbsp;'} ] (3) ภ.ง.ด.2 &nbsp;&nbsp;&nbsp;
+            [ ${typeOption === 'service_3' ? '<strong>X</strong>' : '&nbsp;'} ] (4) ภ.ง.ด.3 &nbsp;&nbsp;&nbsp;
+            [ ${typeOption === 'rent_5' ? '<strong>X</strong>' : '&nbsp;'} ] (5) ภ.ง.ด.53
+          </div>
+
+          <!-- Section 4: Income & Tax Table -->
+          <table style="width: 100%; border: 1px solid #0f172a; border-collapse: collapse; margin-bottom: 10px;">
+            <thead>
+              <tr style="background: #f1f5f9;">
+                <th style="border: 1px solid #0f172a; padding: 6px; width: 55%;">ประเภทเงินได้พึงประเมินที่จ่าย</th>
+                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: center;">วัน เดือน ปี ที่จ่าย</th>
+                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: right;">จำนวนเงินที่จ่าย</th>
+                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: right;">ภาษีที่หักและนำส่ง</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border: 1px solid #0f172a; padding: 6px;">1. เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตาม ม.40 (1)</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">-</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #0f172a; padding: 6px;">2. ค่าธรรมเนียม ค่านายหน้า ฯลฯ ตาม ม.40 (2)</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">-</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #0f172a; padding: 6px;">
+                  3. การจ่ายเงินได้ตามคำสั่งกรมสรรพากร:<br>
+                  &nbsp;&nbsp;• <strong>${escapeHtml(state.activeDoc.items[0]?.desc || 'ค่าจ้างบริการ / ค่าสอนโค้ช')}</strong> (${(rate * 100)}%)
+                </td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">${formatDateTh(docDate)}</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-weight: 700;">${formatNumber(basePay)}</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-weight: 800; color: #dc2626;">${formatNumber(taxWithheld)}</td>
+              </tr>
+              <tr style="background: #f8fafc; font-weight: 700;">
+                <td colspan="2" style="border: 1px solid #0f172a; padding: 6px; text-align: center;">
+                  รวมเงินภาษีที่หักและนำส่ง (ตัวอักษร): &nbsp;&nbsp;<strong>( ${thaiBaht} )</strong>
+                </td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">${formatNumber(basePay)}</td>
+                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-size: 14px; font-weight: 800;">${formatNumber(taxWithheld)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Footer Confirmation & Signature -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 1.5rem;">
+            <div style="font-size: 11.5px; color: #334155; max-width: 50%;">
+              ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความเป็นจริงทุกประการ
+            </div>
+            <div style="text-align: center; width: 45%;">
+              <div style="border-bottom: 1px solid #0f172a; height: 50px;"></div>
+              <div style="margin-top: 6px; font-weight: 700;">( บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด )</div>
+              <div style="font-size: 12px; color: #475569;">ผู้จ่ายเงิน / ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</div>
+              <div style="font-size: 12px; color: #475569; margin-top: 3px;">วันที่ ${formatDateTh(docDate)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function printCustomDocument() {
+      window.print();
+    }
+
+    function saveCustomDocument() {
+      const docNo = document.getElementById('edDocNo')?.value || state.activeDoc.docNo;
+      if (!docNo) {
+        alert("กรุณาระบุเลขที่เอกสาร");
+        return;
+      }
+
+      const docRecord = {
+        id: 'doc_' + Date.now(),
+        docNo: docNo,
+        type: state.activeDoc.type,
+        date: document.getElementById('edDocDate')?.value || state.activeDoc.date,
+        dueDate: document.getElementById('edDocDueDate')?.value || state.activeDoc.dueDate,
+        customer: {
+          name: document.getElementById('edCustName')?.value || '',
+          taxId: document.getElementById('edCustTaxId')?.value || '',
+          branch: document.getElementById('edCustBranch')?.value || 'สำนักงานใหญ่',
+          address: document.getElementById('edCustAddress')?.value || ''
+        },
+        items: JSON.parse(JSON.stringify(state.activeDoc.items)),
+        tradeDiscount: parseFloat(document.getElementById('edTradeDiscount')?.value) || 0,
+        vatChoice: document.getElementById('edVatChoice')?.value || 'none',
+        whtChoice: document.getElementById('edWhtChoice')?.value || 'none',
+        remarks: document.getElementById('edDocRemarks')?.value || state.activeDoc.remarks,
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        const savedStr = localStorage.getItem('grandslam_saved_docs') || '[]';
+        const savedList = JSON.parse(savedStr);
+        savedList.unshift(docRecord);
+        localStorage.setItem('grandslam_saved_docs', JSON.stringify(savedList));
+        alert(`บันทึกเอกสาร ${docNo} ลงประวัติเรียบร้อยแล้ว!`);
+      } catch (e) {
+        console.error("Save doc error:", e);
+        alert("เกิดข้อผิดพลาดในการบันทึกเอกสาร");
+      }
+    }
+
+    function openSavedDocsModal() {
+      const container = document.getElementById('savedDocsListContainer');
+      if (!container) return;
+
+      const savedStr = localStorage.getItem('grandslam_saved_docs') || '[]';
+      let savedList = [];
+      try {
+        savedList = JSON.parse(savedStr);
+      } catch(e) {}
+
+      if (savedList.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">ยังไม่มีประวัติเอกสารที่บันทึกไว้</div>';
+      } else {
+        let html = '<div style="display: flex; flex-direction: column; gap: 0.6rem;">';
+        savedList.forEach((d, idx) => {
+          html += `
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 0.85rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span class="badge" style="background: rgba(163,230,53,0.1); color: var(--accent-color); font-weight: 700; margin-right: 0.4rem;">${escapeHtml(d.docNo)}</span>
+                <strong>${escapeHtml(d.customer?.name || 'ลูกค้าทั่วไป')}</strong>
+                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">วันที่: ${d.date} | ประเภท: ${d.type}</div>
+              </div>
+              <div style="display: flex; gap: 0.4rem;">
+                <button type="button" class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background: var(--accent-color); color: #000; border: none; border-radius: 4px;" onclick="loadSavedDoc(${idx})">โหลด</button>
+                <button type="button" class="btn-secondary" style="padding: 0.35rem 0.55rem; font-size: 0.8rem; color: #ef4444;" onclick="deleteSavedDoc(${idx})"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      document.getElementById('savedDocsModal').style.display = 'flex';
+    }
+
+    function closeSavedDocsModal() {
+      document.getElementById('savedDocsModal').style.display = 'none';
+    }
+
+    function loadSavedDoc(idx) {
+      const savedStr = localStorage.getItem('grandslam_saved_docs') || '[]';
+      try {
+        const savedList = JSON.parse(savedStr);
+        const doc = savedList[idx];
+        if (!doc) return;
+
+        state.activeDoc.type = doc.type;
+        state.activeDoc.docNo = doc.docNo;
+        state.activeDoc.date = doc.date;
+        state.activeDoc.dueDate = doc.dueDate;
+        state.activeDoc.customer = doc.customer || {};
+        state.activeDoc.items = doc.items || [];
+        state.activeDoc.tradeDiscount = doc.tradeDiscount || 0;
+        state.activeDoc.vatChoice = doc.vatChoice || 'none';
+        state.activeDoc.whtChoice = doc.whtChoice || 'none';
+        state.activeDoc.remarks = doc.remarks || '';
+
+        // Update form controls
+        document.getElementById('edDocNo').value = doc.docNo;
+        document.getElementById('edDocDate').value = doc.date;
+        document.getElementById('edDocDueDate').value = doc.dueDate;
+        document.getElementById('edCustName').value = doc.customer?.name || '';
+        document.getElementById('edCustTaxId').value = doc.customer?.taxId || '';
+        document.getElementById('edCustBranch').value = doc.customer?.branch || 'สำนักงานใหญ่';
+        document.getElementById('edCustAddress').value = doc.customer?.address || '';
+        document.getElementById('edTradeDiscount').value = doc.tradeDiscount || 0;
+        document.getElementById('edVatChoice').value = doc.vatChoice || 'none';
+        document.getElementById('edWhtChoice').value = doc.whtChoice || 'none';
+        document.getElementById('edDocRemarks').value = doc.remarks || '';
+
+        switchDocType(doc.type);
+        renderDocItemsEditor();
+        updateDocPreview();
+        closeSavedDocsModal();
+        alert(`โหลดเอกสาร ${doc.docNo} เรียบร้อยแล้ว!`);
+      } catch(e) {
+        console.error("Load doc error:", e);
+      }
+    }
+
+    function deleteSavedDoc(idx) {
+      if (!confirm("คุณต้องการลบเอกสารนี้จากประวัติใช่หรือไม่?")) return;
+      const savedStr = localStorage.getItem('grandslam_saved_docs') || '[]';
+      try {
+        const savedList = JSON.parse(savedStr);
+        savedList.splice(idx, 1);
+        localStorage.setItem('grandslam_saved_docs', JSON.stringify(savedList));
+        openSavedDocsModal();
+      } catch(e) {}
+    }
+
+    function resetCustomDocument() {
+      if (!confirm("ต้องการล้างฟอร์มเพื่อสร้างเอกสารใหม่ใช่หรือไม่?")) return;
+      initDocStudioDefaults();
+      state.activeDoc.customer = { name: '', taxId: '', branch: 'สำนักงานใหญ่', address: '', phone: '' };
+      state.activeDoc.items = [
+        { desc: 'ค่าบริการ / สินค้า', qty: 1, unit: 'รายการ', price: 0, discount: 0 }
+      ];
+      document.getElementById('edCustName').value = '';
+      document.getElementById('edCustTaxId').value = '';
+      document.getElementById('edCustAddress').value = '';
+      document.getElementById('edTradeDiscount').value = '0';
+      document.getElementById('edVatChoice').value = 'none';
+      document.getElementById('edWhtChoice').value = 'none';
+      renderDocItemsEditor();
+      updateDocPreview();
+    }
+
+    // Post to General Ledger directly from created document
+    async function postCustomDocToLedger() {
+      const totals = calculateDocTotals();
+      const docNo = document.getElementById('edDocNo')?.value || state.activeDoc.docNo;
+      const docDate = document.getElementById('edDocDate')?.value || state.activeDoc.date;
+      const custName = document.getElementById('edCustName')?.value || 'ลูกค้าทั่วไป';
+
+      if (!confirm(`คุณต้องการนำยอดเอกสาร ${docNo} จำนวน ${formatCurrency(totals.grandTotal)} เข้าบันทึกลงสมุดบัญชีแยกประเภท (General Ledger) ใช่หรือไม่?`)) return;
+
+      let accountCode = '4101'; // default revenue
+      let type = 'income';
+
+      if (state.activeDoc.type === 'wht_cert') {
+        accountCode = '5103';
+        type = 'expense';
+      }
+
+      let desc = `[เอกสาร ${docNo}] ลูกค้า: ${custName}`;
+      if (state.activeDoc.vatChoice === 'included') desc += " [VAT:inc]";
+      else if (state.activeDoc.vatChoice === 'excluded') desc += " [VAT:exc]";
+      if (state.activeDoc.whtChoice === '3') desc += " [WHT:3%_corp]";
+      else if (state.activeDoc.whtChoice === '1') desc += " [WHT:1%]";
+      else if (state.activeDoc.whtChoice === '5') desc += " [WHT:5%]";
+
+      if (!supabaseClient) {
+        alert("ไม่พบการเชื่อมต่อฐานข้อมูล Supabase");
+        return;
+      }
+
+      try {
+        const { error } = await supabaseClient
+          .from('transactions')
+          .insert([{
+            transaction_date: docDate,
+            type: type,
+            category: accountCode,
+            amount: totals.grandTotal,
+            description: desc
+          }]);
+
+        if (error) throw error;
+
+        alert(`บันทึกยอดเงินจากเอกสาร ${docNo} เข้าสู่ระบบบัญชีเรียบร้อยแล้ว!`);
+        await loadFinancialData();
+      } catch (err) {
+        console.error("Post doc to ledger error:", err);
+        alert("บันทึกลงสมุดบัญชีล้มเหลว: " + err.message);
+      }
+    }
+
+    // ==========================================
+    // 7. GENERAL LEDGER TABLE & SEARCH
+    // ==========================================
+    function renderLedgerTable() {
+      const filtered = getFilteredTransactions();
       const tableBody = document.getElementById('ledgerTableBody');
       if (!tableBody) return;
 
       tableBody.innerHTML = '';
 
       if (filtered.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">ไม่มีธุรกรรมการเงินในปีนี้</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">ไม่มีธุรกรรมการเงินในช่วงเวลาที่เลือก</td></tr>`;
         return;
       }
 
       filtered.forEach(tx => {
         const tr = document.createElement('tr');
+        const acc = getTransactionAccount(tx);
+        const taxInfo = parseTransactionTax(tx);
         
         const rawDate = (tx.transaction_date || '').split('T')[0].split(' ')[0];
         const dParts = rawDate.split('-');
-        const formattedDate = dParts.length === 3 ? `${dParts[2]}-${dParts[1]}-${dParts[0]}` : tx.transaction_date;
+        const formattedDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : tx.transaction_date;
 
-        const typeBadge = tx.type === 'income' 
-          ? `<span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2);">รายรับ</span>`
-          : `<span class="badge" style="background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2);">รายจ่าย</span>`;
+        let typeBadge = '';
+        if (acc.type === 'income') {
+          typeBadge = `<span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2);">รายรับ</span>`;
+        } else if (acc.type === 'expense') {
+          typeBadge = `<span class="badge" style="background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2);">รายจ่าย</span>`;
+        } else if (acc.type === 'asset') {
+          typeBadge = `<span class="badge" style="background: rgba(59,130,246,0.1); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2);">สินทรัพย์</span>`;
+        } else if (acc.type === 'liability') {
+          typeBadge = `<span class="badge" style="background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2);">หนี้สิน/กู้</span>`;
+        } else {
+          typeBadge = `<span class="badge" style="background: rgba(168,85,247,0.1); color: #c084fc; border: 1px solid rgba(168,85,247,0.2);">ทุน/ส่วนเจ้าของ</span>`;
+        }
 
-        const catMap = {
-          court_rental: "ค่าเช่าสนาม",
-          coaching_fee: "ค่าสอนโค้ช",
-          maintenance: "ค่าบำรุงรักษาสนาม",
-          utility: "ค่าน้ำ-ไฟ",
-          coach_compensation: "ค่าตอบแทนโค้ช",
-          supplies: "ค่าอุปกรณ์/ลูกบอล",
-          other: "อื่นๆ"
-        };
-        const catText = catMap[tx.category] || tx.category;
+        let taxBadges = '';
+        if (taxInfo.vatType !== 'none') {
+          taxBadges += `<span class="badge" style="background: rgba(236,72,153,0.1); color: #f472b6; margin-right: 3px;">VAT 7%</span>`;
+        }
+        if (taxInfo.whtRate > 0) {
+          taxBadges += `<span class="badge" style="background: rgba(245,158,11,0.1); color: #fbbf24; margin-right: 3px;">WHT ${(taxInfo.whtRate * 100)}%</span>`;
+        }
+        if (taxInfo.hasSso) {
+          taxBadges += `<span class="badge" style="background: rgba(16,185,129,0.1); color: #34d399;">SSO 5%</span>`;
+        }
+        if (!taxBadges) taxBadges = `<span style="color: #64748b; font-size: 0.8rem;">-</span>`;
 
-        const deleteBtn = `<button class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2);" onclick="deleteTransaction('${tx.id}')"><i class="fa-solid fa-trash"></i> ลบ</button>`;
+        let slipIcon = '';
+        if (tx.slip_url || tx.slipUrl) {
+          slipIcon = `<a href="${tx.slip_url || tx.slipUrl}" target="_blank" style="color: var(--accent-color); margin-left: 0.4rem;" title="ดูสลิปโอนเงิน"><i class="fa-solid fa-file-invoice"></i></a>`;
+        }
+
+        const deleteBtn = `<button class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2);" onclick="deleteTransaction('${tx.id}')"><i class="fa-solid fa-trash"></i></button>`;
 
         tr.innerHTML = `
           <td>${formattedDate}</td>
-          <td>${typeBadge}</td>
-          <td>${catText}</td>
-          <td style="text-align: right; font-weight: 600;">${formatCurrency(parseFloat(tx.amount))}</td>
-          <td>${tx.description}</td>
+          <td><span class="badge-code">${acc.code}</span></td>
+          <td>${typeBadge} <span style="font-weight: 500; margin-left: 0.25rem;">${acc.name.split('(')[0]}</span></td>
+          <td style="text-align: right; font-weight: 600; color: ${acc.type === 'income' ? '#10b981' : (acc.type === 'expense' ? '#ef4444' : '#fff')};">${formatCurrency(parseFloat(tx.amount))}</td>
+          <td>${taxBadges}</td>
+          <td>${tx.description || '-'} ${slipIcon}</td>
           <td class="no-print" style="text-align: center;">${deleteBtn}</td>
         `;
 
@@ -1123,49 +3217,81 @@
 
       rows.forEach(row => {
         const text = row.innerText.toLowerCase();
-        if (text.includes(search)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
+        row.style.display = text.includes(search) ? '' : 'none';
       });
+    }
+
+    function handleAccountCodeChange() {
+      const code = document.getElementById('txAccountCode').value;
+      const ssoSelect = document.getElementById('txSsoOption');
+      const whtSelect = document.getElementById('txWhtOption');
+
+      if (code === '5104') { // เงินเดือน
+        if (ssoSelect) ssoSelect.value = 'sso_calc';
+        if (whtSelect) whtSelect.value = 'none';
+      } else if (code === '5103') { // ค่าสอนโค้ช
+        if (whtSelect) whtSelect.value = 'wht3_indiv';
+        if (ssoSelect) ssoSelect.value = 'none';
+      }
     }
 
     async function handleSaveManualTx(e) {
       e.preventDefault();
       
       const date = document.getElementById('txDate').value;
-      const type = document.getElementById('txType').value;
-      const category = document.getElementById('txCategory').value;
-      const desc = document.getElementById('txDesc').value;
+      const accountCode = document.getElementById('txAccountCode').value;
       const amount = parseFloat(document.getElementById('txAmount').value);
+      const vatOption = document.getElementById('txVatOption').value;
+      const whtOption = document.getElementById('txWhtOption').value;
+      const ssoOption = document.getElementById('txSsoOption').value;
+      let desc = document.getElementById('txDesc').value.trim();
+      const slipUrl = document.getElementById('txSlipUrl').value.trim();
 
-      if (!date || !type || !category || !desc || isNaN(amount)) {
-        alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      if (!date || !accountCode || isNaN(amount) || amount <= 0 || !desc) {
+        alert("กรุณากรอกข้อมูลวันที่, ผังบัญชี, จำนวนเงิน และรายละเอียดให้ครบถ้วน");
         return;
       }
 
-      if (!supabaseClient) return;
+      const acc = CHART_OF_ACCOUNTS[accountCode];
+      
+      // Append Tax Tags to Description for transparent audit trail
+      if (vatOption === 'included') desc += " [VAT:inc]";
+      else if (vatOption === 'excluded') desc += " [VAT:exc]";
+
+      if (whtOption === 'wht1') desc += " [WHT:1%]";
+      else if (whtOption === 'wht3_indiv') desc += " [WHT:3%_indiv]";
+      else if (whtOption === 'wht3_corp') desc += " [WHT:3%_corp]";
+      else if (whtOption === 'wht5') desc += " [WHT:5%]";
+
+      if (ssoOption === 'sso_calc') desc += " [SSO:5%]";
+
+      if (!supabaseClient) {
+        alert("ไม่พบการเชื่อมต่อฐานข้อมูล Supabase");
+        return;
+      }
 
       try {
         const { error } = await supabaseClient
           .from('transactions')
           .insert([{
             transaction_date: date,
-            type: type,
-            category: category,
+            type: acc.type,
+            category: accountCode,
             amount: amount,
-            description: desc
+            description: desc,
+            slip_url: slipUrl || null
           }]);
 
         if (error) throw error;
 
-        alert("บันทึกธุรกรรมบัญชีลงฐานข้อมูลสำเร็จ!");
+        alert(`บันทึกรายการบัญชี [${accountCode}] ${acc.name} สำเร็จ!`);
         document.getElementById('formAddManualTx').reset();
+        document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+        
         await loadFinancialData();
       } catch (err) {
         console.error("Failed to insert transaction in Supabase:", err);
-        alert("บันทึกข้อมูลล้มเหลว");
+        alert("บันทึกข้อมูลล้มเหลว: " + err.message);
       }
     }
 
@@ -1181,20 +3307,21 @@
 
         if (error) throw error;
 
-        alert("ลบธุรกรรมการเงินเสร็จสิ้น!");
+        alert("ลบรายการธุรกรรมเสร็จสิ้น!");
         await loadFinancialData();
       } catch (err) {
         console.error("Failed to delete transaction:", err);
-        alert("ลบข้อมูลล้มเหลว");
+        alert("ลบข้อมูลล้มเหลว: " + err.message);
       }
     }
 
+    // Corporate SME Progressive Income Tax Rate Calculator
     function calculateEstimatedTax(netProfit) {
       if (netProfit <= 0) return 0;
       const type = state.accounting.businessType;
 
       if (type === 'sole_proprietor') {
-        const netTaxableIncome = netProfit * 0.4; // 60% deduction standard
+        const netTaxableIncome = netProfit * 0.4; // 60% standard deduction
         if (netTaxableIncome <= 150000) return 0;
         
         let tax = 0;
@@ -1217,22 +3344,26 @@
         }
         return tax;
       } else {
+        // Corporate SME Tax Rates (Revenue <= 30M, Capital <= 5M):
+        // 0 - 300,000 Baht: Exempt (0%)
+        // 300,001 - 3,000,000 Baht: 15%
+        // Over 3,000,000 Baht: 20%
         if (netProfit <= 300000) return 0;
-        let tax = 0;
         if (netProfit <= 3000000) {
-          tax = (netProfit - 300000) * 0.15;
-        } else {
-          tax = (2700000 * 0.15) + ((netProfit - 3000000) * 0.20);
+          return (netProfit - 300000) * 0.15;
         }
-        return tax;
+        return (2700000 * 0.15) + ((netProfit - 3000000) * 0.20);
       }
     }
 
     function openConfigModal() {
-      document.getElementById('cfgCapital').value = state.accounting.initialCapital;
-      document.getElementById('cfgAssetVal').value = state.accounting.fixedAssetVal;
-      document.getElementById('cfgDeprecRate').value = state.accounting.depreciationRate;
-      document.getElementById('cfgBusinessType').value = state.accounting.businessType;
+      document.getElementById('cfgCapital').value = state.accounting.initialCapital || 1000000;
+      document.getElementById('cfgAssetVal').value = state.accounting.fixedAssetVal || 500000;
+      document.getElementById('cfgDeprecRate').value = state.accounting.depreciationRate || 5;
+      document.getElementById('cfgDirectorLoan').value = state.accounting.directorLoan || 0;
+      document.getElementById('cfgBankLoan').value = state.accounting.bankLoan || 0;
+      document.getElementById('cfgBusinessType').value = state.accounting.businessType || 'corporate_sme';
+      document.getElementById('cfgVatRegistered').value = state.accounting.vatRegistered || 'yes';
       document.getElementById('configModal').style.display = 'flex';
     }
 
@@ -1244,53 +3375,148 @@
       const capital = parseFloat(document.getElementById('cfgCapital').value) || 0;
       const asset = parseFloat(document.getElementById('cfgAssetVal').value) || 0;
       const deprec = parseFloat(document.getElementById('cfgDeprecRate').value) || 0;
+      const dirLoan = parseFloat(document.getElementById('cfgDirectorLoan').value) || 0;
+      const bankLoan = parseFloat(document.getElementById('cfgBankLoan').value) || 0;
       const bizType = document.getElementById('cfgBusinessType').value;
+      const vatReg = document.getElementById('cfgVatRegistered').value;
 
       state.accounting = {
         initialCapital: capital,
         fixedAssetVal: asset,
         depreciationRate: deprec,
+        directorLoan: dirLoan,
+        bankLoan: bankLoan,
         businessType: bizType,
-        liabilities: 0
+        vatRegistered: vatReg
       };
 
-      if (!supabaseClient) return;
+      if (supabaseClient) {
+        try {
+          const configJson = JSON.stringify(state.accounting);
+          const existing = state.transactions.find(tx => tx.description === '__ACCOUNTING_CONFIG__');
 
-      try {
-        const configRow = state.transactions.find(tx => tx.description === '__ACCOUNTING_CONFIG__');
-
-        if (configRow) {
-          const { error } = await supabaseClient
-            .from('transactions')
-            .update({ category: JSON.stringify(state.accounting) })
-            .eq('id', configRow.id);
-
-          if (error) throw error;
-        } else {
-          const { error } = await supabaseClient
-            .from('transactions')
-            .insert([{
-              transaction_date: '1970-01-01',
-              type: 'config',
-              category: JSON.stringify(state.accounting),
-              amount: 0,
-              description: '__ACCOUNTING_CONFIG__'
-            }]);
-
-          if (error) throw error;
+          if (existing) {
+            await supabaseClient
+              .from('transactions')
+              .update({ category: configJson })
+              .eq('id', existing.id);
+          } else {
+            await supabaseClient
+              .from('transactions')
+              .insert([{
+                transaction_date: new Date().toISOString().split('T')[0],
+                type: 'config',
+                category: configJson,
+                amount: 0,
+                description: '__ACCOUNTING_CONFIG__'
+              }]);
+          }
+          alert("บันทึกการตั้งค่าข้อมูลพื้นฐานของกิจการเรียบร้อยแล้ว!");
+        } catch (e) {
+          console.error("Failed to persist config to Supabase:", e);
         }
-
-        alert("บันทึกการตั้งค่าลง Supabase สำเร็จ!");
-        closeConfigModal();
-        await loadFinancialData();
-      } catch (err) {
-        console.error("Failed to save accounting config row to Supabase:", err);
-        alert("บันทึกข้อมูลล้มเหลว");
       }
+
+      closeConfigModal();
+      await loadFinancialData();
+    }
+
+    // ==========================================
+    // 🔤 THAI BAHT TEXT CONVERTER (แปลงตัวเลขเป็นบาทถ้วน)
+    // ==========================================
+    function thaiBahtText(num) {
+      if (isNaN(num)) return "";
+      num = Math.round(num * 100) / 100;
+      const numStr = num.toFixed(2);
+      const parts = numStr.split('.');
+      const integerPart = parts[0];
+      const decimalPart = parts[1];
+
+      if (parseFloat(numStr) === 0) return "ศูนย์บาทถ้วน";
+
+      const digits = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+      const positions = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
+
+      function convertGroup(nStr) {
+        let res = "";
+        const len = nStr.length;
+        for (let i = 0; i < len; i++) {
+          const digit = parseInt(nStr.charAt(i));
+          const pos = len - i - 1;
+          if (digit !== 0) {
+            if (pos === 1 && digit === 1) {
+              res += "สิบ";
+            } else if (pos === 1 && digit === 2) {
+              res += "ยี่สิบ";
+            } else if (pos === 0 && digit === 1 && len > 1 && nStr.charAt(len - 2) !== '0') {
+              res += "เอ็ด";
+            } else {
+              res += digits[digit] + positions[pos];
+            }
+          }
+        }
+        return res;
+      }
+
+      let result = "";
+      if (integerPart.length > 6) {
+        const millions = integerPart.substring(0, integerPart.length - 6);
+        const remainder = integerPart.substring(integerPart.length - 6);
+        result = convertGroup(millions) + "ล้าน" + convertGroup(remainder);
+      } else {
+        result = convertGroup(integerPart);
+      }
+
+      if (!result) result = "ศูนย์";
+      result += "บาท";
+
+      if (decimalPart === "00") {
+        result += "ถ้วน";
+      } else {
+        const d1 = parseInt(decimalPart.charAt(0));
+        const d2 = parseInt(decimalPart.charAt(1));
+        let decStr = "";
+        if (d1 === 1) decStr += "สิบ";
+        else if (d1 === 2) decStr += "ยี่สิบ";
+        else if (d1 > 2) decStr += digits[d1] + "สิบ";
+
+        if (d2 === 1 && d1 > 0) decStr += "เอ็ด";
+        else if (d2 > 0) decStr += digits[d2];
+
+        result += decStr + "สตางค์";
+      }
+
+      return result;
     }
 
     function formatCurrency(val) {
-      return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(val);
+      const num = parseFloat(val) || 0;
+      return "฿" + num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatNumber(val) {
+      const num = parseFloat(val) || 0;
+      return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDateTh(dateStr) {
+      if (!dateStr) return '-';
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0]) + 543;
+        return `${parts[2]}/${parts[1]}/${y}`;
+      }
+      return dateStr;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
   </script>
 </body>
