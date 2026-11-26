@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // CONFIGURATION (ตั้งค่าการเชื่อมต่อ)
 // ==========================================
 function getCleanScriptProperty(key) {
@@ -134,6 +134,20 @@ function doGet(e) {
     const action = e.parameter ? e.parameter.action : "";
     if (action === "getExistingBookings") {
       return handleGetExistingBookings();
+    }
+    if (action === "testSlipAi") {
+      const testUrl = (e.parameter && e.parameter.url) ? e.parameter.url : "https://eqwmodrhorcbwsshbepg.supabase.co/storage/v1/object/public/slips/R.202611263_1795264424968.jpg";
+      const testFee = (e.parameter && e.parameter.fee) ? parseFloat(e.parameter.fee) : 1.00;
+      const geminiKey = getCleanScriptProperty("GEMINI_API_KEY") || getCleanScriptProperty("GEMINI_KEY") || getCleanScriptProperty("GOOGLE_API_KEY");
+      const iappKey = getCleanScriptProperty("IAPP_API_KEY") || getCleanScriptProperty("OPENTHAI_API_KEY") || "iapp_live_56a8f920aa8e17eb6c0f861b89042ec2d9c6f1446315eac3c0ea29e3852c94a1";
+      const analysis = analyzePaymentSlip(testUrl, testFee, null);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "test_completed",
+        hasGeminiKey: !!geminiKey,
+        hasIappKey: !!iappKey,
+        testUrl: testUrl,
+        analysis: analysis
+      }, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService.createTextOutput(JSON.stringify({ 
       status: "online", 
@@ -738,12 +752,19 @@ function sendLineMessageReminder(lineUserId, name, dateStr, slots, receiptNo, re
 }
 
 // ==========================================
-// 🤖 AI SLIP VERIFICATION & EXTRACTION (GEMINI VISION)
+// 🤖 HYBRID AI SLIP VERIFICATION & EXTRACTION
+// Primary: OpenThai 2.1 OCR (iApp Technology) - รวดเร็ว (~0.4 วินาที) และแม่นยำสูงกับฟอนต์สลิปธนาคารไทย
+// Fallback: Google Gemini Vision AI - สลับทำงานอัตโนมัติหาก OpenThai เกิดข้อผิดพลาด
 // ==========================================
+
 /**
- * วิเคราะห์และอ่านข้อมูลจากสลิปโอนเงินด้วย Google Gemini Vision AI
- * ดึงข้อมูล: ธนาคาร, ชื่อผู้โอน, ยอดเงิน, รหัสอ้างอิง, วันเวลาโอน
- * ตรวจสอบความถูกต้องของยอดเงิน และตรวจจับสลิปซ้ำในระบบ Google Sheets
+ * ฟังก์ชันหลักในการตรวจสอบสลิปโอนเงิน (ระบบ Hybrid)
+ * ลำดับ:
+ * 1. ดาวน์โหลดไฟล์ภาพสลิปจาก Supabase Storage
+ * 2. ทดลองอ่านข้อมูลด้วย OpenThai 2.1 OCR (iApp API)
+ * 3. หาก OpenThai ไม่สำเร็จ/อ่านไม่ออก จะสลับมาใช้ Google Gemini Vision AI (Fallback) ทันที
+ * 4. ตรวจสอบความถูกต้องของยอดเงินเทียบกับยอดที่ต้องชำระ (expectedFee)
+ * 5. ตรวจสอบหมายเลขอ้างอิงสลิปซ้ำ (Duplicate Detection) ใน Google Sheets
  */
 function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
   const result = {
@@ -754,54 +775,499 @@ function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
     transferTime: "-",
     status: "รอตรวจสอบ (ไม่มีสลิป)",
     amountMatch: false,
-    isDuplicate: false
+    isDuplicate: false,
+    engine: "-",
+    debugInfo: ""
   };
 
   if (!slipUrl || typeof slipUrl !== "string" || slipUrl.indexOf("http") !== 0) {
     return result;
   }
 
-  const apiKey = getCleanScriptProperty("GEMINI_API_KEY");
-  if (!apiKey) {
-    result.status = "รอตรวจสอบ (ไม่ได้ตั้งค่า GEMINI_API_KEY)";
-    return result;
-  }
-
+  // 1. ดาวน์โหลดภาพสลิป
+  let imageBlob = null;
   try {
-    // 1. ดาวน์โหลดภาพสลิปและแปลงเป็น Base64
     const response = UrlFetchApp.fetch(slipUrl, {
       method: "get",
       muteHttpExceptions: true
     });
 
-    if (response.getResponseCode() !== 200) {
-      result.status = "รอตรวจสอบ (ดาวน์โหลดสลิปไม่สำเร็จ)";
+    const resCode = response.getResponseCode();
+    if (resCode !== 200) {
+      result.status = "❌ ดาวน์โหลดสลิปไม่สำเร็จ (HTTP " + resCode + ")";
+      result.debugInfo = "HTTP " + resCode + " for URL: " + slipUrl;
+      logError("Slip Download Failed", "analyzePaymentSlip", result.debugInfo, "ERROR");
       return result;
     }
 
-    const blob = response.getBlob();
-    const contentType = blob.getContentType() || "image/jpeg";
-    const base64Data = Utilities.base64Encode(blob.getBytes());
+    imageBlob = response.getBlob();
+  } catch (dlErr) {
+    result.status = "❌ ไม่สามารถเข้าถึงไฟล์ภาพสลิป";
+    result.debugInfo = dlErr.toString();
+    logError("Slip Fetch Exception", "analyzePaymentSlip", dlErr.toString(), "ERROR");
+    return result;
+  }
 
-    // 2. เรียกใช้งาน Gemini Vision API
-    const systemInstruction = 
-      "คุณคือ AI ตรวจสอบสลิปการโอนเงินของสนามเทนนิส The Grand Slam\n" +
-      "หน้าที่ของคุณคืออ่านข้อมูลตัวอักษรและตัวเลขจากภาพสลิปธนาคารไทยอย่างแม่นยำ และตอบกลับเฉพาะ JSON ล้วนเท่านั้น ห้ามใส่คำบรรยายอื่นและห้ามใส่ markdown code block เด็ดขาด";
+  // 2. Engine 1: OpenThai 2.1 OCR (iApp Technology)
+  try {
+    const openThaiResult = analyzeSlipWithOpenThai(imageBlob, expectedFee, bookingSheet);
+    if (openThaiResult && (openThaiResult.amount > 0 || (openThaiResult.refNo && openThaiResult.refNo !== "-"))) {
+      openThaiResult.engine = "OpenThai 2.1 OCR";
+      return openThaiResult;
+    }
+    if (openThaiResult && openThaiResult.debugInfo) {
+      result.debugInfo = "OpenThai: " + openThaiResult.debugInfo + " | ";
+    }
+  } catch (otErr) {
+    logError("OpenThai OCR Error", "analyzePaymentSlip", otErr.toString(), "WARNING");
+    result.debugInfo = "OpenThai Exception: " + otErr.toString() + " | ";
+  }
+
+  // 3. Engine 2 (Fallback): Google Gemini Vision AI
+  try {
+    const geminiResult = analyzeSlipWithGemini(imageBlob, expectedFee, bookingSheet);
+    if (geminiResult && (geminiResult.amount > 0 || (geminiResult.refNo && geminiResult.refNo !== "-"))) {
+      geminiResult.engine = "Gemini Vision AI";
+      if (result.debugInfo) {
+        geminiResult.debugInfo = (result.debugInfo + (geminiResult.debugInfo || "")).substring(0, 250);
+      }
+      return geminiResult;
+    }
+    if (geminiResult) {
+      geminiResult.engine = "Gemini Vision AI (Fallback)";
+      return geminiResult;
+    }
+  } catch (gemErr) {
+    logError("Gemini Vision Error", "analyzePaymentSlip", gemErr.toString(), "WARNING");
+    result.status = "❌ AI ทั้งสองระบบขัดข้อง";
+    result.debugInfo = (result.debugInfo + "Gemini Exception: " + gemErr.toString()).substring(0, 250);
+  }
+
+  result.status = "❌ ไม่สามารถอ่านข้อมูลจากสลิปได้";
+  return result;
+}
+
+/**
+ * Engine 1: OpenThai 2.1 OCR (iApp Technology)
+ * ส่งไฟล์รูปภาพสลิปไปที่ https://api.iapp.co.th/v3/store/ocr/document/markdown
+ */
+function analyzeSlipWithOpenThai(imageBlob, expectedFee, bookingSheet) {
+  const result = {
+    bank: "-",
+    senderName: "-",
+    amount: 0,
+    refNo: "-",
+    transferTime: "-",
+    status: "รอตรวจสอบ",
+    amountMatch: false,
+    isDuplicate: false,
+    engine: "OpenThai 2.1 OCR",
+    debugInfo: ""
+  };
+
+  const iappKey = getCleanScriptProperty("IAPP_API_KEY") || 
+                  getCleanScriptProperty("OPENTHAI_API_KEY") || 
+                  "iapp_live_56a8f920aa8e17eb6c0f861b89042ec2d9c6f1446315eac3c0ea29e3852c94a1";
+
+  if (!iappKey) {
+    result.debugInfo = "Missing IAPP_API_KEY";
+    return null;
+  }
+
+  try {
+    const apiUrl = "https://api.iapp.co.th/v3/store/ocr/document/markdown";
+    const payload = {
+      "file": imageBlob
+    };
+
+    const res = UrlFetchApp.fetch(apiUrl, {
+      method: "post",
+      headers: {
+        "apikey": iappKey
+      },
+      payload: payload,
+      muteHttpExceptions: true
+    });
+
+    const resCode = res.getResponseCode();
+    const resText = res.getContentText();
+
+    if (resCode !== 200) {
+      result.debugInfo = "HTTP " + resCode + ": " + resText.substring(0, 150);
+      logError("OpenThai HTTP Error", "analyzeSlipWithOpenThai", result.debugInfo, "WARNING");
+      return null;
+    }
+
+    const resJson = JSON.parse(resText);
+    let mdText = "";
+    if (resJson.data && resJson.data.markdown) {
+      mdText = resJson.data.markdown;
+    } else if (resJson.markdown) {
+      mdText = resJson.markdown;
+    } else if (typeof resJson.data === "string") {
+      mdText = resJson.data;
+    }
+
+    if (!mdText) {
+      result.debugInfo = "Empty markdown returned from OpenThai";
+      return null;
+    }
+
+    // สกัดข้อมูลจาก Markdown
+    const parsed = parseSlipMarkdown(mdText);
+    result.bank = parsed.bank;
+    result.senderName = parsed.senderName;
+    result.amount = parsed.amount;
+    result.refNo = parsed.refNo;
+    result.transferTime = parsed.transferTime;
+    result.debugInfo = "OpenThai v2.1 success (" + (resJson.data && resJson.data.time ? resJson.data.time + "s" : "ok") + ")";
+
+    // ตรวจสอบยอดเงิน และสลิปซ้ำ
+    validateSlipAmount(result, expectedFee);
+    checkDuplicateSlipRef(result, bookingSheet);
+
+    return result;
+
+  } catch (err) {
+    result.debugInfo = err.toString();
+    logError("OpenThai Exception", "analyzeSlipWithOpenThai", err.toString(), "WARNING");
+    return null;
+  }
+}
+
+/**
+ * ฟังก์ชันแยกข้อความและโครงสร้างจากผลลัพธ์ Markdown ของ OpenThai 2.1 OCR
+ * ปรับปรุงระบบตรวจจับ: ยอดเงิน (จำนวน/Amount), รหัสอ้างอิง (Ref No/Ref ID), วันที่ทำรายการ, และผู้โอน (จาก/From)
+ * รองรับสลิปทุกธนาคาร (BBL, SCB, KTB, KBANK, BAY/Kept, ttb, GSB, ฯลฯ)
+ */
+function parseSlipMarkdown(mdText) {
+  const info = {
+    bank: "-",
+    senderName: "-",
+    amount: 0,
+    refNo: "-",
+    transferTime: "-"
+  };
+
+  if (!mdText || typeof mdText !== "string") return info;
+
+  // 0. ลบเครื่องหมายตกแต่ง Markdown (*, _, `, ~, #) และตาราง (|) เพื่อป้องกันปัญหาจับคำค้นไม่ติด
+  const cleanMd = mdText
+    .replace(/[*_`~#]/g, " ")
+    .replace(/\|/g, " ")
+    .replace(/\t/g, " ");
+
+  const rawLines = cleanMd.split(/\r?\n/)
+    .map(function(l) { return l.trim(); })
+    .filter(function(l) { return l.length > 0; });
+
+  // 1. Transaction Ref No. (รหัสอ้างอิง / เลขที่รายการ / เลขที่อ้างอิง / Ref ID / Ref No)
+  // ให้ความสำคัญกับ "เลขที่อ้างอิง" (รหัสธุรกรรมหลักยาว 15-30 หลัก) เป็นอันดับแรก เหมือนของทุกธนาคาร
+  // และใช้ "หมายเลขอ้างอิง" (รหัสภายใน 6 หลัก เช่น ของ BBL) เป็นตัวเลือกรอง
+  let primaryRef = "";
+  let secondaryRef = "";
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+
+    // ตรวจจับรหัสหลัก: "เลขที่อ้างอิง", "รหัสอ้างอิง", "เลขที่รายการ", "Ref ID", "Ref No", "Transaction ID"
+    const primaryMatch = line.match(/(?:เลขที่อ้างอิง|รหัสอ้างอิง|เลขที่(?:รายการ|ธุรกรรม)|Transaction\s*(?:ID|No\.?)|Ref(?:\s*ID|\.?\s*No\.?)?|Reference(?:\s*No\.?)?)[\s:]+([A-Za-z0-9_-]{5,})/i);
+    if (primaryMatch && primaryMatch[1]) {
+      const cand = primaryMatch[1].trim();
+      if (cand.length >= 12 || !primaryRef) {
+        primaryRef = cand;
+      }
+    }
+    if (/^(?:เลขที่อ้างอิง|รหัสอ้างอิง|เลขที่(?:รายการ|ธุรกรรม)|Transaction\s*(?:ID|No\.?)|Ref(?:\s*ID|\.?\s*No\.?)?|Reference(?:\s*No\.?)?)[\s:]*$/i.test(line) && i + 1 < rawLines.length) {
+      const nextL = rawLines[i + 1].trim();
+      if (/^[A-Za-z0-9_-]{5,}$/.test(nextL)) {
+        if (nextL.length >= 12 || !primaryRef) {
+          primaryRef = nextL;
+        }
+      }
+    }
+
+    // ตรวจจับรหัสรอง: "หมายเลขอ้างอิง", "หมายเลขรายการ" (เช่น BBL เลข 6 หลัก เช่น 389149)
+    const secondaryMatch = line.match(/(?:หมายเลข(?:อ้างอิง|รายการ)|รหัสรายการ)[\s:]+([A-Za-z0-9_-]{5,})/i);
+    if (secondaryMatch && secondaryMatch[1]) {
+      const cand = secondaryMatch[1].trim();
+      if (!secondaryRef) secondaryRef = cand;
+    }
+    if (/^(?:หมายเลข(?:อ้างอิง|รายการ)|รหัสรายการ)[\s:]*$/i.test(line) && i + 1 < rawLines.length) {
+      const nextL = rawLines[i + 1].trim();
+      if (/^[A-Za-z0-9_-]{5,}$/.test(nextL)) {
+        if (!secondaryRef) secondaryRef = nextL;
+      }
+    }
+  }
+
+  // กำหนดค่าเลขที่อ้างอิง (เลือกรหัสยาวมาตรฐานกลางก่อน หากไม่มีจึงใช้รหัสรอง)
+  info.refNo = primaryRef || secondaryRef || "-";
+
+  // 2. Amount (ยอดเงินโอน / จำนวน / จำนวนเงิน / Amount / Total Amount)
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    // ข้ามบรรทัดค่าธรรมเนียม ยอดคงเหลือ หรือวงเงิน
+    if (/ค่าธรรมเนียม|คงเหลือ|วงเงิน|Fee|Balance|Limit/i.test(line)) {
+      continue;
+    }
+
+    // Inline amount (เช่น "จำนวนเงิน 350.00 บาท", "Amount 250.00 THB", "จำนวน: 250.00 บาท", "จำนวน 99.00")
+    const inlineAmt = line.match(/(?:จำนวนเงิน|จำนวน|ยอดเงิน|ยอดโอน|ยอดเงินโอน|โอนเงิน|จ่ายเงิน|Amount|Total\s*Amount|Transfer\s*Amount)[\s:]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|[0-9]+(?:\.\d{1,2})?)\s*(?:THB|บาท|Baht)?/i);
+    if (inlineAmt && inlineAmt[1]) {
+      const val = parseFloat(inlineAmt[1].replace(/,/g, ""));
+      if (!isNaN(val) && val > 0) {
+        info.amount = val;
+        break;
+      }
+    }
+
+    // Multi-line amount (คำค้นอยู่บรรทัดที่ i เช่น "จำนวนเงิน" หรือ "Amount", ตัวเลขยอดเงินอยู่บรรทัดถัดไป)
+    if (/^(?:จำนวนเงิน|จำนวน|ยอดเงิน|ยอดโอน|ยอดเงินโอน|Amount|Total\s*Amount|Transfer\s*Amount)[\s:]*$/i.test(line) && i + 1 < rawLines.length) {
+      const nextL = rawLines[i + 1].trim();
+      if (!/ค่าธรรมเนียม|Fee|คงเหลือ|Balance/i.test(nextL)) {
+        const nextAmtMatch = nextL.match(/^([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|[0-9]+(?:\.\d{1,2})?)\s*(?:THB|บาท|Baht)?$/i);
+        if (nextAmtMatch && nextAmtMatch[1]) {
+          const val = parseFloat(nextAmtMatch[1].replace(/,/g, ""));
+          if (!isNaN(val) && val > 0) {
+            info.amount = val;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // ตัวเลือกรอง (Fallback): ค้นหาบรรทัดที่เป็นตัวเลขยอดเงินโดดๆ เช่น "99.00 THB", "250.00 บาท", "7,000.00"
+  if (info.amount === 0) {
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      if (/ค่าธรรมเนียม|คงเหลือ|วงเงิน|Fee|Balance|Limit/i.test(line)) {
+        continue;
+      }
+      const saMatch = line.match(/^([0-9]{1,3}(?:,[0-9]{3})*\.\d{2})\s*(?:THB|บาท|Baht)?$/i);
+      if (saMatch && saMatch[1]) {
+        const val = parseFloat(saMatch[1].replace(/,/g, ""));
+        if (!isNaN(val) && val > 0) {
+          info.amount = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Transfer Date & Time (วันเวลาโอน / วันที่ทำรายการ)
+  const monthsThai = "ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม";
+  const monthsEng = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+  const monthPattern = "(?:" + monthsThai + "|" + monthsEng + ")";
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    // รองรับเครื่องหมายคั่นระหว่างวันและเวลาทั้ง space, comma, dash/hyphen (-) เช่น "23 พ.ย. 2569 - 16:04", "23 Nov 2026 - 21:53", "24 พ.ย. 69 21:24 น."
+    const timeMatch1 = line.match(new RegExp("\\b(\\d{1,2}\\s+" + monthPattern + "\\s+\\d{2,4})[\\s,\\-–]+(?:เวลา\\s*|at\\s*)?(\\d{1,2}:\\d{2}(?::\\d{2})?(?:\\s*น\\.?)?)", "i"));
+    if (timeMatch1) {
+      info.transferTime = (timeMatch1[1] + ", " + timeMatch1[2]).trim();
+      break;
+    }
+    // รูปแบบตัวเลขล้วน เช่น "23/11/2026 21:53", "23-11-2569 - 16:04"
+    const timeMatch2 = line.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[\s,\-–]+(?:เวลา\s*|at\s*)?(\d{1,2}:\d{2}(?::\d{2})?(?:\s*น\\.?)?)/i);
+    if (timeMatch2) {
+      info.transferTime = (timeMatch2[1] + ", " + timeMatch2[2]).trim();
+      break;
+    }
+  }
+
+  // 3.2 กรณีวันที่และเวลาอยู่คนละบรรทัด (เช่น บรรทัดบนบอกวันที่ บรรทัดล่างบอกเวลา)
+  if (info.transferTime === "-") {
+    let foundDate = "";
+    let foundTime = "";
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      if (!foundDate) {
+        const dMatch = line.match(new RegExp("\\b(\\d{1,2}\\s+" + monthPattern + "\\s+\\d{2,4})", "i")) ||
+                       line.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/);
+        if (dMatch) foundDate = dMatch[1].trim();
+      }
+      if (!foundTime) {
+        const tMatch = line.match(/\b(?:เวลา\s*)?(\d{1,2}:\d{2}(?::\d{2})?(?:\s*น\.?)?)\b/);
+        if (tMatch && line.indexOf("http") === -1 && line.indexOf("www") === -1) {
+          foundTime = tMatch[1].trim();
+        }
+      }
+      if (foundDate && foundTime) {
+        info.transferTime = (foundDate + ", " + foundTime).trim();
+        break;
+      }
+    }
+  }
+
+  // 4. Bank (ธนาคาร)
+  const fullText = cleanMd.toLowerCase();
+  if (fullText.indexOf("ttb") !== -1 || fullText.indexOf("ทหารไทยธนชาต") !== -1 || fullText.indexOf("tmb") !== -1 || fullText.indexOf("thanachart") !== -1) {
+    info.bank = "ttb (ทหารไทยธนชาต)";
+  } else if (fullText.indexOf("kbank") !== -1 || fullText.indexOf("กสิกรไทย") !== -1 || fullText.indexOf("kasikorn") !== -1 || fullText.indexOf("k+") !== -1) {
+    info.bank = "กสิกรไทย (KBANK)";
+  } else if (fullText.indexOf("scb") !== -1 || fullText.indexOf("ไทยพาณิชย์") !== -1 || fullText.indexOf("siam commercial") !== -1) {
+    info.bank = "ไทยพาณิชย์ (SCB)";
+  } else if (fullText.indexOf("ktb") !== -1 || fullText.indexOf("กรุงไทย") !== -1 || fullText.indexOf("krungthai") !== -1) {
+    info.bank = "กรุงไทย (KTB)";
+  } else if (fullText.indexOf("bbl") !== -1 || fullText.indexOf("กรุงเทพ") !== -1 || fullText.indexOf("bangkok bank") !== -1) {
+    info.bank = "กรุงเทพ (BBL)";
+  } else if (fullText.indexOf("kept") !== -1) {
+    info.bank = "Kept (กรุงศรี)";
+  } else if (fullText.indexOf("bay") !== -1 || fullText.indexOf("กรุงศรี") !== -1 || fullText.indexOf("krungsri") !== -1 || (info.refNo && info.refNo.indexOf("KSA") === 0)) {
+    info.bank = "กรุงศรีอยุธยา (BAY)";
+  } else if (fullText.indexOf("gsb") !== -1 || fullText.indexOf("ออมสิน") !== -1 || fullText.indexOf("government savings") !== -1) {
+    info.bank = "ออมสิน (GSB)";
+  } else if (fullText.indexOf("baac") !== -1 || fullText.indexOf("ธ.ก.ส.") !== -1 || fullText.indexOf("ธกส") !== -1) {
+    info.bank = "ธ.ก.ส. (BAAC)";
+  } else if (fullText.indexOf("uob") !== -1 || fullText.indexOf("ยูโอบี") !== -1) {
+    info.bank = "ยูโอบี (UOB)";
+  } else if (fullText.indexOf("cimb") !== -1 || fullText.indexOf("ซีไอเอ็มบี") !== -1) {
+    info.bank = "CIMB Thai";
+  } else if (fullText.indexOf("พร้อมเพย์") !== -1 || fullText.indexOf("promptpay") !== -1) {
+    info.bank = "พร้อมเพย์";
+  }
+
+  // 5. Sender Name (ผู้โอน = จาก / From)
+  // ป้องกันการสับสนระหว่างชื่อผู้โอน กับชื่อผู้รับ (ไปยัง / To)
+  let fromIndex = -1;
+  let toIndex = -1;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const l = rawLines[i];
+    if (fromIndex === -1 && /^(?:จาก|From)[\s:]*$/i.test(l)) {
+      fromIndex = i;
+    } else if (fromIndex === -1 && /^(?:จาก|From)[\s:]+(.+)$/i.test(l)) {
+      const candidate = l.replace(/^(?:จาก|From)[\s:]+/i, "").trim();
+      if (!isInvalidSenderLine(candidate)) {
+        info.senderName = cleanSenderName(candidate);
+        break;
+      }
+      fromIndex = i;
+    }
+    if (toIndex === -1 && /^(?:ไปยัง|ถึง|To)[\s:]*/i.test(l)) {
+      toIndex = i;
+    }
+  }
+
+  // หากพบตำแหน่ง "จาก / From" ให้ค้นหาชื่อผู้โอนเฉพาะในช่วงระหว่าง "จาก" ถึง "ไปยัง"
+  if (info.senderName === "-" && fromIndex !== -1) {
+    const maxScan = toIndex > fromIndex ? toIndex : Math.min(rawLines.length, fromIndex + 4);
+    for (let i = fromIndex + 1; i < maxScan; i++) {
+      const line = rawLines[i];
+      if (isInvalidSenderLine(line)) continue;
+      if (isValidPersonName(line)) {
+        info.senderName = cleanSenderName(line);
+        break;
+      }
+    }
+  }
+
+  // กรณีสลิปไม่มีคำว่า "จาก / From" (เช่น KBANK, BAY) ให้ค้นหาก่อนถึงตำแหน่งผู้รับ (เช่น "ไปยัง" หรือ บจก. แกรนด์สแลม)
+  if (info.senderName === "-") {
+    const limit = toIndex !== -1 ? toIndex : rawLines.length;
+    for (let i = 0; i < limit; i++) {
+      const line = rawLines[i];
+      if (isInvalidSenderLine(line)) continue;
+      if (isValidPersonName(line)) {
+        info.senderName = cleanSenderName(line);
+        break;
+      }
+    }
+  }
+
+  return info;
+}
+
+/**
+ * ตรวจสอบข้อความที่ไม่ใช่ชื่อผู้โอน (เช่น ชื่อสนาม, ธนาคาร, เลขบัญชี, หัวข้อระบบ)
+ */
+function isInvalidSenderLine(text) {
+  if (!text) return true;
+  const t = text.toLowerCase();
+  if (t.indexOf("แกรนด์สแลม") !== -1 || t.indexOf("grand slam") !== -1 || t.indexOf("grand sla") !== -1) return true;
+  if (t.indexOf("ธนาคาร") !== -1 || t.indexOf("bank") !== -1 || t.indexOf("krungthai") !== -1 || t.indexOf("กสิกรไทย") !== -1 || t.indexOf("krungsri") !== -1) return true;
+  if (/^[xX0-9\-\s\.]+$/.test(text)) return true; // เลขบัญชีหรือเบอร์โทร
+  if (/^(?:โอนเงินสำเร็จ|successful|รายการสำเร็จ|จำนวน|amount|fee|ref|transfer|transaction|qr code|scan|recipient)/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * ตรวจสอบโครงสร้างชื่อบุคคล (ภาษาไทย หรือภาษาอังกฤษ พร้อมคำนำหน้าชื่อ และรองรับดอกจันซ่อนชื่อ)
+ */
+function isValidPersonName(text) {
+  if (!text) return false;
+  // ชื่อภาษาไทย เช่น "นาย กมลวิทย์", "น.ส. วรัญญู เ***", "คุณสมชาย"
+  if (/^(?:นาย|นางสาว|นาง|น\.ส\.|คุณ|บจก\.|บริษัท)\s*[\u0E00-\u0E7FA-Za-z\s\*\.]{2,}/i.test(text)) {
+    return true;
+  }
+  // ชื่อภาษาอังกฤษ เช่น "Thanwarat Maklab", "CHAYUT CHIWKA", "MR. JOHN DOE"
+  if (/^(?:MR\.|MRS\.|MS\.|MISS\s+)?[A-Z][a-zA-Z\s\*\.]{3,}$/.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * ตัดช่องว่างซ้ำซ้อนในชื่อ
+ */
+function cleanSenderName(name) {
+  return name.replace(/\s{2,}/g, " ").trim();
+}
+
+/**
+ * Engine 2 (Fallback): Google Gemini Vision AI
+ */
+function analyzeSlipWithGemini(imageBlob, expectedFee, bookingSheet) {
+  const result = {
+    bank: "-",
+    senderName: "-",
+    amount: 0,
+    refNo: "-",
+    transferTime: "-",
+    status: "รอตรวจสอบ",
+    amountMatch: false,
+    isDuplicate: false,
+    engine: "Gemini Vision AI",
+    debugInfo: ""
+  };
+
+  const apiKey = getCleanScriptProperty("GEMINI_API_KEY") || 
+                 getCleanScriptProperty("GEMINI_KEY") || 
+                 getCleanScriptProperty("GOOGLE_API_KEY") || 
+                 getCleanScriptProperty("GEMINI_APIKEY");
+
+  if (!apiKey) {
+    result.debugInfo = "Missing GEMINI_API_KEY";
+    return null;
+  }
+
+  try {
+    let contentType = "image/jpeg";
+    try {
+      const mime = imageBlob.getContentType();
+      if (mime && mime.indexOf("image/") === 0 && mime !== "image/svg+xml") {
+        contentType = mime;
+      }
+    } catch(e) {}
+
+    const base64Data = Utilities.base64Encode(imageBlob.getBytes());
 
     const promptText = 
-      "กรุณาอ่านข้อมูลจากสลิปนี้ และตอบกลับเป็น JSON รูปแบบนี้เท่านั้น:\n" +
+      "คุณคือ AI ตรวจสอบสลิปการโอนเงินของสนามเทนนิส The Grand Slam\n" +
+      "หน้าที่ของคุณคืออ่านข้อมูลตัวอักษรและตัวเลขจากภาพสลิปธนาคารไทยนี้อย่างแม่นยำ และตอบกลับเป็น JSON ล้วนเท่านั้น ห้ามใส่คำบรรยายอื่นหรือ markdown code block เด็ดขาด\n\n" +
+      "โครงสร้าง JSON ที่ต้องการ:\n" +
       "{\n" +
-      '  "bank": "ชื่อธนาคารของผู้โอน เช่น กสิกรไทย, ไทยพาณิชย์, กรุงไทย, กรุงเทพ, ออมสิน, ทหารไทยธนชาต, กรุงศรี, พร้อมเพย์",\n' +
-      '  "senderName": "ชื่อ-นามสกุล หรือชื่อบัญชีของผู้โอนเงิน",\n' +
-      '  "amount": ตัวเลขยอดเงินที่โอนสำเร็จ (ตัวเลขทศนิยมหรือจำนวนเต็ม เช่น 250 หรือ 500.00 โดยไม่ใส่เครื่องหมายจุลภาค),\n' +
-      '  "refNo": "หมายเลขอ้างอิง หรือ รหัสธุรกรรม หรือ Transaction ID หรือ Ref No.",\n' +
-      '  "transferTime": "วันและเวลาที่โอนเงินตามที่ระบุในสลิป (เช่น 21 พ.ย. 69 14:30 น. หรือ 21/11/2026 14:30:00)"\n' +
+      '  "bank": "ชื่อธนาคารของผู้โอน เช่น กสิกรไทย, ไทยพาณิชย์, กรุงไทย, กรุงเทพ, ออมสิน, ทหารไทยธนชาต (ttb), กรุงศรี, พร้อมเพย์",\n' +
+      '  "senderName": "ชื่อ-นามสกุล หรือชื่อบัญชีของผู้โอนเงิน (ระบุใต้คำว่า จาก หรือ From ห้ามเอาชื่อผู้รับ)",\n' +
+      '  "amount": ตัวเลขยอดเงินที่โอนสำเร็จ (ระบุใต้คำว่า จำนวน, จำนวนเงิน, หรือ Amount เช่น 250 หรือ 99.00 หรือ 7000 โดยไม่ใส่เครื่องหมายจุลภาคและไม่ต้องใส่หน่วย),\n' +
+      '  "refNo": "หมายเลขอ้างอิง หรือ รหัสอ้างอิง หรือ รหัสธุรกรรม หรือ Transaction ID หรือ Ref ID หรือ Ref No.",\n' +
+      '  "transferTime": "วันและเวลาที่โอนเงินตามที่ระบุในสลิป เช่น วันที่ทำรายการ (เช่น 23 พ.ย. 69, 21:53 น. หรือ 23 Nov 2026 - 21:53)"\n' +
       "}";
 
     const payload = {
-      systemInstruction: {
-        parts: [{ text: systemInstruction }]
-      },
       contents: [
         {
           role: "user",
@@ -825,13 +1291,14 @@ function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
     };
 
     const models = [
-      "gemini-2.5-flash",
       "gemini-2.0-flash",
-      "gemini-1.5-flash"
+      "gemini-1.5-flash",
+      "gemini-2.0-flash-exp"
     ];
 
     let geminiRawResponse = "";
     let callSuccess = false;
+    let lastError = "";
 
     for (let m = 0; m < models.length; m++) {
       const modelName = models[m];
@@ -845,36 +1312,32 @@ function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
           muteHttpExceptions: true
         });
 
-        const resCode = geminiRes.getResponseCode();
-        const resText = geminiRes.getContentText();
+        const gCode = geminiRes.getResponseCode();
+        const gText = geminiRes.getContentText();
 
-        if (resCode === 200) {
-          const resJson = JSON.parse(resText);
-          if (resJson.candidates && resJson.candidates.length > 0 && resJson.candidates[0].content) {
+        if (gCode === 200) {
+          const resJson = JSON.parse(gText);
+          if (resJson.candidates && resJson.candidates.length > 0 && resJson.candidates[0].content && resJson.candidates[0].content.parts) {
             geminiRawResponse = resJson.candidates[0].content.parts[0].text.trim();
             callSuccess = true;
+            result.debugInfo = "Gemini (" + modelName + ")";
             break;
           }
+        } else {
+          lastError = modelName + " (HTTP " + gCode + "): " + gText.substring(0, 200);
         }
       } catch (callErr) {
-        // ลองโมเดลถัดไป
+        lastError = modelName + " Error: " + callErr.toString();
       }
     }
 
     if (!callSuccess || !geminiRawResponse) {
-      result.status = "รอตรวจสอบ (Gemini OCR ไม่ตอบกลับ)";
-      return result;
+      result.debugInfo = lastError;
+      return null;
     }
 
-    // 3. แปลงผลลัพธ์ JSON
-    let parsedData = {};
-    try {
-      let cleanJson = geminiRawResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
-      parsedData = JSON.parse(cleanJson);
-    } catch (parseErr) {
-      result.status = "รอตรวจสอบ (แปลงข้อมูลไม่สำเร็จ)";
-      return result;
-    }
+    let cleanJson = geminiRawResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const parsedData = JSON.parse(cleanJson);
 
     result.bank = String(parsedData.bank || "-").trim();
     result.senderName = String(parsedData.senderName || "-").trim();
@@ -882,24 +1345,43 @@ function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
     result.refNo = String(parsedData.refNo || "-").trim();
     result.transferTime = String(parsedData.transferTime || "-").trim();
 
-    // 4. ตรวจสอบความถูกต้องของยอดเงิน
-    const expFee = parseFloat(expectedFee) || 0;
-    if (result.amount > 0 && expFee > 0) {
-      if (Math.abs(result.amount - expFee) < 0.01) {
-        result.amountMatch = true;
-        result.status = "ยอดเงินตรง ✅";
-      } else {
-        result.amountMatch = false;
-        result.status = "⚠️ ยอดไม่ตรง (สลิป: " + result.amount + " บ., ค่าบริการ: " + expFee + " บ.)";
-      }
-    } else if (result.amount > 0) {
-      result.status = "มียอดเงิน " + result.amount + " บ.";
-    } else {
-      result.status = "รอตรวจสอบ (ไม่พบยอดเงินในสลิป)";
-    }
+    validateSlipAmount(result, expectedFee);
+    checkDuplicateSlipRef(result, bookingSheet);
 
-    // 5. ตรวจสอบสลิปซ้ำ (Duplicate Detection) ใน Google Sheets คอลัมน์ Ref No (คอลัมน์ V / 22)
-    if (bookingSheet && result.refNo && result.refNo !== "-" && result.refNo.length >= 6) {
+    return result;
+
+  } catch (err) {
+    result.debugInfo = "Gemini Exception: " + err.toString();
+    return null;
+  }
+}
+
+/**
+ * ตรวจสอบความถูกต้องของยอดเงิน
+ */
+function validateSlipAmount(result, expectedFee) {
+  const expFee = parseFloat(expectedFee) || 0;
+  if (result.amount > 0 && expFee > 0) {
+    if (Math.abs(result.amount - expFee) < 0.01) {
+      result.amountMatch = true;
+      result.status = "ยอดเงินตรง ✅";
+    } else {
+      result.amountMatch = false;
+      result.status = "⚠️ ยอดไม่ตรง (สลิป: " + result.amount + " บ., ค่าบริการ: " + expFee + " บ.)";
+    }
+  } else if (result.amount > 0) {
+    result.status = "มียอดเงิน " + result.amount + " บ.";
+  } else {
+    result.status = "⚠️ ไม่พบยอดเงินในสลิป";
+  }
+}
+
+/**
+ * ตรวจสอบหมายเลขอ้างอิงสลิปซ้ำในระบบ Google Sheets (คอลัมน์ V / 22)
+ */
+function checkDuplicateSlipRef(result, bookingSheet) {
+  if (bookingSheet && result.refNo && result.refNo !== "-" && result.refNo.length >= 6) {
+    try {
       const lastRow = bookingSheet.getLastRow();
       if (lastRow > 1 && bookingSheet.getLastColumn() >= 22) {
         const existingRefs = bookingSheet.getRange(2, 22, lastRow - 1, 1).getValues();
@@ -912,14 +1394,7 @@ function analyzePaymentSlip(slipUrl, expectedFee, bookingSheet) {
           }
         }
       }
-    }
-
-    return result;
-
-  } catch (err) {
-    logError("Slip Analysis Error", "analyzePaymentSlip", err.toString(), "WARNING");
-    result.status = "รอตรวจสอบ (เกิดข้อผิดพลาดในการอ่านสลิป)";
-    return result;
+    } catch (dupErr) {}
   }
 }
 
@@ -938,20 +1413,98 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
   if (slipAnalysis && (slipUrl || (slipAnalysis.refNo && slipAnalysis.refNo !== "-"))) {
     let badgeBg = "#E8F8EE";
     let badgeTextColor = "#1DB446";
-    let badgeText = slipAnalysis.status || "ยอดเงินตรง ✅";
+    let badgeText = "✅ ยอดเงินตรง";
 
     if (slipAnalysis.isDuplicate) {
       badgeBg = "#FEE2E2";
       badgeTextColor = "#DC2626";
-      badgeText = "🚨 ตรวจพบสลิปซ้ำ";
+      badgeText = "🚨 สลิปซ้ำ";
     } else if (slipAnalysis.amountMatch === false && slipAnalysis.amount > 0) {
       badgeBg = "#FFF4E5";
       badgeTextColor = "#D97706";
       badgeText = "⚠️ ยอดไม่ตรง";
-    } else if (slipAnalysis.status && slipAnalysis.status.indexOf("รอตรวจสอบ") !== -1) {
+    } else if (slipAnalysis.amountMatch) {
+      badgeBg = "#E8F8EE";
+      badgeTextColor = "#1DB446";
+      badgeText = "✅ ยอดเงินตรง";
+    } else if (slipAnalysis.status && (slipAnalysis.status.indexOf("ไม่พบคีย์") !== -1 || slipAnalysis.status.indexOf("❌") !== -1)) {
+      badgeBg = "#FEE2E2";
+      badgeTextColor = "#DC2626";
+      badgeText = "❌ ตรวจไม่ผ่าน";
+    } else {
       badgeBg = "#F1F5F9";
       badgeTextColor = "#64748B";
-      badgeText = "⏳ รอตรวจสอบ";
+      badgeText = "🔍 รอตรวจสอบ";
+    }
+
+    const detailRows = [
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "ธนาคาร:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.bank || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "ผู้โอน:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.senderName || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "ยอดในสลิป:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: (slipAnalysis.amount ? Number(slipAnalysis.amount).toLocaleString("th-TH", { minimumFractionDigits: 2 }) + " บาท" : "-"), size: "xs", color: (slipAnalysis.amountMatch ? "#16A34A" : "#DC2626"), weight: "bold", flex: 6 }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "เลขที่รายการ:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.refNo || "-"), size: "xs", color: "#1E293B", flex: 6, wrap: true }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "วันเวลาโอน:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.transferTime || "-"), size: "xs", color: "#64748B", flex: 6, wrap: true }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "ผลตรวจ:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.status || "-"), size: "xs", color: badgeTextColor, weight: "bold", flex: 6, wrap: true }
+        ]
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "ระบบที่ใช้:", size: "xs", color: "#64748B", flex: 3 },
+          { type: "text", text: String(slipAnalysis.engine || "Hybrid OCR"), size: "xs", color: "#64748B", flex: 6, wrap: true }
+        ]
+      }
+    ];
+
+    if (slipAnalysis.debugInfo && slipAnalysis.status.indexOf("❌") !== -1) {
+      detailRows.push({
+        type: "box",
+        layout: "baseline",
+        contents: [
+          { type: "text", text: "สาเหตุ:", size: "xxs", color: "#94A3B8", flex: 3 },
+          { type: "text", text: String(slipAnalysis.debugInfo).substring(0, 100), size: "xxs", color: "#DC2626", flex: 6, wrap: true }
+        ]
+      });
     }
 
     aiBoxContents.push(
@@ -972,7 +1525,7 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
             contents: [
               {
                 type: "text",
-                text: "🤖 AI ตรวจสอบสลิป",
+                text: "🤖 AI ตรวจสลิป (" + (slipAnalysis.engine || "Hybrid") + ")",
                 weight: "bold",
                 size: "xs",
                 color: "#1E3A8A",
@@ -1005,48 +1558,7 @@ function sendAdminSlipNotification(name, phone, dateStr, slots, receiptNo, slipU
             layout: "vertical",
             margin: "sm",
             spacing: "xs",
-            contents: [
-              {
-                type: "box",
-                layout: "baseline",
-                contents: [
-                  { type: "text", text: "ธนาคาร:", size: "xs", color: "#64748B", flex: 3 },
-                  { type: "text", text: String(slipAnalysis.bank || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
-                ]
-              },
-              {
-                type: "box",
-                layout: "baseline",
-                contents: [
-                  { type: "text", text: "ผู้โอน:", size: "xs", color: "#64748B", flex: 3 },
-                  { type: "text", text: String(slipAnalysis.senderName || "-"), size: "xs", color: "#1E293B", weight: "bold", flex: 6, wrap: true }
-                ]
-              },
-              {
-                type: "box",
-                layout: "baseline",
-                contents: [
-                  { type: "text", text: "ยอดในสลิป:", size: "xs", color: "#64748B", flex: 3 },
-                  { type: "text", text: (slipAnalysis.amount ? Number(slipAnalysis.amount).toLocaleString("th-TH", { minimumFractionDigits: 2 }) + " บาท" : "-"), size: "xs", color: (slipAnalysis.amountMatch ? "#16A34A" : "#DC2626"), weight: "bold", flex: 6 }
-                ]
-              },
-              {
-                type: "box",
-                layout: "baseline",
-                contents: [
-                  { type: "text", text: "เลขที่รายการ:", size: "xs", color: "#64748B", flex: 3 },
-                  { type: "text", text: String(slipAnalysis.refNo || "-"), size: "xs", color: "#1E293B", flex: 6, wrap: true }
-                ]
-              },
-              {
-                type: "box",
-                layout: "baseline",
-                contents: [
-                  { type: "text", text: "วันเวลาโอน:", size: "xs", color: "#64748B", flex: 3 },
-                  { type: "text", text: String(slipAnalysis.transferTime || "-"), size: "xs", color: "#64748B", flex: 6, wrap: true }
-                ]
-              }
-            ]
+            contents: detailRows
           }
         ]
       }
@@ -1702,80 +2214,6 @@ function handleBackup(data) {
     try { lock.releaseLock(); } catch(err) {}
   }
 }
-
-function handleSyncTransaction(data) {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  let txSheet = spreadsheet.getSheetByName("Transactions");
-  const txHeaders = ["Transaction ID", "Date", "Type", "Category", "Amount", "Description", "Slip URL", "Booking ID", "Timestamp"];
-  if (!txSheet) {
-    txSheet = spreadsheet.insertSheet("Transactions");
-    txSheet.getRange(1, 1, 1, txHeaders.length).setValues([txHeaders]);
-  }
-
-  const tx = data.transaction || data;
-  if (!tx || !tx.id) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Transaction ID is required." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  const txId = String(tx.id).trim();
-  const dateStr = String(tx.date || tx.transaction_date || "").trim();
-  const typeStr = String(tx.type || "").trim();
-  const catStr = String(tx.category || "").trim();
-  const amtNum = Number(tx.amount) || 0;
-  const descStr = String(tx.description || "").trim();
-  const slipUrl = String(tx.slipUrl || tx.slip_url || "").trim();
-  const bookingId = String(tx.bookingId || tx.booking_id || "").trim();
-  const nowIso = new Date().toISOString();
-
-  const lastRow = txSheet.getLastRow();
-  let existingRow = -1;
-  if (lastRow > 1) {
-    const ids = txSheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) { return String(r[0]); });
-    const idx = ids.indexOf(txId);
-    if (idx !== -1) {
-      existingRow = idx + 2;
-    }
-  }
-
-  const rowValues = [txId, dateStr, typeStr, catStr, amtNum, descStr, slipUrl, bookingId, nowIso];
-  if (existingRow > 0) {
-    txSheet.getRange(existingRow, 1, 1, txHeaders.length).setValues([rowValues]);
-  } else {
-    txSheet.appendRow(rowValues);
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction synced.", id: txId }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function handleDeleteTransaction(data) {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  let txSheet = spreadsheet.getSheetByName("Transactions");
-  if (!txSheet) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "No Transactions sheet found." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  const txId = String(data.id || "").trim();
-  if (!txId) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Transaction ID is required for deletion." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  const lastRow = txSheet.getLastRow();
-  if (lastRow > 1) {
-    const ids = txSheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) { return String(r[0]); });
-    const idx = ids.indexOf(txId);
-    if (idx !== -1) {
-      txSheet.deleteRow(idx + 2);
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction deleted from sheet.", id: txId }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Transaction not found in sheet (already removed).", id: txId }))
-    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function handleLogAdminAction(data) {

@@ -7,7 +7,7 @@
   
   <!-- FontAwesome & Google Fonts -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Prompt:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Supabase & Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -264,17 +264,199 @@
       overflow-x: auto;
     }
 
+    .font-prompt {
+      font-family: 'Prompt', sans-serif;
+    }
+
+    /* Template Exact Match - The Grand Slam Services */
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+      margin-bottom: 20px;
+    }
+    .header-table td {
+      border: none !important;
+      vertical-align: top;
+      padding: 0 !important;
+      background: transparent !important;
+    }
+    .company-logo {
+      width: 85px;
+      height: 85px;
+      object-fit: contain;
+      border-radius: 50%;
+      border: 2px solid #fcd34d;
+      margin-right: 16px;
+      display: inline-block;
+    }
+    .company-name-th {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000000;
+      margin: 0 0 4px 0;
+      white-space: nowrap !important;
+    }
+    .company-name-en {
+      font-size: 13px;
+      font-weight: bold;
+      color: #d97706; /* Amber/Orange */
+      margin: 0 0 8px 0;
+      letter-spacing: 0.5px;
+      white-space: nowrap !important;
+    }
+    .company-info {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #000000;
+    }
+    .company-info div {
+      white-space: nowrap !important;
+    }
+    .invoice-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #000000;
+      margin: 0;
+      text-align: right;
+    }
+    .invoice-subtitle {
+      font-size: 13px;
+      font-weight: bold;
+      color: #d97706; /* Amber/Orange */
+      margin: 0 0 12px 0;
+      text-align: right;
+      letter-spacing: 2px;
+    }
+    /* Middle Info Box: กรอบสีดำ 1px */
+    .info-box {
+      border: 1px solid #000000 !important;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #ffffff !important;
+      width: 250px;
+      margin-left: auto;
+    }
+    .info-box table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none !important;
+      margin: 0 !important;
+    }
+    .info-box td {
+      border: none !important;
+      padding: 2px 0 !important;
+      font-size: 12px;
+      color: #000000;
+      background: transparent !important;
+    }
+    .info-box .label {
+      font-weight: 600;
+      text-align: left;
+    }
+    .info-box .value {
+      font-weight: bold;
+      text-align: right;
+    }
+    /* Customer Info Box (if provided) */
+    .cust-info-box {
+      border: 1px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 15px 0 0 0;
+      background: #ffffff;
+      font-size: 12px;
+      color: #000000;
+    }
+    /* Middle Items Table: กรอบสีดำ 1px */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000 !important;
+      margin-top: 25px;
+    }
+    .items-table th {
+      background-color: #f8fafc !important;
+      border: 1px solid #000000 !important;
+      padding: 10px 8px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #000000;
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+    .items-table td {
+      border: 1px solid #000000 !important;
+      padding: 12px 10px;
+      font-size: 13px;
+      color: #000000;
+      background: #ffffff !important;
+    }
+    .items-table .text-center { text-align: center; }
+    .items-table .text-left { text-align: left; }
+    .items-table .text-right { text-align: right; }
+    .items-table .font-bold { font-weight: bold; }
+    .tfoot-row td {
+      background-color: #f8fafc !important;
+      border: 1px solid #000000 !important;
+      padding: 12px 10px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    /* Signature Area */
+    .signature-container {
+      margin-top: 110px;
+      width: 280px;
+      text-align: center;
+    }
+    .signature-line {
+      border-bottom: 1px solid #000000;
+      height: 45px;
+      margin-bottom: 8px;
+    }
+    .signature-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #000000;
+      margin: 0;
+    }
+    .signature-company {
+      font-size: 12px;
+      font-weight: 600;
+      color: #000000;
+      margin: 2px 0 0 0;
+    }
+    .signature-date {
+      font-size: 12px;
+      font-weight: bold;
+      color: #000000;
+      margin: 4px 0 0 0;
+    }
+    /* System Footer */
+    .system-footer {
+      margin-top: 50px;
+      padding-top: 15px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 11px;
+      color: #000000;
+    }
+
     .doc-sheet {
       background: #ffffff;
-      color: #0f172a;
-      width: 100%;
-      max-width: 794px; /* A4 width standard at 96dpi */
-      min-height: 1123px; /* A4 height */
+      color: #000000;
+      width: 820px;
+      min-width: 820px;
+      max-width: 820px;
+      min-height: 1123px;
       margin: 0 auto;
-      padding: 2.5rem 2.8rem;
+      padding: 35px 40px;
       box-sizing: border-box;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      font-family: 'Sarabun', sans-serif;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07);
+      font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
       font-size: 13.5px;
       line-height: 1.45;
       position: relative;
@@ -291,7 +473,7 @@
       margin: 1rem 0;
     }
 
-    .doc-sheet th {
+    .doc-sheet table:not(.items-table):not(.header-table) th {
       background: #f1f5f9;
       color: #1e293b;
       border-top: 1px solid #cbd5e1;
@@ -301,7 +483,7 @@
       text-align: left;
     }
 
-    .doc-sheet td {
+    .doc-sheet table:not(.items-table):not(.header-table) td {
       padding: 8px 10px;
       border-bottom: 1px solid #e2e8f0;
       color: #1e293b;
@@ -315,6 +497,10 @@
     }
 
     /* Print Styles */
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
     @media print {
       body {
         background: #ffffff !important;
@@ -325,31 +511,26 @@
       .sidebar, .nav-buttons, button, form, .no-print, .modal-overlay, #accounting-login-gate, .doc-editor-col, #viewTitle, #currentPeriodLabel {
         display: none !important;
       }
-      .accounting-grid {
+      .accounting-grid, .doc-studio-grid, .main-content {
         display: block !important;
-        grid-template-columns: 1fr !important;
-      }
-      .main-content {
         padding: 0 !important;
         margin: 0 !important;
         overflow: visible !important;
         max-height: none !important;
       }
-      .doc-studio-grid {
-        display: block !important;
-      }
       .doc-sheet-wrapper {
         background: transparent !important;
         padding: 0 !important;
+        margin: 0 !important;
         box-shadow: none !important;
       }
       .doc-sheet {
         box-shadow: none !important;
         border: none !important;
-        margin: 0 !important;
-        padding: 0.5cm 1cm !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
         width: 100% !important;
-        max-width: 100% !important;
+        max-width: 820px !important;
         min-height: auto !important;
       }
     }
@@ -1082,14 +1263,14 @@
             </div>
             
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <button class="doc-type-btn active" id="btnDocQuotation" onclick="switchDocType('quotation')">
+              <button class="doc-type-btn" id="btnDocQuotation" onclick="switchDocType('quotation')">
                 <i class="fa-solid fa-file-lines"></i> ใบเสนอราคา (QT)
               </button>
               <button class="doc-type-btn" id="btnDocInvoice" onclick="switchDocType('invoice')">
                 <i class="fa-solid fa-file-invoice"></i> ใบแจ้งหนี้ (INV)
               </button>
-              <button class="doc-type-btn" id="btnDocReceipt" onclick="switchDocType('receipt')">
-                <i class="fa-solid fa-receipt"></i> ใบเสร็จ / ใบกำกับภาษี (RC/TAX)
+              <button class="doc-type-btn active" id="btnDocReceipt" onclick="switchDocType('receipt')">
+                <i class="fa-solid fa-receipt"></i> ใบเสร็จรับเงิน (RC)
               </button>
               <button class="doc-type-btn" id="btnDocDelivery" onclick="switchDocType('delivery_order')">
                 <i class="fa-solid fa-truck-ramp-box"></i> ใบส่งสินค้า (DO)
@@ -1559,7 +1740,7 @@
       
       // Document Studio State
       activeDoc: {
-        type: 'quotation',
+        type: 'receipt',
         docNo: '',
         date: '',
         dueDate: '',
@@ -1571,7 +1752,8 @@
           phone: ''
         },
         items: [
-          { desc: 'ค่าบริการเช่าสนามเทนนิส (Court Rental)', qty: 2, unit: 'ชม.', price: 250, discount: 0 }
+          { desc: 'ค่าบริการสนามเทนนิส ช่วงเวลา 08.00-16.00', qty: 4, unit: 'ชม.', price: 250, discount: 0 },
+          { desc: 'ค่าบริการสนามเทนนิส ช่วงเวลา 16.00-23.00', qty: 7, unit: 'ชม.', price: 350, discount: 0 }
         ],
         tradeDiscount: 0,
         vatChoice: 'none',
@@ -1652,6 +1834,13 @@
       await loadFinancialData();
       renderDocItemsEditor();
       updateDocPreview();
+
+      // Support direct tab opening via URL hash (e.g., accounting.html#documents)
+      const urlHash = (window.location.hash || '').replace('#', '').trim();
+      const validTabs = ['dashboard', 'pnl', 'balance', 'cashflow', 'tax', 'documents', 'ledger'];
+      if (validTabs.includes(urlHash)) {
+        switchTab(urlHash);
+      }
     }
 
     // Helper: Map any transaction to standard COA
@@ -1836,8 +2025,13 @@
       state.currentTab = tabId;
       
       const menuItems = document.querySelectorAll('.menu-item');
-      menuItems.forEach(item => item.classList.remove('active'));
-      event?.currentTarget?.classList.add('active');
+      menuItems.forEach(item => {
+        item.classList.remove('active');
+        const onclickAttr = item.getAttribute('onclick') || '';
+        if (onclickAttr.includes(`'${tabId}'`)) {
+          item.classList.add('active');
+        }
+      });
 
       const tabContents = document.querySelectorAll('.tab-content');
       tabContents.forEach(c => c.style.display = 'none');
@@ -2381,6 +2575,24 @@
     // ==========================================
     // 6. BUSINESS DOCUMENT STUDIO (✨ เอกสารธุรกิจ - ใหม่!)
     // ==========================================
+    const COMPANY_LOGO_BASE64 = "data:image/jpeg;base64,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";
+
+    function formatThaiDateFull(dateStr) {
+      if (!dateStr) return '';
+      const thaiMonths = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+      ];
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10) + 543;
+        const month = thaiMonths[parseInt(parts[1], 10) - 1] || "";
+        const day = parseInt(parts[2], 10);
+        return `${day} ${month} ${year}`;
+      }
+      return dateStr;
+    }
+
     function initDocStudioDefaults() {
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
@@ -2391,7 +2603,7 @@
 
       state.activeDoc.date = todayStr;
       state.activeDoc.dueDate = dueStr;
-      state.activeDoc.docNo = generateDocNumber('quotation');
+      state.activeDoc.docNo = generateDocNumber('receipt');
 
       const edDate = document.getElementById('edDocDate');
       if (edDate) edDate.value = todayStr;
@@ -2405,19 +2617,23 @@
 
     function generateDocNumber(type) {
       const d = new Date();
-      const yy = String(d.getFullYear()).slice(-2);
+      const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const prefixMap = {
-        'quotation': 'QT',
-        'invoice': 'INV',
-        'receipt': 'REC',
-        'tax_invoice': 'TAX',
-        'delivery_order': 'DO',
-        'wht_cert': 'WHT'
-      };
-      const prefix = prefixMap[type] || 'DOC';
-      const rand = Math.floor(100 + Math.random() * 900);
-      return `${prefix}-${yy}${mm}-${rand}`;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateCode = `${yyyy}${mm}${dd}`;
+
+      if (type === 'receipt') {
+        return `R.${dateCode}`;
+      } else if (type === 'invoice') {
+        return `${dateCode}`;
+      } else if (type === 'quotation') {
+        return `QT.${dateCode}`;
+      } else if (type === 'delivery_order') {
+        return `DO.${dateCode}`;
+      } else if (type === 'wht_cert') {
+        return `WHT.${dateCode}`;
+      }
+      return `${dateCode}`;
     }
 
     function switchDocType(type) {
@@ -2512,9 +2728,10 @@
 
     function applyDocPreset(presetKey) {
       if (presetKey === 'court') {
-        switchDocType('invoice');
+        switchDocType('receipt');
         state.activeDoc.items = [
-          { desc: 'ค่าบริการเช่าสนามเทนนิส Main Court (18:00 - 20:00)', qty: 2, unit: 'ชม.', price: 250, discount: 0 }
+          { desc: 'ค่าบริการสนามเทนนิส ช่วงเวลา 08.00-16.00', qty: 4, unit: 'ชม.', price: 250, discount: 0 },
+          { desc: 'ค่าบริการสนามเทนนิส ช่วงเวลา 16.00-23.00', qty: 7, unit: 'ชม.', price: 350, discount: 0 }
         ];
         state.activeDoc.vatChoice = 'none';
         state.activeDoc.whtChoice = 'none';
@@ -2612,14 +2829,15 @@
       const docDate = document.getElementById('edDocDate')?.value || state.activeDoc.date || '';
       const dueDate = document.getElementById('edDocDueDate')?.value || state.activeDoc.dueDate || '';
 
-      const custName = document.getElementById('edCustName')?.value.trim() || 'ลูกค้าทั่วไป / Cash Customer';
-      const custTaxId = document.getElementById('edCustTaxId')?.value.trim() || '-';
-      const custBranch = document.getElementById('edCustBranch')?.value.trim() || 'สำนักงานใหญ่';
-      const custAddress = document.getElementById('edCustAddress')?.value.trim() || '-';
-      const remarks = document.getElementById('edDocRemarks')?.value.trim() || state.activeDoc.remarks;
+      const custName = (document.getElementById('edCustName')?.value || '').trim();
+      const custTaxId = (document.getElementById('edCustTaxId')?.value || '').trim();
+      const custBranch = (document.getElementById('edCustBranch')?.value || '').trim();
+      const custAddress = (document.getElementById('edCustAddress')?.value || '').trim();
+      const remarks = (document.getElementById('edDocRemarks')?.value || '').trim();
 
       const totals = calculateDocTotals();
-      const thaiBaht = thaiBahtText(type === 'invoice' && totals.whtAmount > 0 ? totals.netPayable : totals.grandTotal);
+      const finalAmount = (type === 'invoice' && totals.whtAmount > 0) ? totals.netPayable : totals.grandTotal;
+      const thaiBaht = thaiBahtText(finalAmount);
 
       const previewContainer = document.getElementById('printableDocSheet');
       if (!previewContainer) return;
@@ -2632,315 +2850,441 @@
 
       // 2. Standard Business Documents (Quotation / Invoice / Receipt / Delivery Order)
       const docTitles = {
-        'quotation': { th: 'ใบเสนอราคา', en: 'QUOTATION', badgeColor: '#2563eb' },
-        'invoice': { th: 'ใบแจ้งหนี้ / ใบวางบิล', en: 'INVOICE / BILLING', badgeColor: '#d97706' },
-        'receipt': { th: 'ใบเสร็จรับเงิน / ใบกำกับภาษี', en: 'RECEIPT / TAX INVOICE', badgeColor: '#16a34a' },
-        'delivery_order': { th: 'ใบส่งสินค้า / ใบส่งของ', en: 'DELIVERY ORDER', badgeColor: '#4f46e5' }
+        'quotation': { th: 'ใบเสนอราคา', en: 'QUOTATION' },
+        'invoice': { th: 'ใบแจ้งหนี้', en: 'INVOICE' },
+        'receipt': { th: 'ใบเสร็จรับเงิน', en: 'RECEIPT' },
+        'delivery_order': { th: 'ใบส่งสินค้า', en: 'DELIVERY ORDER' }
       };
       const curTitle = docTitles[type] || docTitles['quotation'];
+
+      // Column header titles
+      const allHourly = state.activeDoc.items.length > 0 && state.activeDoc.items.every(item => item.unit === 'ชม.' || item.unit === 'ชั่วโมง' || (item.desc && item.desc.includes('ช่วงเวลา')));
+      const colQtyTitle = allHourly ? 'จำนวนชม.' : 'จำนวน';
+      const colRateTitle = allHourly ? 'ราคา/ชม. (บาท)' : 'ราคา/หน่วย (บาท)';
 
       let rowsHtml = '';
       state.activeDoc.items.forEach((item, idx) => {
         const lineTotal = (item.qty * item.price) - (item.discount || 0);
         rowsHtml += `
           <tr>
-            <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-            <td style="font-weight: 500;">${escapeHtml(item.desc)}</td>
-            <td style="text-align: center;">${item.qty} ${escapeHtml(item.unit || '')}</td>
-            <td style="text-align: right;">${formatNumber(item.price)}</td>
-            <td style="text-align: right; color: #64748b;">${item.discount > 0 ? '-' + formatNumber(item.discount) : '-'}</td>
-            <td style="text-align: right; font-weight: 600;">${formatNumber(lineTotal)}</td>
+            <td class="text-center font-bold">${idx + 1}</td>
+            <td class="font-bold">${escapeHtml(item.desc)}</td>
+            <td class="text-center font-bold">${item.qty}${allHourly ? '' : ' ' + escapeHtml(item.unit || '')}</td>
+            <td class="text-right font-bold">${formatNumber(item.price)}</td>
+            <td class="text-right font-bold">${formatNumber(lineTotal)}</td>
           </tr>
         `;
       });
 
-      // Signature Blocks according to doc type
-      let signaturesHtml = '';
-      if (type === 'quotation') {
-        signaturesHtml = `
-          <div style="display: flex; justify-content: space-between; margin-top: 2.5rem; text-align: center;">
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้เสนอราคา / Authorized Signature</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้อนุมัติสั่งซื้อ / Customer Acceptance</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-          </div>
-        `;
-      } else if (type === 'delivery_order') {
-        signaturesHtml = `
-          <div style="margin-top: 1.5rem; padding: 8px 12px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px; color: #475569;">
-            <strong>เงื่อนไขการรับสินค้า:</strong> ผู้รับสินค้าได้ตรวจนับและรับสินค้าตามรายการข้างต้นในสภาพเรียบร้อย ถูกต้อง ครบถ้วนสมบูรณ์แล้วทุกประการ
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 2rem; text-align: center;">
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้จัดส่งสินค้า / Delivered By</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้รับสินค้า / Received By</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-          </div>
+      // Tfoot rows: If taxes/discounts exist, show clean rows; else exact 1-line matching PDF
+      let tfootHtml = '';
+      const hasTaxOrDiscount = (totals.tradeDiscount > 0 || state.activeDoc.vatChoice !== 'none' || totals.whtAmount > 0);
+      
+      if (hasTaxOrDiscount) {
+        const extraRowsCount = 1 + (totals.tradeDiscount > 0 ? 1 : 0) + (state.activeDoc.vatChoice !== 'none' ? 2 : 0) + (totals.whtAmount > 0 ? 2 : 0);
+        tfootHtml = `
+          <tr class="tfoot-row">
+            <td colspan="3" rowspan="${extraRowsCount}" style="vertical-align: middle;">
+              <span>จำนวนเงินตัวอักษร:</span>
+              <span class="font-bold" style="margin-left: 6px;">""${thaiBaht}""</span>
+              ${remarks ? `<div style="font-size: 11px; font-weight: normal; margin-top: 8px; color: #333333;"><strong>หมายเหตุ:</strong> ${escapeHtml(remarks)}</div>` : ''}
+            </td>
+            <td class="text-right font-bold">รวมเป็นเงิน:</td>
+            <td class="text-right font-bold">${formatNumber(totals.subtotal)}</td>
+          </tr>
+          ${totals.tradeDiscount > 0 ? `
+          <tr class="tfoot-row">
+            <td class="text-right font-bold" style="color: #c00;">ส่วนลดพิเศษ:</td>
+            <td class="text-right font-bold" style="color: #c00;">-${formatNumber(totals.tradeDiscount)}</td>
+          </tr>` : ''}
+          ${state.activeDoc.vatChoice !== 'none' ? `
+          <tr class="tfoot-row">
+            <td class="text-right font-bold">มูลค่าก่อนภาษี:</td>
+            <td class="text-right font-bold">${formatNumber(totals.netBeforeVat)}</td>
+          </tr>
+          <tr class="tfoot-row">
+            <td class="text-right font-bold">ภาษีมูลค่าเพิ่ม 7%:</td>
+            <td class="text-right font-bold">${formatNumber(totals.vatAmount)}</td>
+          </tr>` : ''}
+          <tr class="tfoot-row" style="border-top: 2px solid #000;">
+            <td class="text-right font-bold" style="font-size: 14px;">ยอดรวมทั้งหมด:</td>
+            <td class="text-right font-bold" style="font-size: 15px;">${formatNumber(totals.grandTotal)}</td>
+          </tr>
+          ${totals.whtAmount > 0 ? `
+          <tr class="tfoot-row">
+            <td class="text-right font-bold" style="color: #d97706;">หัก ณ ที่จ่าย ${(totals.whtRate * 100)}%:</td>
+            <td class="text-right font-bold" style="color: #d97706;">-${formatNumber(totals.whtAmount)}</td>
+          </tr>
+          <tr class="tfoot-row">
+            <td class="text-right font-bold" style="font-size: 14px; color: #15803d;">ยอดชำระสุทธิ:</td>
+            <td class="text-right font-bold" style="font-size: 16px; color: #15803d;">${formatNumber(totals.netPayable)}</td>
+          </tr>` : ''}
         `;
       } else {
-        signaturesHtml = `
-          <div style="display: flex; justify-content: space-between; margin-top: 2.5rem; text-align: center;">
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้รับเงิน / ผู้วางบิล / Collector</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-            <div style="width: 45%;">
-              <div style="border-bottom: 1px solid #94a3b8; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 600;">( ............................................................ )</div>
-              <div style="color: #64748b; font-size: 12px;">ผู้มีอำนาจลงนาม / Authorized Signature</div>
-              <div style="color: #64748b; font-size: 12px; margin-top: 4px;">วันที่ ......../......../............</div>
-            </div>
-          </div>
+        tfootHtml = `
+          <tr class="tfoot-row">
+            <td colspan="3" style="vertical-align: middle;">
+              <span>จำนวนเงินตัวอักษร:</span>
+              <span class="font-bold" style="margin-left: 6px;">""${thaiBaht}""</span>
+            </td>
+            <td class="text-right font-bold" style="vertical-align: middle;">ยอดรวมทั้งหมด:</td>
+            <td class="text-right font-bold" style="font-size: 15px; vertical-align: middle;">${formatNumber(totals.grandTotal)}</td>
+          </tr>
         `;
       }
 
       previewContainer.innerHTML = `
-        <!-- Header: Company & Document Title -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 1.25rem; border-bottom: 2px solid #0f172a;">
-          <div style="max-width: 60%;">
-            <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</h2>
-            <div style="font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px;">The Grand Slam Services Co., Ltd.</div>
-            <div style="font-size: 12px; color: #334155;"><strong>เลขประจำตัวผู้เสียภาษีอากร:</strong> 0105569192114 (สำนักงานใหญ่)</div>
-            <div style="font-size: 12px; color: #475569; margin-top: 2px;">บริการสนามเทนนิสมาตรฐาน, ฝึกสอน, จำหน่ายอุปกรณ์ และบริการธุรกิจครบวงจร</div>
-            <div style="font-size: 12px; color: #475569;">โทร: 089-493-2242 | พร้อมเพย์: 0105569192114</div>
-          </div>
+        <!-- Top Header Table -->
+        <table class="header-table">
+          <tr>
+            <td style="width: 95px; vertical-align: top;">
+              <img src="${COMPANY_LOGO_BASE64}" alt="Logo" class="company-logo">
+            </td>
+            <td style="vertical-align: top; white-space: nowrap;">
+              <div class="company-name-th" style="white-space: nowrap;">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</div>
+              <div class="company-name-en font-prompt" style="white-space: nowrap;">THE GRAND SLAM SERVICES CO., LTD.</div>
+              <div class="company-info" style="white-space: nowrap;">
+                <div style="white-space: nowrap;"><strong>เลขประจำตัวผู้เสียภาษี:</strong> 0105569192114</div>
+                <div style="white-space: nowrap;"><strong>ที่ตั้ง:</strong> 288/114 หมู่บ้าน เมอร์ราญาเพลส ซอย คู้บอน 34 ถนนคู้บอน</div>
+                <div style="white-space: nowrap;">แขวงบางชัน เขตคลองสามวา กรุงเทพมหานคร 10510</div>
+                <div style="white-space: nowrap;"><strong>โทรศัพท์:</strong> 089-4932242</div>
+              </div>
+            </td>
+            <td style="width: 255px; text-align: right; vertical-align: top;">
+              <div class="invoice-title font-prompt">${curTitle.th}</div>
+              <div class="invoice-subtitle font-prompt">${curTitle.en}</div>
 
-          <div style="text-align: right;">
-            <div style="font-size: 18px; font-weight: 800; color: ${curTitle.badgeColor}; letter-spacing: 0.5px;">${curTitle.th}</div>
-            <div style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 6px;">${curTitle.en}</div>
-            <div style="font-size: 12px; color: #334155;"><strong>เลขที่ / No:</strong> <span style="font-weight: 700; font-family: monospace; font-size: 13px;">${escapeHtml(docNo)}</span></div>
-            <div style="font-size: 12px; color: #334155;"><strong>วันที่ / Date:</strong> ${formatDateTh(docDate)}</div>
-            ${dueDate ? `<div style="font-size: 12px; color: #dc2626;"><strong>กำหนดชำระ / Due:</strong> ${formatDateTh(dueDate)}</div>` : ''}
-          </div>
+              <!-- Middle Info Box (กรอบสีดำบาง 1px) -->
+              <div class="info-box">
+                <table>
+                  <tr>
+                    <td class="label">เลขที่เอกสาร:</td>
+                    <td class="value">${escapeHtml(docNo)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">วันที่:</td>
+                    <td class="value">${formatThaiDateFull(docDate)}</td>
+                  </tr>
+                  ${dueDate && type === 'quotation' ? `
+                  <tr>
+                    <td class="label">ยืนราคาถึง:</td>
+                    <td class="value">${formatThaiDateFull(dueDate)}</td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Optional Customer Details Box (if filled) -->
+        ${custName && custName !== '-' ? `
+        <div class="cust-info-box">
+          <table style="width: 100%; border: none; margin: 0;">
+            <tr>
+              <td style="border: none !important; padding: 2px 0 !important; background: transparent !important;">
+                <strong>ชื่อลูกค้า / บริษัท:</strong> ${escapeHtml(custName)}
+                ${custTaxId && custTaxId !== '-' ? `&nbsp;&nbsp;|&nbsp;&nbsp;<strong>เลขประจำตัวผู้เสียภาษี:</strong> ${escapeHtml(custTaxId)}` : ''}
+                ${custBranch && custBranch !== '-' ? `&nbsp;&nbsp;(${escapeHtml(custBranch)})` : ''}
+              </td>
+            </tr>
+            ${custAddress && custAddress !== '-' ? `
+            <tr>
+              <td style="border: none !important; padding: 2px 0 !important; background: transparent !important;">
+                <strong>ที่อยู่:</strong> ${escapeHtml(custAddress)}
+              </td>
+            </tr>
+            ` : ''}
+          </table>
         </div>
+        ` : ''}
 
-        <!-- Customer Box & Meta Box -->
-        <div style="display: flex; gap: 1rem; margin: 1.25rem 0;">
-          <div class="doc-box-border" style="flex: 2;">
-            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">ลูกค้า / ข้อมูลผู้รับ (CUSTOMER DETAILS):</div>
-            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 3px;">${escapeHtml(custName)}</div>
-            <div style="font-size: 12px; color: #334155; margin-top: 2px;"><strong>ที่อยู่:</strong> ${escapeHtml(custAddress)}</div>
-            <div style="font-size: 12px; color: #334155; margin-top: 2px;">
-              <strong>เลขประจำตัวผู้เสียภาษี:</strong> ${escapeHtml(custTaxId)} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>สาขา:</strong> ${escapeHtml(custBranch)}
-            </div>
-          </div>
-        </div>
-
-        <!-- Line Items Table -->
-        <table>
+        <!-- Middle Items Table (กรอบสีดำบาง 1px ไม่หนา) -->
+        <table class="items-table">
           <thead>
             <tr>
-              <th style="width: 6%; text-align: center;">ลำดับ</th>
-              <th style="width: 48%;">รายการ (Description)</th>
-              <th style="width: 12%; text-align: center;">จำนวน</th>
-              <th style="width: 12%; text-align: right;">ราคา/หน่วย</th>
-              <th style="width: 10%; text-align: right;">ส่วนลด</th>
-              <th style="width: 12%; text-align: right;">จำนวนเงิน</th>
+              <th style="width: 50px; text-align: center !important; vertical-align: middle !important;">ลำดับ</th>
+              <th style="text-align: center !important; vertical-align: middle !important;">รายการ</th>
+              <th style="width: 100px; text-align: center !important; vertical-align: middle !important;">${colQtyTitle}</th>
+              <th style="width: 120px; text-align: center !important; vertical-align: middle !important;">${colRateTitle}</th>
+              <th style="width: 130px; text-align: center !important; vertical-align: middle !important;">จำนวนเงิน (บาท)</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
           </tbody>
+          <tfoot>
+            ${tfootHtml}
+          </tfoot>
         </table>
 
-        <!-- Summary & Totals -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 1rem; gap: 1.5rem;">
-          <!-- Left: Remarks & Bank Info -->
-          <div style="flex: 1.2;">
-            <div class="doc-box-border">
-              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">หมายเหตุและช่องทางการชำระเงิน (PAYMENT DETAILS):</div>
-              <div style="font-size: 12px; color: #1e293b; margin-top: 4px; white-space: pre-line;">${escapeHtml(remarks)}</div>
-            </div>
-            
-            <div style="margin-top: 8px; padding: 6px 10px; background: #f1f5f9; border-radius: 4px; font-size: 12px; color: #334155;">
-              <strong>จำนวนเงินตัวอักษร:</strong> <span style="font-weight: 700; color: #0f172a;">( ${thaiBaht} )</span>
-            </div>
-          </div>
-
-          <!-- Right: Calculations Summary -->
-          <div style="flex: 0.9;">
-            <table style="margin: 0; font-size: 12.5px;">
-              <tbody>
-                <tr>
-                  <td style="padding: 4px 6px; border: none; color: #475569;">รวมเป็นเงิน (Subtotal):</td>
-                  <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.subtotal)}</td>
-                </tr>
-                ${totals.tradeDiscount > 0 ? `
-                  <tr>
-                    <td style="padding: 4px 6px; border: none; color: #dc2626;">ส่วนลดการค้า (Discount):</td>
-                    <td style="padding: 4px 6px; border: none; text-align: right; color: #dc2626; font-weight: 600;">-${formatNumber(totals.tradeDiscount)}</td>
-                  </tr>
-                ` : ''}
-                ${state.activeDoc.vatChoice !== 'none' ? `
-                  <tr>
-                    <td style="padding: 4px 6px; border: none; color: #475569;">มูลค่าก่อนภาษี (Net Amount):</td>
-                    <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.netBeforeVat)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 4px 6px; border: none; color: #475569;">ภาษีมูลค่าเพิ่ม (VAT 7%):</td>
-                    <td style="padding: 4px 6px; border: none; text-align: right; font-weight: 600;">${formatNumber(totals.vatAmount)}</td>
-                  </tr>
-                ` : ''}
-                <tr style="border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f172a;">
-                  <td style="padding: 6px 6px; font-weight: 700; font-size: 13.5px;">จำนวนเงินรวมทั้งสิ้น (Grand Total):</td>
-                  <td style="padding: 6px 6px; text-align: right; font-weight: 800; font-size: 15px; color: #0f172a;">${formatNumber(totals.grandTotal)}</td>
-                </tr>
-                ${totals.whtAmount > 0 ? `
-                  <tr>
-                    <td style="padding: 4px 6px; border: none; color: #d97706;">หัก ณ ที่จ่าย (WHT ${(totals.whtRate * 100)}%):</td>
-                    <td style="padding: 4px 6px; border: none; text-align: right; color: #d97706; font-weight: 600;">-${formatNumber(totals.whtAmount)}</td>
-                  </tr>
-                  <tr style="border-top: 1px dashed #94a3b8;">
-                    <td style="padding: 6px 6px; font-weight: 800; font-size: 14px; color: #16a34a;">ยอดชำระสุทธิ (Net Payable):</td>
-                    <td style="padding: 6px 6px; text-align: right; font-weight: 800; font-size: 16px; color: #16a34a;">${formatNumber(totals.netPayable)}</td>
-                  </tr>
-                ` : ''}
-              </tbody>
-            </table>
-          </div>
+        <!-- Signature Section -->
+        <div class="signature-container">
+          <div class="signature-line"></div>
+          <div class="signature-title font-prompt">ผู้มีอำนาจลงนาม</div>
+          <div class="signature-company">บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</div>
+          <div class="signature-date font-prompt">วันที่ ${formatThaiDateFull(docDate)}</div>
         </div>
 
-        <!-- Signatures Block -->
-        ${signaturesHtml}
-      `;
-    }
-
-    // Helper: Standard Thai Revenue Dept 50 ทวิ Layout
-    function renderWht50TwiHTML(docNo, docDate, custName, custTaxId, custAddress, totals) {
-      const typeOption = document.getElementById('edWhtIncomeType')?.value || 'service_3';
-      const whtRateMap = {
-        'service_3': 0.03,
-        'rent_5': 0.05,
-        'transport_1': 0.01,
-        'salary_1': 0.05
-      };
-      const rate = whtRateMap[typeOption] || 0.03;
-      const basePay = totals.subtotal;
-      const taxWithheld = basePay * rate;
-      const thaiBaht = thaiBahtText(taxWithheld);
-
-      return `
-        <div style="border: 2px solid #0f172a; padding: 1.5rem; font-family: 'Sarabun', sans-serif; font-size: 12.5px;">
-          <!-- Top Title -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-            <div>
-              <div style="font-weight: 800; font-size: 15px; color: #0f172a;">หนังสือรับรองการหักภาษี ณ ที่จ่าย</div>
-              <div style="font-size: 11px; color: #475569;">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
-            </div>
-            <div style="text-align: right;">
-              <div><strong>เล่มที่ / เลขที่:</strong> <span style="font-family: monospace; font-weight: 700;">${escapeHtml(docNo)}</span></div>
-              <div><strong>ฉบับที่ 1:</strong> (สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการ)</div>
-            </div>
-          </div>
-
-          <!-- Section 1: ผู้มีหน้าที่หักภาษี ณ ที่จ่าย (Payer) -->
-          <div style="border: 1px solid #94a3b8; border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; background: #f8fafc;">
-            <div><strong>1. ผู้มีหน้าที่หักภาษี ณ ที่จ่าย:</strong></div>
-            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-              <div><strong>ชื่อ:</strong> บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด</div>
-              <div><strong>เลขประจำตัวผู้เสียภาษีอากร:</strong> <span style="font-family: monospace; font-weight: 700; letter-spacing: 1px;">0-1055-69192-11-4</span></div>
-            </div>
-            <div style="margin-top: 2px;"><strong>ที่อยู่:</strong> สำนักงานใหญ่ (The Grand Slam Tennis Court & Services)</div>
-          </div>
-
-          <!-- Section 2: ผู้ถูกหักภาษี ณ ที่จ่าย (Payee) -->
-          <div style="border: 1px solid #94a3b8; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; background: #f8fafc;">
-            <div><strong>2. ผู้ถูกหักภาษี ณ ที่จ่าย:</strong></div>
-            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-              <div><strong>ชื่อ:</strong> <span style="font-weight: 700;">${escapeHtml(custName)}</span></div>
-              <div><strong>เลขประจำตัวผู้เสียภาษี / บัตรประชาชน:</strong> <span style="font-family: monospace; font-weight: 700;">${escapeHtml(custTaxId)}</span></div>
-            </div>
-            <div style="margin-top: 2px;"><strong>ที่อยู่:</strong> ${escapeHtml(custAddress)}</div>
-          </div>
-
-          <!-- Section 3: Tax Filing Category (ภ.ง.ด.) -->
-          <div style="margin-bottom: 8px; font-size: 12px;">
-            <strong>ลำดับที่ในแบบยื่น:</strong> &nbsp;&nbsp;
-            [ &nbsp; ] (1) ภ.ง.ด.1ก &nbsp;&nbsp;&nbsp;
-            [ &nbsp; ] (2) ภ.ง.ด.1ก พิเศษ &nbsp;&nbsp;&nbsp;
-            [ ${rate === 0.03 && typeOption === 'service_3' ? '<strong>X</strong>' : '&nbsp;'} ] (3) ภ.ง.ด.2 &nbsp;&nbsp;&nbsp;
-            [ ${typeOption === 'service_3' ? '<strong>X</strong>' : '&nbsp;'} ] (4) ภ.ง.ด.3 &nbsp;&nbsp;&nbsp;
-            [ ${typeOption === 'rent_5' ? '<strong>X</strong>' : '&nbsp;'} ] (5) ภ.ง.ด.53
-          </div>
-
-          <!-- Section 4: Income & Tax Table -->
-          <table style="width: 100%; border: 1px solid #0f172a; border-collapse: collapse; margin-bottom: 10px;">
-            <thead>
-              <tr style="background: #f1f5f9;">
-                <th style="border: 1px solid #0f172a; padding: 6px; width: 55%;">ประเภทเงินได้พึงประเมินที่จ่าย</th>
-                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: center;">วัน เดือน ปี ที่จ่าย</th>
-                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: right;">จำนวนเงินที่จ่าย</th>
-                <th style="border: 1px solid #0f172a; padding: 6px; width: 15%; text-align: right;">ภาษีที่หักและนำส่ง</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="border: 1px solid #0f172a; padding: 6px;">1. เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตาม ม.40 (1)</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">-</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
-              </tr>
-              <tr>
-                <td style="border: 1px solid #0f172a; padding: 6px;">2. ค่าธรรมเนียม ค่านายหน้า ฯลฯ ตาม ม.40 (2)</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">-</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">-</td>
-              </tr>
-              <tr>
-                <td style="border: 1px solid #0f172a; padding: 6px;">
-                  3. การจ่ายเงินได้ตามคำสั่งกรมสรรพากร:<br>
-                  &nbsp;&nbsp;• <strong>${escapeHtml(state.activeDoc.items[0]?.desc || 'ค่าจ้างบริการ / ค่าสอนโค้ช')}</strong> (${(rate * 100)}%)
-                </td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: center;">${formatDateTh(docDate)}</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-weight: 700;">${formatNumber(basePay)}</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-weight: 800; color: #dc2626;">${formatNumber(taxWithheld)}</td>
-              </tr>
-              <tr style="background: #f8fafc; font-weight: 700;">
-                <td colspan="2" style="border: 1px solid #0f172a; padding: 6px; text-align: center;">
-                  รวมเงินภาษีที่หักและนำส่ง (ตัวอักษร): &nbsp;&nbsp;<strong>( ${thaiBaht} )</strong>
-                </td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right;">${formatNumber(basePay)}</td>
-                <td style="border: 1px solid #0f172a; padding: 6px; text-align: right; font-size: 14px; font-weight: 800;">${formatNumber(taxWithheld)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <!-- Footer Confirmation & Signature -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 1.5rem;">
-            <div style="font-size: 11.5px; color: #334155; max-width: 50%;">
-              ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความเป็นจริงทุกประการ
-            </div>
-            <div style="text-align: center; width: 45%;">
-              <div style="border-bottom: 1px solid #0f172a; height: 50px;"></div>
-              <div style="margin-top: 6px; font-weight: 700;">( บริษัท เดอะ แกรนด์สแลม เซอร์วิสเซส จำกัด )</div>
-              <div style="font-size: 12px; color: #475569;">ผู้จ่ายเงิน / ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</div>
-              <div style="font-size: 12px; color: #475569; margin-top: 3px;">วันที่ ${formatDateTh(docDate)}</div>
-            </div>
-          </div>
+        <!-- System Footer -->
+        <div class="system-footer">
+          เอกสารนี้ออกโดยระบบบริหารจัดการ The Grand Slam Services Management System
         </div>
       `;
     }
-
     function printCustomDocument() {
-      window.print();
+      const type = state.activeDoc.type;
+      const docTitles = {
+        'quotation': { th: 'ใบเสนอราคา', en: 'QUOTATION' },
+        'invoice': { th: 'ใบแจ้งหนี้', en: 'INVOICE' },
+        'receipt': { th: 'ใบเสร็จรับเงิน', en: 'RECEIPT' },
+        'delivery_order': { th: 'ใบส่งสินค้า', en: 'DELIVERY ORDER' },
+        'wht_cert': { th: 'หนังสือรับรองการหักภาษี ณ ที่จ่าย', en: 'WITHHOLDING TAX CERTIFICATE' }
+      };
+      const curTitle = docTitles[type] || docTitles['quotation'];
+      const pageTitle = `${curTitle.th} / ${curTitle.en} - The Grand Slam Services Co., Ltd.`;
+      
+      const sheetEl = document.getElementById('printableDocSheet');
+      if (!sheetEl) {
+        window.print();
+        return;
+      }
+      
+      const sheetContent = sheetEl.innerHTML;
+      
+      const printHtml = `<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>${pageTitle}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      color: #000000;
+    }
+    .font-prompt {
+      font-family: 'Prompt', 'Sarabun', sans-serif;
+    }
+    .invoice-card {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 35px 40px;
+      border: none;
+    }
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+      margin-bottom: 20px;
+    }
+    .header-table td {
+      border: none;
+      vertical-align: top;
+      padding: 0;
+    }
+    .company-logo {
+      width: 85px;
+      height: 85px;
+      object-fit: contain;
+      border-radius: 50%;
+      border: 2px solid #fcd34d;
+      margin-right: 16px;
+    }
+    .company-name-th {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000000;
+      margin: 0 0 4px 0;
+      white-space: nowrap;
+    }
+    .company-name-en {
+      font-size: 13px;
+      font-weight: bold;
+      color: #d97706;
+      margin: 0 0 8px 0;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .company-info {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #000000;
+    }
+    .company-info div {
+      white-space: nowrap;
+    }
+    .invoice-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #000000;
+      margin: 0;
+      text-align: right;
+    }
+    .invoice-subtitle {
+      font-size: 13px;
+      font-weight: bold;
+      color: #d97706;
+      margin: 0 0 12px 0;
+      text-align: right;
+      letter-spacing: 2px;
+    }
+    .info-box {
+      border: 1px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #ffffff;
+      width: 250px;
+      margin-left: auto;
+    }
+    .info-box table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+    }
+    .info-box td {
+      border: none;
+      padding: 2px 0;
+      font-size: 12px;
+      color: #000000;
+    }
+    .info-box .label {
+      font-weight: 600;
+      text-align: left;
+    }
+    .info-box .value {
+      font-weight: bold;
+      text-align: right;
+    }
+    .cust-info-box {
+      border: 1px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 15px 0 0 0;
+      background: #ffffff;
+      font-size: 12px;
+      color: #000000;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+      margin-top: 25px;
+    }
+    .items-table th {
+      background-color: #f8fafc;
+      border: 1px solid #000000;
+      padding: 10px 8px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #000000;
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+    .items-table td {
+      border: 1px solid #000000;
+      padding: 12px 10px;
+      font-size: 13px;
+      color: #000000;
+    }
+    .items-table .text-center { text-align: center; }
+    .items-table .text-left { text-align: left; }
+    .items-table .text-right { text-align: right; }
+    .items-table .font-bold { font-weight: bold; }
+    .tfoot-row td {
+      background-color: #f8fafc;
+      border: 1px solid #000000;
+      padding: 12px 10px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .signature-container {
+      margin-top: 110px;
+      width: 280px;
+      text-align: center;
+    }
+    .signature-line {
+      border-bottom: 1px solid #000000;
+      height: 45px;
+      margin-bottom: 8px;
+    }
+    .signature-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #000000;
+      margin: 0;
+    }
+    .signature-company {
+      font-size: 12px;
+      font-weight: 600;
+      color: #000000;
+      margin: 2px 0 0 0;
+    }
+    .signature-date {
+      font-size: 12px;
+      font-weight: bold;
+      color: #000000;
+      margin: 4px 0 0 0;
+    }
+    .system-footer {
+      margin-top: 50px;
+      padding-top: 15px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 11px;
+      color: #000000;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+      }
+      .invoice-card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-card">
+    ${sheetContent}
+  </div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    });
+  <\/script>
+</body>
+</html>`;
+
+      const printWin = window.open('', '_blank');
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(printHtml);
+        printWin.document.close();
+      } else {
+        window.print();
+      }
     }
 
     function saveCustomDocument() {
@@ -3521,3 +3865,5 @@
   </script>
 </body>
 </html>
+
+
